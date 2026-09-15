@@ -1,0 +1,45 @@
+# syntax=docker/dockerfile:1
+
+# Multi-stage so the runtime image carries the bundle and nothing else: no pnpm store,
+# no TypeScript, no source. Smaller image, faster cold start on Cloud Run.
+FROM node:22-slim AS base
+ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
+RUN corepack enable
+WORKDIR /app
+
+FROM base AS deps
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY apps/api/package.json apps/api/
+COPY packages/db/package.json packages/db/
+COPY packages/shared/package.json packages/shared/
+COPY packages/wallet/package.json packages/wallet/
+COPY packages/config/package.json packages/config/
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --filter @volvia/api...
+
+FROM deps AS build
+COPY tsconfig.base.json ./
+COPY packages ./packages
+COPY apps/api ./apps/api
+RUN pnpm --filter @volvia/api build
+
+FROM node:22-slim AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+
+# Never run as root, and let the container stop cleanly on SIGTERM.
+RUN groupadd --system --gid 1001 volvia \
+ && useradd --system --uid 1001 --gid volvia volvia \
+ && apt-get update && apt-get install -y --no-install-recommends dumb-init \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build --chown=volvia:volvia /app/apps/api/dist ./dist
+# Migrations ship with the image so a release can apply its own schema change.
+COPY --from=build --chown=volvia:volvia /app/packages/db/drizzle ./drizzle
+
+USER volvia
+EXPOSE 8080
+
+# Cloud Run sends SIGTERM and waits; main.ts drains in-flight requests before exiting.
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/main.js"]

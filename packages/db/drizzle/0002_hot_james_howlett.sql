@@ -1,0 +1,1 @@
+ALTER TABLE "wallet_passes" DROP COLUMN "auth_token_hash";

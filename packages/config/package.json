@@ -1,0 +1,13 @@
+{
+  "name": "@volvia/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": ["*.json"],
+  "exports": {
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/node.json": "./tsconfig/node.json",
+    "./tsconfig/next.json": "./tsconfig/next.json",
+    "./vitest/node": "./vitest/node.ts"
+  }
+}

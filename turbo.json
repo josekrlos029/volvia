@@ -1,0 +1,33 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["NODE_ENV"],
+  "globalPassThroughEnv": [
+    "DATABASE_URL",
+    "REDIS_URL",
+    "API_URL",
+    "NEXT_PUBLIC_*",
+    "PORT",
+    "JWT_*",
+    "APP_URL",
+    "WEB_URL",
+    "PASS_URL",
+    "WALLET_*",
+    "STORAGE_*",
+    "SMTP_*",
+    "STRIPE_*",
+    "WOMPI_*",
+    "GOOGLE_*",
+    "LOG_LEVEL",
+    "OTEL_*"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": { "cache": false, "persistent": true },
+    "start": { "dependsOn": ["build"], "cache": false, "persistent": true },
+    "typecheck": { "dependsOn": ["^build"] },
+    "test": { "dependsOn": ["^build"], "outputs": ["coverage/**"] }
+  }
+}

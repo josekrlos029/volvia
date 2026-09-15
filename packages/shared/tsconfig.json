@@ -1,0 +1,10 @@
+{
+  "extends": "@volvia/config/tsconfig/base.json",
+  "compilerOptions": {
+    // `src/client.ts` is the isomorphic HTTP client and needs the DOM's fetch types.
+    // It is exported only from "@volvia/shared/client", never the main barrel, so a
+    // Node-side consumer never pulls these types in.
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

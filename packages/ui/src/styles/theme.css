@@ -1,0 +1,59 @@
+/* Volvia design tokens. Values mirror `src/brand.ts` — a unit test fails if they drift. */
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #16624a;
+  --color-primary-hover: #114f3b;
+  --color-primary-soft: #e7f1ed;
+  --color-accent: #e9a23b;
+  --color-accent-soft: #fbf1e0;
+  --color-ink: #10120f;
+  --color-ink-muted: #565b57;
+  --color-line: #e2e6e2;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f8f6;
+  --color-inverse-surface: #14171a;
+  --color-success: #166b45;
+  --color-warning: #9a6206;
+  --color-danger: #b3261e;
+  --color-info: #175e9e;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+  }
+
+  body {
+    background: var(--color-surface);
+  }
+
+  /* Visible, consistent focus for keyboard users on every interactive surface. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

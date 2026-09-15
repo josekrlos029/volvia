@@ -1,0 +1,64 @@
+@import "@volvia/ui/styles.css";
+
+@layer base {
+  body {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  /*
+   * Entry motion. Sections fade up as they arrive rather than on a timer, so the page
+   * feels like it is responding to the reader instead of performing at them.
+   */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .rise {
+    animation: rise 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 26%;
+  }
+
+  /* Browsers without scroll-driven animations get the content, just without the motion. */
+  @supports not (animation-timeline: view()) {
+    .rise {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rise {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@layer utilities {
+  /* Present to screen readers, absent from the visual layout. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}

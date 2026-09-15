@@ -1,0 +1,6 @@
+{
+  "extends": "@volvia/config/tsconfig/next.json",
+  "compilerOptions": { "noEmit": true, "paths": { "@/*": ["./src/*"] } },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

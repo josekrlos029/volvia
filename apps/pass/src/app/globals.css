@@ -1,0 +1,79 @@
+@import "@volvia/ui/styles.css";
+
+/*
+ * The customer card is a phone-first surface. It sits inside a business's own
+ * colours, so the page chrome stays neutral and lets the card carry the brand.
+ */
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  body {
+    background: var(--color-surface-muted);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+    /* Safe areas so the sticky wallet buttons clear the iOS home indicator. */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body {
+      background: #0c0e0c;
+      color: #f2f4f2;
+    }
+  }
+}
+
+@layer components {
+  /* A stamp landing should feel physical: a quick press, then settle. */
+  @keyframes stamp-land {
+    0% {
+      transform: scale(0.4) rotate(-14deg);
+      opacity: 0;
+    }
+    55% {
+      transform: scale(1.18) rotate(4deg);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1) rotate(0deg);
+      opacity: 1;
+    }
+  }
+
+  @keyframes reward-glow {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--card-accent) 45%, transparent);
+    }
+    50% {
+      box-shadow: 0 0 0 14px color-mix(in srgb, var(--card-accent) 0%, transparent);
+    }
+  }
+
+  @keyframes confetti-fall {
+    0% {
+      transform: translateY(-8%) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(120vh) rotate(540deg);
+      opacity: 0;
+    }
+  }
+
+  .stamp-land {
+    animation: stamp-land 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .reward-glow {
+    animation: reward-glow 2.4s ease-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stamp-land,
+    .reward-glow {
+      animation: none;
+    }
+  }
+}
