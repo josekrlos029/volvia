@@ -1,8 +1,10 @@
 'use client'
 
 import type { Locale, SiteCopy } from '@/lib/i18n'
+import Image from 'next/image'
 import Link from 'next/link'
-import { useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 /**
  * Site header.
@@ -12,6 +14,16 @@ import { useState } from 'react'
  */
 export function Header({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
   const [open, setOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const pathname = usePathname()
+
+  // The header only lifts off the page once there is content sliding under it.
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
   const base = `/${locale}`
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001'
 
@@ -36,35 +48,39 @@ export function Header({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
   ]
 
   return (
-    <header className="sticky top-0 z-20 border-b border-[var(--color-line)] bg-[var(--color-surface)]/92 backdrop-blur">
-      <div className="mx-auto flex h-[68px] max-w-[1180px] items-center justify-between gap-6 px-5 lg:px-8">
-        <Link href={base} className="text-[17px] font-semibold tracking-[-0.02em]">
-          Volvia
+    <header
+      className={`sticky top-0 z-20 border-b border-[var(--color-line)] bg-[var(--color-surface)] transition-shadow duration-300 ${scrolled ? 'shadow-[var(--shadow-nav)]' : ''}`}
+    >
+      <div className="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between gap-6 px-5 lg:px-8">
+        <Link href={base} className="shrink-0" aria-label="Volvia">
+          <Image src="/brand/logo.png" alt="Volvia" width={98} height={28} priority />
         </Link>
 
-        <nav className="hidden items-center gap-7 lg:flex" aria-label="Principal">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-[14px] text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
-            >
-              {link.label}
-            </Link>
-          ))}
+        <nav className="hidden items-center gap-[14px] lg:flex" aria-label="Principal">
+          {links.map((link) => {
+            const active = pathname === link.href || pathname.startsWith(`${link.href}/`)
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={active ? 'page' : undefined}
+                className={`border-b-2 px-2 py-1 text-[15px] transition-colors ${
+                  active
+                    ? 'border-[var(--color-primary)] text-[var(--color-ink)]'
+                    : 'border-transparent text-[var(--color-ink)] hover:border-[var(--color-primary)]'
+                }`}
+              >
+                {link.label}
+              </Link>
+            )
+          })}
         </nav>
 
-        <div className="hidden items-center gap-4 lg:flex">
-          <a
-            href={`${appUrl}/login`}
-            className="text-[14px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-          >
+        <div className="hidden items-center gap-2 lg:flex">
+          <a href={`${appUrl}/login`} className="btn-ghost btn-sm">
             {copy.nav.login}
           </a>
-          <a
-            href={`${appUrl}/signup`}
-            className="rounded-[9px] bg-[var(--color-ink)] px-4 py-2 text-[14px] font-medium text-white transition-transform duration-150 active:scale-[0.985]"
-          >
+          <a href={`${appUrl}/signup`} className="btn-primary btn-sm">
             {copy.nav.cta}
           </a>
         </div>
@@ -74,7 +90,7 @@ export function Header({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
           onClick={() => setOpen(!open)}
           aria-expanded={open}
           aria-controls="site-nav"
-          className="rounded-[9px] border border-[var(--color-line)] px-3 py-1.5 text-[14px] font-medium lg:hidden"
+          className="btn-ghost btn-sm lg:hidden"
         >
           {open ? 'Cerrar' : 'Menú'}
         </button>
@@ -86,25 +102,27 @@ export function Header({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
           className="border-t border-[var(--color-line)] px-5 py-4 lg:hidden"
           aria-label="Principal"
         >
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col">
             {[...links, ...more].map((link) => (
-              <li key={link.href}>
+              <li key={link.href} className="border-b border-[var(--color-line)] last:border-b-0">
                 <Link
                   href={link.href}
                   onClick={() => setOpen(false)}
-                  className="block rounded-[8px] px-2 py-2.5 text-[15px]"
+                  className="block py-3 text-[18px] tracking-[-0.01em]"
                 >
                   {link.label}
                 </Link>
               </li>
             ))}
           </ul>
-          <a
-            href={`${appUrl}/signup`}
-            className="mt-3 block rounded-[9px] bg-[var(--color-ink)] px-4 py-3 text-center text-[15px] font-medium text-white"
-          >
-            {copy.nav.cta}
-          </a>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <a href={`${appUrl}/login`} className="btn-ghost">
+              {copy.nav.login}
+            </a>
+            <a href={`${appUrl}/signup`} className="btn-primary">
+              {copy.nav.cta}
+            </a>
+          </div>
         </nav>
       ) : null}
     </header>

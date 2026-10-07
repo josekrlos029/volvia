@@ -53,8 +53,8 @@ export default async function ComparisonPage({
   return (
     <>
       <section className="border-b border-[var(--color-line)]">
-        <div className="mx-auto max-w-[1180px] px-5 py-14 lg:px-8 lg:py-20">
-          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] font-semibold leading-[1.06] tracking-[-0.03em]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 lg:px-8 lg:py-20">
+          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] leading-[1.06] tracking-[-0.03em]">
             {copy.headline}
           </h1>
           <p className="mt-5 max-w-[56ch] text-[17px] leading-relaxed text-[var(--color-ink-muted)]">
@@ -73,9 +73,9 @@ export default async function ComparisonPage({
           {copy.theirStrengths.map((item) => (
             <li
               key={item.title}
-              className="rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] p-5"
+              className="rounded-[16px] border border-[var(--color-line)] bg-[var(--color-surface)] p-5"
             >
-              <h3 className="text-[16px] font-semibold">{item.title}</h3>
+              <h3 className="text-[16px]">{item.title}</h3>
               <p className="mt-2 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
                 {item.body}
               </p>
@@ -88,8 +88,8 @@ export default async function ComparisonPage({
         <SectionTitle title={isSpanish ? 'En qué es mejor Volvia' : 'Where Volvia wins'} />
         <ul className="mt-8 grid gap-5 sm:grid-cols-3">
           {copy.ourStrengths.map((item) => (
-            <li key={item.title} className="rounded-[14px] border border-[var(--color-line)] p-5">
-              <h3 className="text-[16px] font-semibold">{item.title}</h3>
+            <li key={item.title} className="rounded-[16px] border border-[var(--color-line)] p-5">
+              <h3 className="text-[16px]">{item.title}</h3>
               <p className="mt-2 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
                 {item.body}
               </p>
@@ -101,25 +101,22 @@ export default async function ComparisonPage({
       <Section tone="muted">
         <SectionTitle title={isSpanish ? 'Qué elegir' : 'Which to choose'} />
         <div className="mt-8 grid gap-5 md:grid-cols-2">
-          <div className="rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
-            <h3 className="text-[16px] font-semibold">
+          <div className="rounded-[16px] border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
+            <h3 className="text-[16px]">
               {isSpanish ? 'Quédate con lo otro si…' : 'Stay with the other if…'}
             </h3>
             <p className="mt-2 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
               {copy.verdict.forThem}
             </p>
           </div>
-          <div className="rounded-[14px] border border-[var(--color-primary)]/45 bg-[var(--color-surface)] p-6">
-            <h3 className="text-[16px] font-semibold">
+          <div className="rounded-[16px] border border-[var(--color-primary)]/45 bg-[var(--color-surface)] p-6">
+            <h3 className="text-[16px]">
               {isSpanish ? 'Pásate a Volvia si…' : 'Move to Volvia if…'}
             </h3>
             <p className="mt-2 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
               {copy.verdict.forUs}
             </p>
-            <a
-              href={`${appUrl}/signup`}
-              className="mt-5 inline-block rounded-[10px] bg-[var(--color-primary)] px-5 py-3 text-[15px] font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-[var(--color-primary-hover)] active:scale-[0.985]"
-            >
+            <a href={`${appUrl}/signup`} className="btn-primary mt-5">
               {site.hero.cta}
             </a>
           </div>
@@ -133,9 +130,9 @@ export default async function ComparisonPage({
             <li key={item.slug}>
               <Link
                 href={`/${locale}/comparativas/${item.slug}`}
-                className="block rounded-[12px] border border-[var(--color-line)] p-4 transition-colors hover:border-[var(--color-primary)]/45"
+                className="block rounded-[16px] border border-[var(--color-line)] p-4 transition-colors hover:border-[var(--color-primary)]/45"
               >
-                <span className="text-[16px] font-medium">{item[locale].headline}</span>
+                <span className="text-[16px]">{item[locale].headline}</span>
               </Link>
             </li>
           ))}

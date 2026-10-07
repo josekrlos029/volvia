@@ -51,8 +51,7 @@ const COPY = {
   },
 } as const
 
-const field =
-  'w-full rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-3 text-[15px] placeholder:text-[#8A908A] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25'
+const field = 'field'
 
 /**
  * The contact form.
@@ -73,8 +72,8 @@ export function ContactForm({
 
   if (state === 'sent') {
     return (
-      <div className="rounded-[14px] border border-[var(--color-primary)]/40 bg-[var(--color-surface)] p-6">
-        <h2 className="text-[18px] font-semibold">{copy.sentTitle}</h2>
+      <div className="rounded-[16px] border border-[var(--color-primary)]/40 bg-[var(--color-surface)] p-6">
+        <h2 className="text-[18px]">{copy.sentTitle}</h2>
         <p className="mt-2 max-w-[48ch] text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
           {copy.sentBody}
         </p>
@@ -114,17 +113,17 @@ export function ContactForm({
       }}
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-2 text-[14px] font-medium">
+        <label className="flex flex-col gap-2 text-[14px]">
           {copy.name}
           <input name="name" required minLength={2} maxLength={80} className={field} />
         </label>
-        <label className="flex flex-col gap-2 text-[14px] font-medium">
+        <label className="flex flex-col gap-2 text-[14px]">
           {copy.email}
           <input name="email" type="email" required className={field} />
         </label>
       </div>
 
-      <label className="flex flex-col gap-2 text-[14px] font-medium">
+      <label className="flex flex-col gap-2 text-[14px]">
         {copy.business}
         <input name="businessName" maxLength={120} className={field} />
         <span className="text-[13px] font-normal text-[var(--color-ink-muted)]">
@@ -132,7 +131,7 @@ export function ContactForm({
         </span>
       </label>
 
-      <label className="flex flex-col gap-2 text-[14px] font-medium">
+      <label className="flex flex-col gap-2 text-[14px]">
         {copy.topic}
         <select name="topic" defaultValue={defaultTopic} className={field}>
           {CONTACT_TOPICS.map((topic) => (
@@ -143,7 +142,7 @@ export function ContactForm({
         </select>
       </label>
 
-      <label className="flex flex-col gap-2 text-[14px] font-medium">
+      <label className="flex flex-col gap-2 text-[14px]">
         {copy.message}
         <textarea
           name="message"
@@ -167,17 +166,13 @@ export function ContactForm({
       {error ? (
         <p
           role="alert"
-          className="rounded-[10px] bg-[#FBEBEA] px-3.5 py-3 text-[14px] text-[var(--color-danger)]"
+          className="rounded-[16px] bg-[#FBEBEA] px-3.5 py-3 text-[14px] text-[var(--color-danger)]"
         >
           {error}
         </p>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={state === 'sending'}
-        className="self-start rounded-[10px] bg-[var(--color-primary)] px-5 py-3 text-[15px] font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-[var(--color-primary-hover)] active:scale-[0.985] disabled:opacity-60"
-      >
+      <button type="submit" disabled={state === 'sending'} className="btn-primary self-start">
         {state === 'sending' ? copy.submitting : copy.submit}
       </button>
     </form>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="199.938" height="199.94" viewBox="0 0 199.938 199.94">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #1e3a8a;
+        fill-rule: evenodd;
+        filter: url(#filter);
+      }
+    </style>
+    <filter id="filter" x="383" y="1197.47" width="199.938" height="199.94" filterUnits="userSpaceOnUse">
+      <feFlood result="flood"/>
+      <feComposite result="composite" operator="in" in2="SourceGraphic"/>
+      <feBlend result="blend" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+  <path id="Icono_Negro.svg" data-name="Icono Negro.svg" class="cls-1" d="M433,1197.46h99.949a50,50,0,0,1,50,50v99.95a50,50,0,0,1-50,50H433a50,50,0,0,1-50-50v-99.95A50,50,0,0,1,433,1197.46Z" transform="translate(-383 -1197.47)"/>
+</svg>

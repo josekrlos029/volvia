@@ -57,8 +57,8 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
       />
 
       <section className="border-b border-[var(--color-line)]">
-        <div className="mx-auto max-w-[1180px] px-5 py-14 lg:px-8 lg:py-20">
-          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] font-semibold leading-[1.06] tracking-[-0.03em]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 lg:px-8 lg:py-20">
+          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] leading-[1.06] tracking-[-0.03em]">
             {isSpanish ? 'Preguntas frecuentes' : 'Frequently asked questions'}
           </h1>
           <p className="mt-5 max-w-[56ch] text-[17px] leading-relaxed text-[var(--color-ink-muted)]">
@@ -80,9 +80,7 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
                   key={entry.id}
                   className="grid gap-2 py-6 lg:grid-cols-[0.9fr_1.1fr] lg:gap-10"
                 >
-                  <dt className="text-[17px] font-semibold leading-snug">
-                    {entry[locale].question}
-                  </dt>
+                  <dt className="text-[17px] leading-snug">{entry[locale].question}</dt>
                   <dd className="max-w-[62ch] text-[16px] leading-relaxed text-[var(--color-ink-muted)]">
                     {entry[locale].answer}
                   </dd>
@@ -95,7 +93,7 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
 
       <Section tone="ink">
         <div className="mx-auto max-w-[40ch] text-center">
-          <h2 className="text-[clamp(26px,3.6vw,38px)] font-semibold leading-[1.1] tracking-[-0.02em]">
+          <h2 className="text-[clamp(26px,3.6vw,38px)] leading-[1.1] tracking-[-0.02em]">
             {isSpanish ? '¿Te queda alguna?' : 'Still have one?'}
           </h2>
           <p className="mt-3 text-[16px] leading-relaxed text-white/70">
@@ -104,15 +102,12 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
               : 'Write to us and a person who knows the product answers, usually the same day.'}
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
-            <Link
-              href={`/${locale}/contacto`}
-              className="rounded-[10px] bg-white px-5 py-3 text-[15px] font-semibold text-[var(--color-ink)] transition-transform duration-150 active:scale-[0.985]"
-            >
+            <Link href={`/${locale}/contacto`} className="btn-inverse">
               {isSpanish ? 'Escribirnos' : 'Write to us'}
             </Link>
             <a
               href={`${appUrl}/signup`}
-              className="rounded-[10px] border border-white/30 px-5 py-3 text-[15px] font-semibold text-white"
+              className="btn-inverse bg-transparent text-white hover:bg-white hover:text-black"
             >
               {site.hero.cta}
             </a>

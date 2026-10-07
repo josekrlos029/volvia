@@ -2,6 +2,7 @@ import { PhoneCard } from '@/components/PhoneCard'
 import { Section, SectionTitle } from '@/components/Section'
 import { LOCALES, copyFor, isLocale } from '@/lib/i18n'
 import { industries } from '@/lib/industries'
+import { photo } from '@/lib/photos'
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -55,7 +56,7 @@ export default async function IndustryPage({
   return (
     <>
       <section className="border-b border-[var(--color-line)]">
-        <div className="mx-auto grid max-w-[1180px] items-center gap-10 px-5 py-14 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:px-8 lg:py-20">
+        <div className="mx-auto grid max-w-[1200px] items-center gap-10 px-5 py-14 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:px-8 lg:py-20">
           <div>
             <Link
               href={`/${locale}/sectores`}
@@ -63,16 +64,13 @@ export default async function IndustryPage({
             >
               {site.nav.industries}
             </Link>
-            <h1 className="mt-3 max-w-[22ch] text-[clamp(30px,4.2vw,44px)] font-semibold leading-[1.06] tracking-[-0.03em]">
+            <h1 className="mt-3 max-w-[22ch] text-[clamp(30px,4.2vw,44px)] leading-[1.06] tracking-[-0.03em]">
               {copy.headline}
             </h1>
             <p className="mt-5 max-w-[50ch] text-[17px] leading-relaxed text-[var(--color-ink-muted)]">
               {copy.intro}
             </p>
-            <a
-              href={`${appUrl}/signup`}
-              className="mt-7 inline-block rounded-[10px] bg-[var(--color-primary)] px-5 py-3 text-[15px] font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-[var(--color-primary-hover)] active:scale-[0.985]"
-            >
+            <a href={`${appUrl}/signup`} className="btn-primary mt-7">
               {site.hero.cta}
             </a>
           </div>
@@ -92,7 +90,7 @@ export default async function IndustryPage({
       <Section tone="muted">
         <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
           <Image
-            src={`https://picsum.photos/seed/${industry.photoSeed}/900/700`}
+            src={photo(industry.photoSeed)}
             alt={copy.plural}
             width={900}
             height={700}
@@ -109,13 +107,13 @@ export default async function IndustryPage({
                 <dt className="text-[13px] text-[var(--color-ink-muted)]">
                   {isSpanish ? 'Sellos' : 'Stamps'}
                 </dt>
-                <dd className="mt-1 text-[26px] font-semibold tabular-nums">{copy.stamps}</dd>
+                <dd className="mt-1 text-[26px] tabular-nums">{copy.stamps}</dd>
               </div>
               <div>
                 <dt className="text-[13px] text-[var(--color-ink-muted)]">
                   {isSpanish ? 'Recompensa' : 'Reward'}
                 </dt>
-                <dd className="mt-1 text-[17px] font-medium leading-snug">{copy.reward}</dd>
+                <dd className="mt-1 text-[17px] leading-snug">{copy.reward}</dd>
               </div>
             </dl>
           </div>
@@ -129,9 +127,9 @@ export default async function IndustryPage({
             <li key={item.slug}>
               <Link
                 href={`/${locale}/sectores/${item.slug}`}
-                className="block rounded-[12px] border border-[var(--color-line)] p-4 transition-colors hover:border-[var(--color-primary)]/45"
+                className="block rounded-[16px] border border-[var(--color-line)] p-4 transition-colors hover:border-[var(--color-primary)]/45"
               >
-                <span className="text-[16px] font-medium">{item[locale].plural}</span>
+                <span className="text-[16px]">{item[locale].plural}</span>
               </Link>
             </li>
           ))}

@@ -40,8 +40,8 @@ export default async function ComparisonsPage({
   return (
     <>
       <section className="border-b border-[var(--color-line)]">
-        <div className="mx-auto max-w-[1180px] px-5 py-14 lg:px-8 lg:py-20">
-          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] font-semibold leading-[1.06] tracking-[-0.03em]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 lg:px-8 lg:py-20">
+          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] leading-[1.06] tracking-[-0.03em]">
             {isSpanish ? 'Comparativas' : 'Comparisons'}
           </h1>
           <p className="mt-5 max-w-[56ch] text-[17px] leading-relaxed text-[var(--color-ink-muted)]">
@@ -58,11 +58,9 @@ export default async function ComparisonsPage({
             <li key={comparison.slug}>
               <Link
                 href={`/${locale}/comparativas/${comparison.slug}`}
-                className="flex h-full flex-col rounded-[14px] border border-[var(--color-line)] p-5 transition-colors hover:border-[var(--color-primary)]/45"
+                className="flex h-full flex-col rounded-[16px] border border-[var(--color-line)] p-5 transition-colors hover:border-[var(--color-primary)]/45"
               >
-                <h2 className="text-[18px] font-semibold leading-snug">
-                  {comparison[locale].headline}
-                </h2>
+                <h2 className="text-[18px] leading-snug">{comparison[locale].headline}</h2>
                 <p className="mt-2.5 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
                   {comparison[locale].lede}
                 </p>

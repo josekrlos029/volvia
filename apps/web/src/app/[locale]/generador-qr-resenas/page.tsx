@@ -40,8 +40,8 @@ export default async function ReviewQrPage({ params }: { params: Promise<{ local
   return (
     <>
       <section className="border-b border-[var(--color-line)]">
-        <div className="mx-auto max-w-[1180px] px-5 py-14 lg:px-8 lg:py-20">
-          <h1 className="max-w-[22ch] text-[clamp(30px,4.2vw,44px)] font-semibold leading-[1.06] tracking-[-0.03em]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 lg:px-8 lg:py-20">
+          <h1 className="max-w-[22ch] text-[clamp(30px,4.2vw,44px)] leading-[1.06] tracking-[-0.03em]">
             {isSpanish ? 'Generador de QR para reseñas' : 'Review QR code generator'}
           </h1>
           <p className="mt-5 max-w-[58ch] text-[17px] leading-relaxed text-[var(--color-ink-muted)]">
@@ -71,16 +71,10 @@ export default async function ReviewQrPage({ params }: { params: Promise<{ local
             : 'What works is asking someone who has just told you it went well. In Volvia that happens inside the customer’s card: one short question, and only a high score sees the Google link. A low score comes to you, in private.'}
         </p>
         <div className="mt-7 flex flex-wrap gap-3">
-          <Link
-            href={`/${locale}/funciones/encuestas-y-resenas`}
-            className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-5 py-3 text-[15px] font-semibold"
-          >
+          <Link href={`/${locale}/funciones/encuestas-y-resenas`} className="btn-ghost">
             {isSpanish ? 'Cómo lo hace Volvia' : 'How Volvia does it'}
           </Link>
-          <a
-            href={`${appUrl}/signup`}
-            className="rounded-[10px] bg-[var(--color-primary)] px-5 py-3 text-[15px] font-semibold text-white"
-          >
+          <a href={`${appUrl}/signup`} className="btn-primary">
             {site.hero.cta}
           </a>
         </div>

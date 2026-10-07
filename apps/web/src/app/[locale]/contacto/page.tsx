@@ -48,8 +48,8 @@ export default async function ContactPage({
   return (
     <>
       <section className="border-b border-[var(--color-line)]">
-        <div className="mx-auto max-w-[1180px] px-5 py-14 lg:px-8 lg:py-20">
-          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] font-semibold leading-[1.06] tracking-[-0.03em]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 lg:px-8 lg:py-20">
+          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] leading-[1.06] tracking-[-0.03em]">
             {isSpanish ? 'Hablamos' : 'Let’s talk'}
           </h1>
           <p className="mt-5 max-w-[56ch] text-[17px] leading-relaxed text-[var(--color-ink-muted)]">
@@ -66,7 +66,7 @@ export default async function ContactPage({
 
           <aside className="flex flex-col gap-7">
             <div>
-              <h2 className="text-[16px] font-semibold">
+              <h2 className="text-[16px]">
                 {isSpanish ? 'Antes de escribir' : 'Before you write'}
               </h2>
               <p className="mt-2 max-w-[48ch] text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
@@ -75,7 +75,7 @@ export default async function ContactPage({
                   : 'It may already be answered in the '}
                 <Link
                   href={`/${locale}/preguntas`}
-                  className="font-medium text-[var(--color-primary)] underline underline-offset-4"
+                  className="text-[var(--color-primary)] underline underline-offset-4"
                 >
                   {isSpanish ? 'preguntas frecuentes' : 'frequently asked questions'}
                 </Link>
@@ -86,7 +86,7 @@ export default async function ContactPage({
             </div>
 
             <div>
-              <h2 className="text-[16px] font-semibold">
+              <h2 className="text-[16px]">
                 {isSpanish ? 'Si ya eres cliente' : 'If you are already a customer'}
               </h2>
               <p className="mt-2 max-w-[48ch] text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
@@ -97,9 +97,7 @@ export default async function ContactPage({
             </div>
 
             <div>
-              <h2 className="text-[16px] font-semibold">
-                {isSpanish ? 'Cuánto tardamos' : 'How long we take'}
-              </h2>
+              <h2 className="text-[16px]">{isSpanish ? 'Cuánto tardamos' : 'How long we take'}</h2>
               <p className="mt-2 max-w-[48ch] text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
                 {isSpanish
                   ? 'Normalmente el mismo día laborable. Si escribes un domingo por la noche, el lunes.'
@@ -119,10 +117,7 @@ export default async function ContactPage({
               : 'You can create an account and try it on real data without paying anything, or ask us to walk you through it on a short call.'
           }
         />
-        <Link
-          href={`/${locale}/contacto?tema=demo`}
-          className="mt-6 inline-block rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-5 py-3 text-[15px] font-semibold"
-        >
+        <Link href={`/${locale}/contacto?tema=demo`} className="btn-ghost mt-6">
           {isSpanish ? 'Pedir una demostración' : 'Ask for a demo'}
         </Link>
       </Section>

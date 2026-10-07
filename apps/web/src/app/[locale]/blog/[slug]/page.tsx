@@ -36,10 +36,10 @@ export async function generateMetadata({
 /** Prose styles live here rather than in a plugin, so the article matches the site. */
 const proseComponents = {
   h2: (props: React.ComponentProps<'h2'>) => (
-    <h2 className="mt-10 text-[24px] font-semibold leading-tight tracking-[-0.015em]" {...props} />
+    <h2 className="mt-10 text-[24px] leading-tight tracking-[-0.015em]" {...props} />
   ),
   h3: (props: React.ComponentProps<'h3'>) => (
-    <h3 className="mt-8 text-[19px] font-semibold leading-tight" {...props} />
+    <h3 className="mt-8 text-[19px] leading-tight" {...props} />
   ),
   p: (props: React.ComponentProps<'p'>) => (
     <p className="mt-4 text-[17px] leading-[1.7] text-[var(--color-ink)]" {...props} />
@@ -51,7 +51,7 @@ const proseComponents = {
     <li className="text-[17px] leading-[1.7] text-[var(--color-ink)]" {...props} />
   ),
   strong: (props: React.ComponentProps<'strong'>) => (
-    <strong className="font-semibold text-[var(--color-ink)]" {...props} />
+    <strong className="text-[var(--color-ink)]" {...props} />
   ),
   a: (props: React.ComponentProps<'a'>) => (
     <a className="text-[var(--color-primary)] underline underline-offset-4" {...props} />
@@ -75,7 +75,7 @@ export default async function BlogPost({
     .slice(0, 2)
 
   return (
-    <article className="mx-auto max-w-[1180px] px-5 py-14 lg:px-8 lg:py-20">
+    <article className="mx-auto max-w-[1200px] px-5 py-14 lg:px-8 lg:py-20">
       <div className="mx-auto max-w-[68ch]">
         <Link
           href={`/${locale}/blog`}
@@ -84,7 +84,7 @@ export default async function BlogPost({
           Blog
         </Link>
 
-        <h1 className="mt-4 text-[clamp(30px,4.4vw,44px)] font-semibold leading-[1.08] tracking-[-0.025em]">
+        <h1 className="mt-4 text-[clamp(30px,4.4vw,44px)] leading-[1.08] tracking-[-0.025em]">
           {post.title}
         </h1>
         <p className="mt-4 text-[18px] leading-relaxed text-[var(--color-ink-muted)]">
@@ -110,15 +110,13 @@ export default async function BlogPost({
 
         {more.length > 0 ? (
           <aside className="mt-14 border-t border-[var(--color-line)] pt-8">
-            <h2 className="text-[14px] font-semibold">
-              {isSpanish ? 'Seguir leyendo' : 'Keep reading'}
-            </h2>
+            <h2 className="text-[14px]">{isSpanish ? 'Seguir leyendo' : 'Keep reading'}</h2>
             <ul className="mt-4 flex flex-col gap-3">
               {more.map((item) => (
                 <li key={item.slug}>
                   <Link
                     href={`/${locale}/blog/${item.slug}`}
-                    className="text-[17px] font-medium leading-snug hover:text-[var(--color-primary)]"
+                    className="text-[17px] leading-snug hover:text-[var(--color-primary)]"
                   >
                     {item.title}
                   </Link>

@@ -63,8 +63,8 @@ export default async function PlaybookPage({ params }: { params: Promise<{ local
       />
 
       <section className="border-b border-[var(--color-line)]">
-        <div className="mx-auto max-w-[1180px] px-5 py-14 lg:px-8 lg:py-20">
-          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] font-semibold leading-[1.06] tracking-[-0.03em]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 lg:px-8 lg:py-20">
+          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] leading-[1.06] tracking-[-0.03em]">
             {isSpanish ? 'Los primeros 30 días' : 'The first 30 days'}
           </h1>
           <p className="mt-5 max-w-[58ch] text-[17px] leading-relaxed text-[var(--color-ink-muted)]">
@@ -80,10 +80,10 @@ export default async function PlaybookPage({ params }: { params: Promise<{ local
           {steps.map((step, index) => (
             <li key={step.id} className="grid gap-5 py-9 lg:grid-cols-[0.8fr_1.2fr] lg:gap-12">
               <div>
-                <p className="tabular-nums text-[13px] font-medium uppercase tracking-[0.1em] text-[var(--color-ink-muted)]">
+                <p className="tabular-nums text-[13px] uppercase tracking-[0.1em] text-[var(--color-ink-muted)]">
                   {isSpanish ? 'Día' : 'Day'} {step.when}
                 </p>
-                <h2 className="mt-2 max-w-[22ch] text-[22px] font-semibold leading-tight tracking-[-0.01em]">
+                <h2 className="mt-2 max-w-[22ch] text-[22px] leading-tight tracking-[-0.01em]">
                   {index + 1}. {step.title}
                 </h2>
               </div>
@@ -94,16 +94,14 @@ export default async function PlaybookPage({ params }: { params: Promise<{ local
                 </p>
 
                 <p className="max-w-[62ch] border-l-2 border-[var(--color-warning)] pl-4 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
-                  <span className="font-medium text-[var(--color-ink)]">
+                  <span className="text-[var(--color-ink)]">
                     {isSpanish ? 'El error típico: ' : 'The usual mistake: '}
                   </span>
                   {step.mistake}
                 </p>
 
-                <p className="max-w-[62ch] rounded-[10px] bg-[var(--color-surface-muted)] px-4 py-3 text-[15px] leading-relaxed">
-                  <span className="font-medium">
-                    {isSpanish ? 'Hecho cuando: ' : 'Done when: '}
-                  </span>
+                <p className="max-w-[62ch] rounded-[16px] bg-[var(--color-surface-muted)] px-4 py-3 text-[15px] leading-relaxed">
+                  <span className="">{isSpanish ? 'Hecho cuando: ' : 'Done when: '}</span>
                   <span className="text-[var(--color-ink-muted)]">{step.check}</span>
                 </p>
               </div>
@@ -122,22 +120,13 @@ export default async function PlaybookPage({ params }: { params: Promise<{ local
           }
         />
         <div className="mt-7 flex flex-wrap gap-3">
-          <Link
-            href={`/${locale}/plantillas`}
-            className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-5 py-3 text-[15px] font-semibold"
-          >
+          <Link href={`/${locale}/plantillas`} className="btn-ghost">
             {isSpanish ? 'Plantillas de tarjeta' : 'Card templates'}
           </Link>
-          <Link
-            href={`/${locale}/referencias`}
-            className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-5 py-3 text-[15px] font-semibold"
-          >
+          <Link href={`/${locale}/referencias`} className="btn-ghost">
             {isSpanish ? 'Números típicos' : 'Typical numbers'}
           </Link>
-          <a
-            href={`${appUrl}/signup`}
-            className="rounded-[10px] bg-[var(--color-primary)] px-5 py-3 text-[15px] font-semibold text-white"
-          >
+          <a href={`${appUrl}/signup`} className="btn-primary">
             {site.hero.cta}
           </a>
         </div>

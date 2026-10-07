@@ -45,9 +45,9 @@ export default async function IndustriesPage({ params }: { params: Promise<{ loc
             <li key={industry.slug}>
               <Link
                 href={`/${locale}/sectores/${industry.slug}`}
-                className="flex h-full flex-col rounded-[14px] border border-[var(--color-line)] bg-white p-5 transition-colors hover:border-[var(--color-primary)]/45"
+                className="flex h-full flex-col rounded-[16px] border border-[var(--color-line)] bg-white p-5 transition-colors hover:border-[var(--color-primary)]/45"
               >
-                <h2 className="text-[18px] font-semibold leading-tight">{copy.plural}</h2>
+                <h2 className="text-[18px] leading-tight">{copy.plural}</h2>
                 <p className="mt-2 flex-1 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
                   {copy.reward}
                 </p>

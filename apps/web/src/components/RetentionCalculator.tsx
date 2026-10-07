@@ -100,7 +100,7 @@ export function RetentionCalculator({ locale }: { locale: Locale }) {
           {isSpanish ? 'En un año' : 'Over a year'}
         </p>
 
-        <p className="mt-4 text-[clamp(30px,5vw,44px)] font-semibold leading-none tracking-[-0.02em] tabular-nums">
+        <p className="mt-4 text-[clamp(30px,5vw,44px)] leading-none tracking-[-0.02em] tabular-nums">
           {money(result.net)}
         </p>
         <p className="mt-2 text-[15px] text-white/60">
@@ -112,21 +112,21 @@ export function RetentionCalculator({ locale }: { locale: Locale }) {
         <dl className="mt-8 flex flex-col gap-4 border-t border-white/12 pt-6 text-[15px]">
           <div className="flex items-baseline justify-between gap-4">
             <dt className="text-white/60">{isSpanish ? 'Visitas extra' : 'Extra visits'}</dt>
-            <dd className="tabular-nums font-medium">{number(result.extraVisitsPerYear)}</dd>
+            <dd className="tabular-nums">{number(result.extraVisitsPerYear)}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-4">
             <dt className="text-white/60">{isSpanish ? 'Ingreso bruto' : 'Gross revenue'}</dt>
-            <dd className="tabular-nums font-medium">{money(result.extraRevenue)}</dd>
+            <dd className="tabular-nums">{money(result.extraRevenue)}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-4">
             <dt className="text-white/60">
               {isSpanish ? 'Recompensas entregadas' : 'Rewards handed out'}
             </dt>
-            <dd className="tabular-nums font-medium">{number(result.rewardsGiven)}</dd>
+            <dd className="tabular-nums">{number(result.rewardsGiven)}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-4">
             <dt className="text-white/60">{isSpanish ? 'Costo de recompensas' : 'Reward cost'}</dt>
-            <dd className="tabular-nums font-medium">{money(result.rewardSpend)}</dd>
+            <dd className="tabular-nums">{money(result.rewardSpend)}</dd>
           </div>
         </dl>
 
@@ -162,10 +162,10 @@ function Slider({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-4">
-        <label htmlFor={id} className="text-[14px] font-medium">
+        <label htmlFor={id} className="text-[14px]">
           {label}
         </label>
-        <output htmlFor={id} className="text-[15px] font-semibold tabular-nums">
+        <output htmlFor={id} className="text-[15px] tabular-nums">
           {format(value)}
         </output>
       </div>

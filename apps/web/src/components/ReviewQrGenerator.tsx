@@ -87,13 +87,12 @@ export function ReviewQrGenerator({ locale }: { locale: 'es' | 'en' }) {
     }
   }, [reviewUrl])
 
-  const field =
-    'w-full rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-3 text-[15px] placeholder:text-[#8A908A] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25'
+  const field = 'field'
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_0.9fr] lg:gap-16">
       <div className="flex flex-col gap-5">
-        <label className="flex flex-col gap-2 text-[14px] font-medium">
+        <label className="flex flex-col gap-2 text-[14px]">
           {copy.label}
           <input
             value={input}
@@ -104,7 +103,7 @@ export function ReviewQrGenerator({ locale }: { locale: 'es' | 'en' }) {
           <span className="text-[13px] font-normal text-[var(--color-ink-muted)]">{copy.help}</span>
         </label>
 
-        <label className="flex flex-col gap-2 text-[14px] font-medium">
+        <label className="flex flex-col gap-2 text-[14px]">
           {copy.businessLabel}
           <input
             value={businessName}
@@ -126,7 +125,7 @@ export function ReviewQrGenerator({ locale }: { locale: 'es' | 'en' }) {
               <a
                 href={dataUrl}
                 download={`resenas-${(businessName || 'negocio').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`}
-                className="rounded-[10px] bg-[var(--color-primary)] px-5 py-3 text-[15px] font-semibold text-white"
+                className="btn-primary"
               >
                 {copy.download}
               </a>
@@ -142,7 +141,7 @@ export function ReviewQrGenerator({ locale }: { locale: 'es' | 'en' }) {
                   setCopied(false)
                 }
               }}
-              className="rounded-[10px] border border-[var(--color-line)] px-5 py-3 text-[15px] font-semibold"
+              className="btn-ghost"
             >
               {copied ? copy.copied : copy.copy}
             </button>
@@ -152,21 +151,21 @@ export function ReviewQrGenerator({ locale }: { locale: 'es' | 'en' }) {
 
       {/* The printable card, previewed exactly as it downloads. */}
       <div className="flex justify-center lg:justify-end">
-        <div className="w-full max-w-[320px] rounded-[18px] border border-[var(--color-line)] bg-white p-7 text-center">
-          <p className="text-[13px] font-medium uppercase tracking-[0.12em] text-[var(--color-ink-muted)]">
+        <div className="w-full max-w-[320px] rounded-[16px] border border-[var(--color-line)] bg-white p-7 text-center">
+          <p className="text-[13px] uppercase tracking-[0.12em] text-[var(--color-ink-muted)]">
             {businessName || copy.printTitle}
           </p>
-          <div className="mt-5 grid aspect-square place-items-center rounded-[12px] bg-[var(--color-surface-muted)]">
+          <div className="mt-5 grid aspect-square place-items-center rounded-[16px] bg-[var(--color-surface-muted)]">
             {dataUrl ? (
               /* A data URL built in this browser: next/image has nothing to optimise. */
-              <img src={dataUrl} alt="" className="h-full w-full rounded-[12px]" />
+              <img src={dataUrl} alt="" className="h-full w-full rounded-[16px]" />
             ) : (
               <span className="px-6 text-[14px] leading-snug text-[var(--color-ink-muted)]">
                 {copy.help}
               </span>
             )}
           </div>
-          <p className="mt-5 text-[17px] font-semibold leading-snug">{copy.printTitle}</p>
+          <p className="mt-5 text-[17px] leading-snug">{copy.printTitle}</p>
           <p className="mt-1.5 text-[14px] leading-snug text-[var(--color-ink-muted)]">
             {copy.printBody}
           </p>

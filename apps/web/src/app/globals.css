@@ -1,14 +1,208 @@
 @import "@volvia/ui/styles.css";
 
+/*
+ * Marketing-site skin. The shared tokens in @volvia/ui still serve the dashboard and the
+ * customer pass; the public site overrides them here with a black-and-white poster system
+ * and a single violet accent. Hierarchy comes from size and tracking, never weight.
+ */
+@theme {
+  --color-primary: #7c3aed;
+  --color-primary-hover: #6d28d9;
+  --color-primary-soft: #f3edfd;
+  --color-accent: #7c3aed;
+  --color-accent-soft: #f3edfd;
+  --color-ink: #000000;
+  --color-ink-muted: #736f7c;
+  --color-line: #dedede;
+  --color-fog: #bdbdbd;
+  --color-slate: #7f7f7f;
+  --color-surface: #ffffff;
+  --color-surface-muted: #ffffff;
+  --color-inverse-surface: #000000;
+
+  --radius-card: 16px;
+  --radius-large: 48px;
+  --radius-button: 64px;
+  --radius-badge: 100px;
+
+  --shadow-nav: rgba(0, 0, 0, 0.15) 0px 12px 60px 0px;
+
+  --font-sans: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
+}
+
 @layer base {
   body {
     background: var(--color-surface);
     color: var(--color-ink);
+    font-weight: 400;
+    letter-spacing: -0.01em;
     -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline-color: var(--color-ink);
   }
 }
 
 @layer components {
+  /*
+   * Type scale. Each size carries its own tracking zone: wide on small uppercase labels,
+   * tight on display sizes, so large type reads as a dense poster block.
+   */
+  .t-caption {
+    font-size: 12px;
+    line-height: 1.78;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .t-body-sm {
+    font-size: 14px;
+    line-height: 1.6;
+    letter-spacing: -0.005em;
+  }
+  .t-body {
+    font-size: 16px;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+  }
+  .t-subheading {
+    font-size: 18px;
+    line-height: 1.45;
+    letter-spacing: -0.01em;
+  }
+  .t-heading-sm {
+    font-size: 24px;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+  .t-heading {
+    font-size: clamp(26px, 3vw, 32px);
+    line-height: 1.13;
+    letter-spacing: -0.03em;
+  }
+  .t-heading-lg {
+    font-size: clamp(32px, 4.4vw, 48px);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+  }
+  .t-display {
+    font-size: clamp(42px, 6.2vw, 72px);
+    line-height: 0.95;
+    letter-spacing: -0.05em;
+  }
+  .t-stat {
+    font-size: clamp(76px, 13vw, 200px);
+    line-height: 0.8;
+    letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Section marker: a hairline violet pill, the accent as punctuation rather than paint. */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-badge);
+    padding: 6px 14px;
+    font-size: 12px;
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* The only filled action: black pill, white type. No colour needed to signal "go". */
+  .btn-primary,
+  .btn-ghost,
+  .btn-inverse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--radius-button);
+    padding: 15px 24px;
+    font-size: 16px;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, transform
+      160ms ease;
+  }
+  .btn-primary {
+    background: var(--color-ink);
+    color: #fff;
+    border: 1px solid var(--color-ink);
+  }
+  .btn-primary:hover {
+    background: #262626;
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-ink);
+    border: 1px solid var(--color-ink);
+  }
+  .btn-ghost:hover {
+    background: var(--color-ink);
+    color: #fff;
+  }
+  /* On black bands the roles flip: white pill, black type. */
+  .btn-inverse {
+    background: #fff;
+    color: var(--color-ink);
+    border: 1px solid #fff;
+  }
+  .btn-inverse:hover {
+    background: transparent;
+    color: #fff;
+  }
+  .btn-primary:active,
+  .btn-ghost:active,
+  .btn-inverse:active {
+    transform: scale(0.985);
+  }
+  .btn-sm {
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+
+  /* Form fields: state is carried by the border going from mist to black, never colour. */
+  .field {
+    width: 100%;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    background: #fff;
+    padding: 15px 16px;
+    font-size: 16px;
+    line-height: 1.33;
+    color: var(--color-ink);
+    transition: border-color 160ms ease;
+  }
+  .field::placeholder {
+    color: var(--color-fog);
+  }
+  .field:focus {
+    border-color: var(--color-ink);
+    outline: none;
+  }
+
+  /* Horizontal card rail on the dark band; snaps per card, scrollbar kept out of sight. */
+  .rail {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(280px, 1fr);
+    gap: 16px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .rail::-webkit-scrollbar {
+    display: none;
+  }
+  .rail > * {
+    scroll-snap-align: start;
+  }
+
   /*
    * Entry motion. Sections fade up as they arrive rather than on a timer, so the page
    * feels like it is responding to the reader instead of performing at them.

@@ -55,8 +55,8 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
       />
 
       <section className="border-b border-[var(--color-line)]">
-        <div className="mx-auto max-w-[1180px] px-5 py-14 lg:px-8 lg:py-20">
-          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] font-semibold leading-[1.06] tracking-[-0.03em]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 lg:px-8 lg:py-20">
+          <h1 className="max-w-[20ch] text-[clamp(30px,4.2vw,44px)] leading-[1.06] tracking-[-0.03em]">
             {isSpanish ? 'Glosario de fidelización' : 'Loyalty glossary'}
           </h1>
           <p className="mt-5 max-w-[58ch] text-[17px] leading-relaxed text-[var(--color-ink-muted)]">
@@ -71,11 +71,9 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
         <dl className="grid gap-x-10 gap-y-8 md:grid-cols-2">
           {terms.map((term) => (
             <div key={term.slug} id={term.slug} className="scroll-mt-24">
-              <dt className="text-[19px] font-semibold leading-snug">{term.term}</dt>
+              <dt className="text-[19px] leading-snug">{term.term}</dt>
               <dd>
-                <p className="mt-1.5 text-[15px] font-medium text-[var(--color-ink)]">
-                  {term.short}
-                </p>
+                <p className="mt-1.5 text-[15px] text-[var(--color-ink)]">{term.short}</p>
                 <p className="mt-2 max-w-[56ch] text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
                   {term.body}
                 </p>
@@ -97,7 +95,7 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
             : 'The numbers behind these words are in '}
           <Link
             href={`/${locale}/referencias`}
-            className="font-medium text-[var(--color-primary)] underline underline-offset-4"
+            className="text-[var(--color-primary)] underline underline-offset-4"
           >
             {isSpanish ? 'referencias' : 'benchmarks'}
           </Link>

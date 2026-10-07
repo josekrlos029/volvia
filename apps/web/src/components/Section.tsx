@@ -10,15 +10,16 @@ export function Section({
   tone?: 'plain' | 'muted' | 'ink'
   className?: string
 }) {
+  // White is the gallery wall; tonal breaks go straight to black, never to a mid-grey.
   const tones = {
     plain: 'bg-[var(--color-surface)]',
-    muted: 'bg-[var(--color-surface-muted)]',
+    muted: 'bg-[var(--color-surface)] border-t border-[var(--color-line)]',
     ink: 'bg-[var(--color-inverse-surface)] text-white',
   }
 
   return (
     <section className={`${tones[tone]} ${className}`}>
-      <div className="rise mx-auto max-w-[1180px] px-5 py-16 sm:py-20 lg:px-8 lg:py-24">
+      <div className="rise mx-auto max-w-[1200px] px-5 py-16 sm:py-20 lg:px-8 lg:py-[120px]">
         {children}
       </div>
     </section>
@@ -28,11 +29,14 @@ export function Section({
 export function SectionTitle({
   title,
   body,
+  eyebrow,
   align = 'left',
   as = 'h2',
 }: {
   title: string
   body?: string
+  /** A short uppercase marker above the title, drawn as a hairline violet pill. */
+  eyebrow?: string
   align?: 'left' | 'center'
   /**
    * The page's own title passes `h1`. Every indexable page needs exactly one, and
@@ -43,12 +47,15 @@ export function SectionTitle({
   const Heading = as
 
   return (
-    <header className={align === 'center' ? 'mx-auto max-w-[46ch] text-center' : 'max-w-[30ch]'}>
-      <Heading className="text-[clamp(24px,3.4vw,34px)] font-semibold leading-[1.12] tracking-[-0.02em]">
+    <header className={align === 'center' ? 'text-center' : ''}>
+      {eyebrow ? <p className="badge mb-6">{eyebrow}</p> : null}
+      <Heading className={`t-heading-lg max-w-[22ch] ${align === 'center' ? 'mx-auto' : ''}`}>
         {title}
       </Heading>
       {body ? (
-        <p className="mt-3 max-w-[52ch] text-[16px] leading-relaxed text-[var(--color-ink-muted)]">
+        <p
+          className={`t-subheading mt-5 max-w-[52ch] text-[var(--color-ink-muted)] ${align === 'center' ? 'mx-auto' : ''}`}
+        >
           {body}
         </p>
       ) : null}

@@ -60,7 +60,7 @@ export function PricingTable({ locale }: { locale: Locale }) {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex justify-center">
-        <fieldset className="inline-flex rounded-[10px] border border-[var(--color-line)] bg-white p-1">
+        <fieldset className="inline-flex rounded-full border border-[var(--color-line)] bg-white p-1">
           <legend className="sr-only">
             {isSpanish ? 'Periodo de facturación' : 'Billing period'}
           </legend>
@@ -71,7 +71,7 @@ export function PricingTable({ locale }: { locale: Locale }) {
               onClick={() => setInterval(option)}
               aria-pressed={interval === option}
               className={[
-                'rounded-[7px] px-4 py-2 text-[14px] font-medium transition-colors',
+                'rounded-full px-4 py-2 text-[14px] transition-colors',
                 interval === option
                   ? 'bg-[var(--color-ink)] text-white'
                   : 'text-[var(--color-ink-muted)]',
@@ -103,22 +103,20 @@ export function PricingTable({ locale }: { locale: Locale }) {
             <article
               key={plan.id}
               className={[
-                'flex flex-col rounded-[14px] border bg-white p-5',
-                isRecommended
-                  ? 'border-[var(--color-primary)] shadow-[0_16px_40px_-24px_rgba(22,98,74,0.5)]'
-                  : 'border-[var(--color-line)]',
+                'flex flex-col rounded-[16px] border bg-white p-5',
+                isRecommended ? 'border-[var(--color-ink)]' : 'border-[var(--color-line)]',
               ].join(' ')}
             >
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-[17px] font-semibold">{names[plan.id]}</h3>
+                <h3 className="text-[17px]">{names[plan.id]}</h3>
                 {isRecommended ? (
-                  <span className="rounded-full bg-[var(--color-primary-soft)] px-2.5 py-1 text-[12px] font-medium text-[var(--color-primary)]">
+                  <span className="badge px-2.5 py-0.5 text-[11px]">
                     {isSpanish ? 'El más elegido' : 'Most chosen'}
                   </span>
                 ) : null}
               </div>
 
-              <p className="mt-4 text-[28px] font-semibold leading-none tracking-[-0.02em] tabular-nums">
+              <p className="mt-4 text-[40px] leading-none tracking-[-0.05em] tabular-nums">
                 {price === 0 ? (isSpanish ? 'Gratis' : 'Free') : format(price)}
               </p>
               <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
@@ -152,7 +150,7 @@ export function PricingTable({ locale }: { locale: Locale }) {
                   </>
                 ) : (
                   <>
-                    <li className="font-medium">
+                    <li>
                       {isSpanish
                         ? `Todo lo de ${names[previous!.id]}, más:`
                         : `Everything in ${names[previous!.id]}, plus:`}
@@ -175,12 +173,7 @@ export function PricingTable({ locale }: { locale: Locale }) {
 
               <a
                 href={`${appUrl}/signup`}
-                className={[
-                  'mt-6 rounded-[9px] px-4 py-2.5 text-center text-[14px] font-semibold transition-transform duration-150 active:scale-[0.985]',
-                  isRecommended
-                    ? 'bg-[var(--color-primary)] text-white'
-                    : 'border border-[var(--color-line)] text-[var(--color-ink)]',
-                ].join(' ')}
+                className={['mt-6 btn-sm', isRecommended ? 'btn-primary' : 'btn-ghost'].join(' ')}
               >
                 {plan.id === 'free'
                   ? isSpanish

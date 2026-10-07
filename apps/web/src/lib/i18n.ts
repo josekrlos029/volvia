@@ -20,6 +20,7 @@ export const site = {
     },
     hero: {
       title: 'Tus clientes vuelven cuando les das una razón',
+      highlight: 'vuelven',
       subtitle:
         'Tarjeta de sellos digital para tu negocio. Sin app para el cliente, sin cartones que se pierden.',
       cta: 'Crear mi tarjeta gratis',
@@ -27,6 +28,7 @@ export const site = {
     },
     trust: { title: 'Pensado para negocios de barrio' },
     steps: {
+      eyebrow: 'Cómo funciona',
       title: 'De cero a sellando en una tarde',
       items: [
         {
@@ -88,6 +90,7 @@ export const site = {
     },
     hero: {
       title: 'Customers come back when you give them a reason',
+      highlight: 'come back',
       subtitle:
         'A digital stamp card for your shop. No app for your customers, no paper cards to lose.',
       cta: 'Create my free card',
@@ -95,6 +98,7 @@ export const site = {
     },
     trust: { title: 'Built for neighbourhood businesses' },
     steps: {
+      eyebrow: 'How it works',
       title: 'From nothing to stamping in an afternoon',
       items: [
         {

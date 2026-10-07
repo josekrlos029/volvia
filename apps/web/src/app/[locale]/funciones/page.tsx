@@ -1,6 +1,7 @@
 import { Section, SectionTitle } from '@/components/Section'
 import { features } from '@/lib/features'
 import { copyFor, isLocale } from '@/lib/i18n'
+import { photo } from '@/lib/photos'
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -176,11 +177,11 @@ export default async function FeaturesPage({ params }: { params: Promise<{ local
             <div className={index % 2 === 0 ? '' : 'lg:order-2'}>
               <SectionTitle title={group.title} body={group.body} />
               <Image
-                src={`https://picsum.photos/seed/${group.photoSeed}/720/540`}
+                src={photo(group.photoSeed)}
                 alt={group.title}
                 width={720}
                 height={540}
-                className="mt-6 w-full rounded-[14px] object-cover"
+                className="mt-6 w-full rounded-[16px] object-cover"
                 sizes="(max-width: 1024px) 100vw, 420px"
               />
             </div>
@@ -188,7 +189,7 @@ export default async function FeaturesPage({ params }: { params: Promise<{ local
             <ul className={`flex flex-col gap-7 ${index % 2 === 0 ? '' : 'lg:order-1'}`}>
               {group.items.map((item) => (
                 <li key={item.name} className="border-l-2 border-[var(--color-primary)] pl-5">
-                  <h3 className="text-[18px] font-semibold leading-tight">{item.name}</h3>
+                  <h3 className="text-[18px] leading-tight">{item.name}</h3>
                   <p className="mt-2 max-w-[58ch] text-[16px] leading-relaxed text-[var(--color-ink-muted)]">
                     {item.body}
                   </p>
@@ -213,9 +214,9 @@ export default async function FeaturesPage({ params }: { params: Promise<{ local
             <li key={feature.slug}>
               <Link
                 href={`/${locale}/funciones/${feature.slug}`}
-                className="block h-full rounded-[12px] border border-[var(--color-line)] p-5 transition-colors hover:border-[var(--color-primary)]/45"
+                className="block h-full rounded-[16px] border border-[var(--color-line)] p-5 transition-colors hover:border-[var(--color-primary)]/45"
               >
-                <h3 className="text-[16px] font-semibold">{feature[locale].name}</h3>
+                <h3 className="text-[16px]">{feature[locale].name}</h3>
                 <p className="mt-2 text-[14px] leading-relaxed text-[var(--color-ink-muted)]">
                   {feature[locale].lede}
                 </p>
@@ -227,14 +228,11 @@ export default async function FeaturesPage({ params }: { params: Promise<{ local
 
       <Section tone="ink">
         <div className="mx-auto max-w-[36ch] text-center">
-          <h2 className="text-[clamp(26px,3.6vw,38px)] font-semibold leading-[1.1] tracking-[-0.02em]">
+          <h2 className="text-[clamp(26px,3.6vw,38px)] leading-[1.1] tracking-[-0.02em]">
             {copy.finalCta.title}
           </h2>
           <p className="mt-3 text-[16px] leading-relaxed text-white/70">{copy.finalCta.body}</p>
-          <a
-            href={`${appUrl}/signup`}
-            className="mt-7 inline-block rounded-[10px] bg-white px-5 py-3 text-[15px] font-semibold text-[var(--color-ink)] transition-transform duration-150 active:scale-[0.985]"
-          >
+          <a href={`${appUrl}/signup`} className="btn-inverse mt-7">
             {copy.finalCta.cta}
           </a>
         </div>

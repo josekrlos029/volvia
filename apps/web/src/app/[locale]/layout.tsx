@@ -2,7 +2,6 @@ import { Footer } from '@/components/Footer'
 import { Header } from '@/components/Header'
 import { LOCALES, copyFor, isLocale } from '@/lib/i18n'
 import { GeistMono } from 'geist/font/mono'
-import { GeistSans } from 'geist/font/sans'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import '../globals.css'
@@ -87,7 +86,7 @@ export default async function LocaleLayout({
   }
 
   return (
-    <html lang={locale} className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang={locale} className={GeistMono.variable}>
       <body className="flex min-h-[100dvh] flex-col">
         <script
           type="application/ld+json"

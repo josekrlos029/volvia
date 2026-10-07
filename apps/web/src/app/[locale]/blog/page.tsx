@@ -45,7 +45,7 @@ export default async function BlogIndex({ params }: { params: Promise<{ locale: 
           <li key={post.slug}>
             <Link href={`/${locale}/blog/${post.slug}`} className="group flex flex-col gap-2 py-6">
               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <h2 className="text-[21px] font-semibold leading-tight tracking-[-0.01em] group-hover:text-[var(--color-primary)]">
+                <h2 className="text-[21px] leading-tight tracking-[-0.01em] group-hover:text-[var(--color-primary)]">
                   {post.title}
                 </h2>
                 <span className="text-[13px] tabular-nums text-[var(--color-ink-muted)]">

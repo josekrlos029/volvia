@@ -3,7 +3,6 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@volvia/ui', '@volvia/shared'],
   images: {
-    remotePatterns: [{ protocol: 'https', hostname: 'picsum.photos' }],
     formats: ['image/avif', 'image/webp'],
   },
   async headers() {

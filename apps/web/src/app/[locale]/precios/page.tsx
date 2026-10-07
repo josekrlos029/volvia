@@ -86,7 +86,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         <div className="mt-8 grid gap-x-12 gap-y-8 lg:grid-cols-2">
           {FAQ[locale].map((item) => (
             <div key={item.q}>
-              <h3 className="text-[17px] font-semibold leading-tight">{item.q}</h3>
+              <h3 className="text-[17px] leading-tight">{item.q}</h3>
               <p className="mt-2 max-w-[54ch] text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
                 {item.a}
               </p>

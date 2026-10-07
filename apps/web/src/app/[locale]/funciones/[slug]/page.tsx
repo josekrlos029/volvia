@@ -1,6 +1,7 @@
 import { Section, SectionTitle } from '@/components/Section'
 import { features, findFeature } from '@/lib/features'
 import { LOCALES, copyFor, isLocale } from '@/lib/i18n'
+import { photo } from '@/lib/photos'
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -73,23 +74,20 @@ export default async function FeaturePage({
       />
 
       <section className="border-b border-[var(--color-line)]">
-        <div className="mx-auto max-w-[1180px] px-5 py-14 lg:px-8 lg:py-20">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 lg:px-8 lg:py-20">
           <Link
             href={`/${locale}/funciones`}
             className="text-[14px] text-[var(--color-ink-muted)] underline underline-offset-4"
           >
             {site.nav.features}
           </Link>
-          <h1 className="mt-3 max-w-[20ch] text-[clamp(30px,4.2vw,44px)] font-semibold leading-[1.06] tracking-[-0.03em]">
+          <h1 className="mt-3 max-w-[20ch] text-[clamp(30px,4.2vw,44px)] leading-[1.06] tracking-[-0.03em]">
             {copy.headline}
           </h1>
           <p className="mt-5 max-w-[56ch] text-[17px] leading-relaxed text-[var(--color-ink-muted)]">
             {copy.lede}
           </p>
-          <a
-            href={`${appUrl}/signup`}
-            className="mt-7 inline-block rounded-[10px] bg-[var(--color-primary)] px-5 py-3 text-[15px] font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-[var(--color-primary-hover)] active:scale-[0.985]"
-          >
+          <a href={`${appUrl}/signup`} className="btn-primary mt-7">
             {site.hero.cta}
           </a>
         </div>
@@ -101,7 +99,7 @@ export default async function FeaturePage({
             <SectionTitle title={copy.problem.title} body={copy.problem.body} />
           </div>
           <Image
-            src={`https://picsum.photos/seed/${feature.photoSeed}/900/700`}
+            src={photo(feature.photoSeed)}
             alt=""
             width={900}
             height={700}
@@ -115,8 +113,8 @@ export default async function FeaturePage({
         <SectionTitle title={copy.how.title} body={copy.how.body} />
         <ul className="mt-9 grid gap-5 sm:grid-cols-3">
           {copy.details.map((detail) => (
-            <li key={detail.title} className="rounded-[14px] border border-[var(--color-line)] p-5">
-              <h3 className="text-[16px] font-semibold">{detail.title}</h3>
+            <li key={detail.title} className="rounded-[16px] border border-[var(--color-line)] p-5">
+              <h3 className="text-[16px]">{detail.title}</h3>
               <p className="mt-2 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
                 {detail.body}
               </p>
@@ -133,14 +131,14 @@ export default async function FeaturePage({
               {copy.caveat}
             </p>
           </div>
-          <div className="rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
-            <h3 className="text-[17px] font-semibold leading-snug">{copy.question}</h3>
+          <div className="rounded-[16px] border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
+            <h3 className="text-[17px] leading-snug">{copy.question}</h3>
             <p className="mt-2.5 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
               {copy.answer}
             </p>
             <Link
               href={`/${locale}/preguntas`}
-              className="mt-4 inline-block text-[14px] font-medium text-[var(--color-primary)] underline underline-offset-4"
+              className="mt-4 inline-block text-[14px] text-[var(--color-primary)] underline underline-offset-4"
             >
               {isSpanish ? 'Ver todas las preguntas' : 'See every question'}
             </Link>
@@ -155,9 +153,9 @@ export default async function FeaturePage({
             <li key={item.slug}>
               <Link
                 href={`/${locale}/funciones/${item.slug}`}
-                className="block h-full rounded-[12px] border border-[var(--color-line)] p-4 transition-colors hover:border-[var(--color-primary)]/45"
+                className="block h-full rounded-[16px] border border-[var(--color-line)] p-4 transition-colors hover:border-[var(--color-primary)]/45"
               >
-                <span className="text-[16px] font-medium">{item[locale].name}</span>
+                <span className="text-[16px]">{item[locale].name}</span>
                 <span className="mt-1.5 block text-[14px] leading-snug text-[var(--color-ink-muted)]">
                   {item[locale].description.slice(0, 90)}…
                 </span>

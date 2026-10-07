@@ -2,11 +2,25 @@ import { PhoneCard } from '@/components/PhoneCard'
 import { Section, SectionTitle } from '@/components/Section'
 import { copyFor, isLocale } from '@/lib/i18n'
 import { industries } from '@/lib/industries'
+import { photo } from '@/lib/photos'
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001'
+
+/** Splits a headline around its key phrase so that phrase alone can carry the accent. */
+function highlight(title: string, phrase: string) {
+  const at = title.toLowerCase().indexOf(phrase.toLowerCase())
+  if (at < 0) return title
+  return (
+    <>
+      {title.slice(0, at)}
+      <span className="text-[var(--color-primary)]">{title.slice(at, at + phrase.length)}</span>
+      {title.slice(at + phrase.length)}
+    </>
+  )
+}
 
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -15,113 +29,234 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const base = `/${locale}`
   const isSpanish = locale === 'es'
 
+  const stats = [
+    { value: '55%', label: isSpanish ? 'de los clientes vuelven' : 'of customers return' },
+    {
+      value: '2.4',
+      label: isSpanish ? 'visitas al mes por cliente' : 'visits a month per customer',
+    },
+    { value: '76%', label: isSpanish ? 'canjean su recompensa' : 'redeem their reward' },
+    { value: '0', label: isSpanish ? 'apps que instalar' : 'apps to install' },
+  ]
+
   return (
     <>
-      {/* Hero: text left, the product itself right. No fake screenshot, no gradient blob. */}
-      <section className="border-b border-[var(--color-line)]">
-        <div className="mx-auto grid max-w-[1180px] items-center gap-10 px-5 pb-16 pt-14 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:px-8 lg:pb-24 lg:pt-20">
+      {/* Hero: a type-led headline stack on the left, warm photography on the right. */}
+      <section>
+        <div className="mx-auto grid max-w-[1200px] items-center gap-12 px-5 pb-16 pt-12 lg:grid-cols-2 lg:gap-16 lg:px-8 lg:pb-[120px] lg:pt-20">
           <div>
-            <h1 className="max-w-[20ch] text-[clamp(32px,4.6vw,50px)] font-semibold leading-[1.06] tracking-[-0.03em]">
-              {copy.hero.title}
+            <p className="badge">{copy.trust.title}</p>
+            <h1 className="t-display mt-8 max-w-[13ch]">
+              {highlight(copy.hero.title, copy.hero.highlight)}
             </h1>
-            <p className="mt-5 max-w-[46ch] text-[17px] leading-relaxed text-[var(--color-ink-muted)]">
+            <p className="t-subheading mt-6 max-w-[42ch] text-[var(--color-ink-muted)]">
               {copy.hero.subtitle}
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <a
-                href={`${appUrl}/signup`}
-                className="rounded-[10px] bg-[var(--color-primary)] px-5 py-3 text-[15px] font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-[var(--color-primary-hover)] active:scale-[0.985]"
-              >
+            <div className="mt-8 flex flex-wrap items-center gap-2">
+              <a href={`${appUrl}/signup`} className="btn-primary">
                 {copy.hero.cta}
               </a>
-              <Link
-                href={`${base}/funciones`}
-                className="rounded-[10px] border border-[var(--color-line)] px-5 py-3 text-[15px] font-medium transition-colors hover:bg-[var(--color-surface-muted)]"
-              >
+              <Link href={`${base}/funciones`} className="btn-ghost">
                 {copy.hero.secondary}
               </Link>
             </div>
           </div>
 
-          <div className="flex justify-center lg:justify-end">
-            <PhoneCard
-              businessName={isSpanish ? 'Café Raíces' : 'Raices Coffee'}
-              cardName={isSpanish ? 'Tarjeta Raíces' : 'Raices card'}
-              filled={7}
-              total={10}
-              reward={isSpanish ? 'Café gratis' : 'Free coffee'}
+          <div className="relative pb-10 lg:pb-12">
+            <Image
+              src={photo('volvia-hero-counter')}
+              alt={
+                isSpanish
+                  ? 'Una clienta muestra su teléfono en el mostrador de una cafetería'
+                  : 'A customer shows her phone at a coffee shop counter'
+              }
+              width={1200}
+              height={1400}
+              priority
+              className="aspect-[6/7] w-full rounded-[16px] object-cover"
+              sizes="(max-width: 1024px) 100vw, 560px"
             />
+            <div className="absolute -bottom-2 left-4 w-[62%] max-w-[260px] sm:left-6 lg:-bottom-12 lg:-left-10 lg:w-[46%]">
+              <PhoneCard
+                businessName={isSpanish ? 'Café Raíces' : 'Raices Coffee'}
+                cardName={isSpanish ? 'Tarjeta Raíces' : 'Raices card'}
+                filled={7}
+                total={10}
+                reward={isSpanish ? 'Café gratis' : 'Free coffee'}
+              />
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Trust sits under the hero, never inside it. */}
-      <div className="border-b border-[var(--color-line)] bg-[var(--color-surface-muted)]">
-        <div className="mx-auto max-w-[1180px] px-5 py-8 lg:px-8">
-          <p className="text-[13px] font-medium uppercase tracking-[0.14em] text-[var(--color-ink-muted)]">
-            {copy.trust.title}
-          </p>
-          <ul className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-[15px] text-[var(--color-ink)]">
-            {industries.slice(0, 6).map((industry) => (
-              <li key={industry.slug}>
-                <Link
-                  href={`${base}/sectores/${industry.slug}`}
-                  className="underline decoration-[var(--color-line)] decoration-2 underline-offset-4 transition-colors hover:decoration-[var(--color-primary)]"
-                >
-                  {industry[locale].plural}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
+      {/* Sectors as hairline link pills: proof of fit without a logo wall. */}
+      <div className="border-y border-[var(--color-line)]">
+        <ul className="mx-auto flex max-w-[1200px] flex-wrap gap-2 px-5 py-6 lg:px-8">
+          {industries.slice(0, 8).map((industry) => (
+            <li key={industry.slug}>
+              <Link
+                href={`${base}/sectores/${industry.slug}`}
+                className="inline-block rounded-[24px] border border-[var(--color-line)] px-4 py-2 text-[14px] transition-colors hover:border-[var(--color-ink)]"
+              >
+                {industry[locale].plural}
+              </Link>
+            </li>
+          ))}
+        </ul>
       </div>
 
-      {/* Steps as a numbered flow rather than three identical cards. */}
+      {/* Proof points as poster numerals. The size jump from body to stat is the point. */}
       <Section>
-        <SectionTitle title={copy.steps.title} />
-        <ol className="mt-10 grid gap-8 lg:grid-cols-3 lg:gap-10">
+        <dl className="grid gap-x-10 gap-y-14 sm:grid-cols-2">
+          {stats.map((stat) => (
+            <div key={stat.label} className="border-t border-[var(--color-ink)] pt-6">
+              <dt className="t-stat">{stat.value}</dt>
+              <dd className="t-body-sm mt-4 text-[var(--color-ink-muted)]">{stat.label}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-10 text-[12px] text-[var(--color-ink-muted)]">
+          {isSpanish
+            ? 'Cifras de ejemplo de una cuenta de demostración.'
+            : 'Example figures from a demonstration account.'}
+        </p>
+      </Section>
+
+      {/* Steps as a numbered, type-only flow. */}
+      <Section tone="muted">
+        <SectionTitle eyebrow={copy.steps.eyebrow} title={copy.steps.title} />
+        <ol className="mt-14 grid gap-10 lg:grid-cols-3">
           {copy.steps.items.map((step, index) => (
-            <li key={step.title} className="border-t-2 border-[var(--color-ink)] pt-4">
-              <span className="tabular-nums text-[13px] font-semibold text-[var(--color-primary)]">
-                {String(index + 1).padStart(2, '0')}
-              </span>
-              <h3 className="mt-2 text-[19px] font-semibold leading-tight">{step.title}</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
-                {step.body}
-              </p>
+            <li key={step.title} className="border-t border-[var(--color-ink)] pt-6">
+              <span className="t-display block tabular-nums">{index + 1}</span>
+              <h3 className="t-heading-sm mt-8">{step.title}</h3>
+              <p className="t-body mt-3 max-w-[36ch] text-[var(--color-ink-muted)]">{step.body}</p>
             </li>
           ))}
         </ol>
       </Section>
 
-      {/* Split with a real photograph, reversed from the hero so the rhythm changes. */}
-      <Section tone="muted">
-        <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
-          <div className="order-2 lg:order-1">
-            <Image
-              src="https://picsum.photos/seed/volvia-phone-wallet-counter/900/700"
-              alt={
-                isSpanish
-                  ? 'Una persona paga en el mostrador con su teléfono en la mano'
-                  : 'Someone paying at a counter with their phone in hand'
-              }
-              width={900}
-              height={700}
-              className="w-full rounded-[16px] object-cover"
-              sizes="(max-width: 1024px) 100vw, 520px"
-            />
+      {/* The one dark band: product cards in a horizontal rail, no seam between card and band. */}
+      <section className="bg-[var(--color-inverse-surface)] text-white">
+        <div className="rise mx-auto max-w-[1200px] px-5 py-16 sm:py-20 lg:px-8 lg:py-[120px]">
+          <div className="flex flex-wrap items-end justify-between gap-6">
+            <h2 className="t-heading-lg max-w-[18ch]">{copy.features.title}</h2>
+            <Link href={`${base}/funciones`} className="btn-inverse">
+              {copy.hero.secondary}
+            </Link>
           </div>
 
-          <div className="order-1 lg:order-2">
+          <div className="rail mt-12 lg:grid-cols-4 lg:grid-flow-row lg:overflow-visible">
+            <article className="flex flex-col rounded-[16px] bg-black">
+              <div className="grid aspect-[4/5] place-items-center rounded-[16px] bg-[#111111] p-6">
+                <div className="w-full max-w-[220px]">
+                  <PhoneCard
+                    businessName={isSpanish ? 'Barbería Norte' : 'North Barbers'}
+                    cardName={isSpanish ? 'El 8.º corte, gratis' : '8th cut free'}
+                    filled={6}
+                    total={8}
+                    reward={isSpanish ? 'Corte gratis' : 'Free cut'}
+                  />
+                </div>
+              </div>
+              <h3 className="t-subheading mt-5">
+                {isSpanish ? 'Tu tarjeta, en su Wallet' : 'Your card, in their Wallet'}
+              </h3>
+              <p className="t-body-sm mt-2 text-white/60">{copy.wallet.points.join(' · ')}</p>
+            </article>
+
+            <article className="flex flex-col rounded-[16px] bg-black">
+              <div className="flex aspect-[4/5] flex-col justify-end rounded-[16px] bg-[#111111] p-6">
+                <p className="t-stat text-[clamp(64px,8vw,96px)]">55%</p>
+                <p className="t-body-sm mt-3 text-white/60">
+                  {isSpanish ? 'de los clientes vuelven' : 'of customers return'}
+                </p>
+              </div>
+              <h3 className="t-subheading mt-5">
+                {isSpanish
+                  ? 'Sabes quién vuelve y quién no'
+                  : 'You know who returns and who does not'}
+              </h3>
+              <p className="t-body-sm mt-2 text-white/60">
+                {isSpanish
+                  ? 'Cada sello es un dato. Los clientes en riesgo se agrupan solos.'
+                  : 'Every stamp is a data point. At-risk customers group themselves.'}
+              </p>
+            </article>
+
+            <article className="flex flex-col rounded-[16px] bg-black">
+              <Image
+                src={photo('volvia-birthday-table')}
+                alt={
+                  isSpanish
+                    ? 'Una mesa celebrando un cumpleaños con un postre'
+                    : 'A table celebrating a birthday with dessert'
+                }
+                width={640}
+                height={800}
+                className="aspect-[4/5] w-full rounded-[16px] object-cover"
+                sizes="(max-width: 1024px) 80vw, 280px"
+              />
+              <h3 className="t-subheading mt-5">
+                {isSpanish ? 'Cumpleaños en automático' : 'Birthdays on autopilot'}
+              </h3>
+              <p className="t-body-sm mt-2 text-white/60">
+                {isSpanish
+                  ? 'Se configura una vez y sale solo, en la hora de tu negocio.'
+                  : 'Set it once and it runs itself, in your shop timezone.'}
+              </p>
+            </article>
+
+            <article className="flex flex-col rounded-[16px] bg-black">
+              <Image
+                src={photo('volvia-barber-hands')}
+                alt={isSpanish ? 'Un barbero terminando un corte' : 'A barber finishing a cut'}
+                width={640}
+                height={800}
+                className="aspect-[4/5] w-full rounded-[16px] object-cover"
+                sizes="(max-width: 1024px) 80vw, 280px"
+              />
+              <h3 className="t-subheading mt-5">
+                {isSpanish ? 'Reseñas de quien sí volvió' : 'Reviews from people who came back'}
+              </h3>
+              <p className="t-body-sm mt-2 text-white/60">
+                {isSpanish
+                  ? 'Pides la reseña justo después de una recompensa, no al azar.'
+                  : 'You ask right after a reward, not at random.'}
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      {/* Wallet split: photograph left, the argument right. */}
+      <Section>
+        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+          <Image
+            src={photo('volvia-phone-wallet-counter')}
+            alt={
+              isSpanish
+                ? 'Una persona paga en el mostrador con su teléfono en la mano'
+                : 'Someone paying at a counter with their phone in hand'
+            }
+            width={1200}
+            height={960}
+            className="w-full rounded-[16px] object-cover"
+            sizes="(max-width: 1024px) 100vw, 560px"
+          />
+          <div>
             <SectionTitle title={copy.wallet.title} body={copy.wallet.body} />
-            <ul className="mt-6 flex flex-col gap-3">
+            <ul className="mt-8 flex flex-col border-t border-[var(--color-line)]">
               {copy.wallet.points.map((point) => (
-                <li key={point} className="flex items-start gap-3 text-[16px]">
+                <li
+                  key={point}
+                  className="t-body flex items-center justify-between gap-4 border-b border-[var(--color-line)] py-4"
+                >
+                  {point}
                   <span
                     aria-hidden="true"
-                    className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-primary)]"
+                    className="h-2 w-2 rounded-full bg-[var(--color-primary)]"
                   />
-                  {point}
                 </li>
               ))}
             </ul>
@@ -129,94 +264,29 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </div>
       </Section>
 
-      {/* Bento with mixed cell sizes and one dark cell, so it is not six white boxes. */}
-      <Section>
-        <SectionTitle title={copy.features.title} />
-        <div className="mt-10 grid gap-3 lg:grid-cols-3">
-          <article className="rounded-[14px] bg-[var(--color-inverse-surface)] p-6 text-white lg:col-span-2 lg:row-span-2">
-            <h3 className="text-[22px] font-semibold leading-tight">
-              {isSpanish
-                ? 'Sabes quién vuelve y quién no'
-                : 'You know who returns and who does not'}
-            </h3>
-            <p className="mt-3 max-w-[46ch] text-[15px] leading-relaxed text-white/70">
-              {isSpanish
-                ? 'Cada sello es un dato: cuántos vuelven, cada cuánto, a qué hora y qué día llenas el local. Los segmentos de clientes en riesgo se arman solos.'
-                : 'Every stamp is a data point: how many return, how often, at what hour, and which day fills your shop. At-risk segments build themselves.'}
-            </p>
-            <dl className="mt-8 grid grid-cols-3 gap-4 border-t border-white/12 pt-6">
-              {[
-                { value: '55%', label: isSpanish ? 'vuelven' : 'return' },
-                { value: '2.4', label: isSpanish ? 'visitas al mes' : 'visits a month' },
-                { value: '76%', label: isSpanish ? 'canjean' : 'redeem' },
-              ].map((stat) => (
-                <div key={stat.label}>
-                  <dt className="text-[24px] font-semibold tabular-nums">{stat.value}</dt>
-                  <dd className="mt-0.5 text-[13px] text-white/60">{stat.label}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-4 text-[12px] text-white/45">
-              {isSpanish
-                ? 'Cifras de ejemplo de una cuenta de demostración.'
-                : 'Example figures from a demonstration account.'}
-            </p>
-          </article>
-
-          <article className="rounded-[14px] border border-[var(--color-line)] p-6">
-            <h3 className="text-[17px] font-semibold leading-tight">
-              {isSpanish ? 'Cumpleaños en automático' : 'Birthdays on autopilot'}
-            </h3>
-            <p className="mt-2 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
-              {isSpanish
-                ? 'Se configura una vez y sale solo, en la hora de tu negocio.'
-                : 'Set it once and it runs itself, in your shop timezone.'}
-            </p>
-          </article>
-
-          <article className="overflow-hidden rounded-[14px] border border-[var(--color-line)]">
-            <Image
-              src="https://picsum.photos/seed/volvia-barber-hands/560/320"
-              alt={isSpanish ? 'Un barbero terminando un corte' : 'A barber finishing a cut'}
-              width={560}
-              height={320}
-              className="h-[150px] w-full object-cover"
-              sizes="(max-width: 1024px) 100vw, 360px"
-            />
-            <div className="p-6">
-              <h3 className="text-[17px] font-semibold leading-tight">
-                {isSpanish ? 'Reseñas de quien sí volvió' : 'Reviews from people who came back'}
-              </h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
-                {isSpanish
-                  ? 'Pides la reseña justo después de una recompensa, no al azar.'
-                  : 'You ask right after a reward, not at random.'}
-              </p>
-            </div>
-          </article>
-        </div>
-      </Section>
-
+      {/* Sectors as photo cards on white. */}
       <Section tone="muted">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <SectionTitle title={copy.industries.title} />
-          <Link
-            href={`${base}/sectores`}
-            className="text-[15px] font-medium text-[var(--color-primary)] underline underline-offset-4"
-          >
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <SectionTitle eyebrow={copy.nav.industries} title={copy.industries.title} />
+          <Link href={`${base}/sectores`} className="btn-ghost">
             {copy.industries.cta}
           </Link>
         </div>
 
-        <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="mt-12 grid gap-x-4 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
           {industries.slice(0, 8).map((industry) => (
             <li key={industry.slug}>
-              <Link
-                href={`${base}/sectores/${industry.slug}`}
-                className="flex h-full flex-col rounded-[12px] border border-[var(--color-line)] bg-white p-4 transition-colors hover:border-[var(--color-primary)]/45"
-              >
-                <span className="text-[16px] font-medium">{industry[locale].plural}</span>
-                <span className="mt-1 text-[14px] text-[var(--color-ink-muted)]">
+              <Link href={`${base}/sectores/${industry.slug}`} className="group block">
+                <Image
+                  src={photo(industry.photoSeed)}
+                  alt=""
+                  width={600}
+                  height={600}
+                  className="aspect-square w-full rounded-[16px] object-cover transition-opacity duration-200 group-hover:opacity-90"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 280px"
+                />
+                <span className="t-subheading mt-4 block">{industry[locale].plural}</span>
+                <span className="t-body-sm mt-1 block text-[var(--color-ink-muted)]">
                   {industry[locale].reward}
                 </span>
               </Link>
@@ -225,18 +295,16 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </ul>
       </Section>
 
-      <Section tone="ink">
-        <div className="mx-auto max-w-[36ch] text-center">
-          <h2 className="text-[clamp(26px,3.6vw,38px)] font-semibold leading-[1.1] tracking-[-0.02em]">
-            {copy.finalCta.title}
-          </h2>
-          <p className="mt-3 text-[16px] leading-relaxed text-white/70">{copy.finalCta.body}</p>
-          <a
-            href={`${appUrl}/signup`}
-            className="mt-7 inline-block rounded-[10px] bg-white px-5 py-3 text-[15px] font-semibold text-[var(--color-ink)] transition-transform duration-150 active:scale-[0.985]"
-          >
-            {copy.finalCta.cta}
-          </a>
+      {/* Closing call to action: white, poster-sized, one black pill. */}
+      <Section tone="muted">
+        <div className="flex flex-col items-start gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <h2 className="t-display max-w-[14ch]">{copy.finalCta.title}</h2>
+          <div className="max-w-[36ch]">
+            <p className="t-subheading text-[var(--color-ink-muted)]">{copy.finalCta.body}</p>
+            <a href={`${appUrl}/signup`} className="btn-primary mt-6">
+              {copy.finalCta.cta}
+            </a>
+          </div>
         </div>
       </Section>
     </>

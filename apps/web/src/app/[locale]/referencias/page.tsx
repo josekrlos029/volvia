@@ -39,8 +39,8 @@ export default async function BenchmarksPage({ params }: { params: Promise<{ loc
   return (
     <>
       <section className="border-b border-[var(--color-line)]">
-        <div className="mx-auto max-w-[1180px] px-5 py-14 lg:px-8 lg:py-20">
-          <h1 className="max-w-[22ch] text-[clamp(30px,4.2vw,44px)] font-semibold leading-[1.06] tracking-[-0.03em]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 lg:px-8 lg:py-20">
+          <h1 className="max-w-[22ch] text-[clamp(30px,4.2vw,44px)] leading-[1.06] tracking-[-0.03em]">
             {isSpanish
               ? 'Números típicos de un programa de sellos'
               : 'Typical numbers for a stamp programme'}
@@ -56,14 +56,12 @@ export default async function BenchmarksPage({ params }: { params: Promise<{ loc
       <Section>
         <ul className="grid gap-4 md:grid-cols-2">
           {rows.map((row) => (
-            <li key={row.id} className="rounded-[14px] border border-[var(--color-line)] p-5">
-              <p className="text-[13px] font-medium uppercase tracking-[0.1em] text-[var(--color-ink-muted)]">
+            <li key={row.id} className="rounded-[16px] border border-[var(--color-line)] p-5">
+              <p className="text-[13px] uppercase tracking-[0.1em] text-[var(--color-ink-muted)]">
                 {basisLabels[row.basis]}
               </p>
-              <h2 className="mt-2.5 text-[17px] font-semibold leading-snug">{row.metric}</h2>
-              <p className="tabular-nums mt-2 text-[28px] font-semibold tracking-[-0.02em]">
-                {row.range}
-              </p>
+              <h2 className="mt-2.5 text-[17px] leading-snug">{row.metric}</h2>
+              <p className="tabular-nums mt-2 text-[28px] tracking-[-0.02em]">{row.range}</p>
               <p className="mt-2.5 max-w-[52ch] text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
                 {row.note}
               </p>
@@ -85,14 +83,14 @@ export default async function BenchmarksPage({ params }: { params: Promise<{ loc
           {isSpanish ? 'Las palabras están definidas en el ' : 'The words are defined in the '}
           <Link
             href={`/${locale}/glosario`}
-            className="font-medium text-[var(--color-primary)] underline underline-offset-4"
+            className="text-[var(--color-primary)] underline underline-offset-4"
           >
             {isSpanish ? 'glosario' : 'glossary'}
           </Link>
           {isSpanish ? '. Para calcular lo tuyo, la ' : '. To work out your own, the '}
           <Link
             href={`/${locale}/calculadora`}
-            className="font-medium text-[var(--color-primary)] underline underline-offset-4"
+            className="text-[var(--color-primary)] underline underline-offset-4"
           >
             {isSpanish ? 'calculadora' : 'calculator'}
           </Link>
