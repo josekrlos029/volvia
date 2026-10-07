@@ -204,6 +204,71 @@
   }
 
   /*
+   * Endless strip. The track holds the items twice and slides by exactly half its width,
+   * so the loop seam is invisible. Hover or focus inside pauses it so links can be read.
+   */
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .marquee {
+    overflow: hidden;
+    mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  }
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee var(--marquee-duration, 60s) linear infinite;
+  }
+  .marquee-reverse .marquee-track {
+    animation-direction: reverse;
+  }
+  .marquee:hover .marquee-track,
+  .marquee:focus-within .marquee-track {
+    animation-play-state: paused;
+  }
+
+  /* Tab timer: the active tab's hairline fills over the dwell time, then hands over. */
+  @keyframes tab-progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+  .tab-progress {
+    transform-origin: left;
+    animation: tab-progress var(--tab-duration, 7s) linear forwards;
+  }
+
+  /* Cross-fade for content that swaps in place, such as the tab panel's photograph. */
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  .fade-in {
+    animation: fade-in 500ms ease both;
+  }
+
+  /* FAQ disclosure: the plus turns into a cross when the answer is open. */
+  .faq-item summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .faq-item summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq-item .faq-icon {
+    transition: transform 200ms ease;
+  }
+  .faq-item[open] .faq-icon {
+    transform: rotate(45deg);
+  }
+
+  /*
    * Entry motion. Sections fade up as they arrive rather than on a timer, so the page
    * feels like it is responding to the reader instead of performing at them.
    */
@@ -238,6 +303,22 @@
       animation: none;
       opacity: 1;
       transform: none;
+    }
+    /* Strips become a plain scrollable row instead of moving on their own. */
+    .marquee {
+      overflow-x: auto;
+      mask-image: none;
+      scrollbar-width: none;
+    }
+    .marquee-track {
+      animation: none;
+    }
+    .marquee-track > [data-copy] {
+      display: none;
+    }
+    .tab-progress {
+      animation: none;
+      transform: scaleX(1);
     }
   }
 }
