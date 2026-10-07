@@ -90,6 +90,6 @@ apunten a algo que existe.
 - [Arquitectura](docs/ARCHITECTURE.md), por qué el sistema está partido así.
 - [Modelo de datos](docs/DATA-MODEL.md), qué guarda cada tabla y por qué.
 - [Operación](docs/RUNBOOK.md), qué hacer cuando algo falla.
-- [Producción](docs/DEPLOYMENT.md), lo que falta para desplegar.
+- [Producción](docs/DEPLOYMENT.md), dónde vive cada pieza y cómo se publica un cambio.
 - [Wallet](docs/WALLET-SETUP.md), certificados de Apple y Google paso a paso.
 - [Apps nativas](docs/APPS-NATIVAS.md), las dos apps del personal y qué falta para publicarlas.

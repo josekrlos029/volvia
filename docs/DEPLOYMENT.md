@@ -1,52 +1,74 @@
 # Producción
 
-Nada de esto se ha ejecutado todavía. El sistema corre completo en local y esta es la lista
-de lo que falta para sacarlo, pendiente de tu visto bueno.
+Volvia corre en `somosvolvia.com` desde el 7 de octubre de 2026. Este documento dice dónde
+vive cada pieza y cómo se publica un cambio.
 
-## Lo que hay que crear
+## Dónde vive cada cosa
 
-**Neon.** Una base y dos cadenas de conexión: la *pooled* para `DATABASE_URL` y la directa
-para `DATABASE_URL_UNPOOLED`, que es la que usan las migraciones. El cliente ya detecta
-Neon y activa TLS y el modo sin sentencias preparadas.
+| Pieza | Dónde | Notas |
+|---|---|---|
+| Sitio de marketing | Vercel, proyecto `volvia-web` (`apps/web`) | `somosvolvia.com`; `www` redirige al dominio raíz |
+| Panel | Vercel, proyecto `volvia-app` (`apps/app`) | `app.somosvolvia.com` |
+| Tarjeta del cliente | Vercel, proyecto `volvia-pass` (`apps/pass`) | `tarjeta.somosvolvia.com` |
+| API | Cloud Run, servicio `volvia-api` | `api.somosvolvia.com`, mínimo una instancia |
+| Worker | Cloud Run, worker pool `volvia-worker` | Una instancia fija; no escucha en ningún puerto |
+| Base de datos | Neon, AWS us-east-1 | URL *pooled* para la API, directa para migraciones |
+| Redis | Redis Cloud, AWS us-east-1 | Sesiones, idempotencia, nonces, límites y colas |
+| Archivos | Cloudflare R2, bucket `volvia-uploads` | Lectura pública en `files.somosvolvia.com` |
+| Correo | Resend por SMTP | Dominio `somosvolvia.com` verificado |
+| DNS | Cloudflare | Todo en DNS-only: Vercel y Google emiten sus propios certificados |
 
-**Redis gestionado.** Sostiene sesiones, idempotencia, nonces de kiosko y límites. Debe
-quedar en la misma región que Cloud Run: cada milisegundo aquí se paga en el escaneo.
+El proyecto de GCP es `somosvolvia-prod`, en la región `us-east4`, al lado de Neon y Redis.
+Cada escaneo pasa por Redis, así que esa cercanía se nota en el mostrador.
 
-**Cloud Run.** Dos servicios desde el mismo `infra/Dockerfile.api`: la API y el worker con
-`--command node --args dist/worker.js`. La API con mínimo una instancia (arrancar en frío
-un escaneo en el mostrador se siente mal); el worker puede escalar a cero.
+Los secretos viven en Secret Manager y el servicio los lee con la cuenta
+`volvia-runtime`: `DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`,
+`TOKEN_PEPPER`, `SMTP_PASS`, `STORAGE_ACCESS_KEY` y `STORAGE_SECRET_KEY`. El resto de la
+configuración son variables normales del servicio.
 
-**Vercel.** Tres proyectos apuntando al mismo repo, con `apps/web`, `apps/app` y
-`apps/pass` como raíz.
+## Publicar un cambio
 
-**Almacenamiento.** Un bucket de GCS con el endpoint S3. El adaptador ya está detrás de
-`STORAGE_*`.
+**Las apps web** se publican solas con cada push a `main`. Vercel no reconstruye una app
+si el commit no la toca.
 
-**Correo.** Resend o similar, cambiando `SMTP_*`. En local todo cae en Mailpit.
+**La API y el worker** comparten imagen. Desde la raíz del repo:
 
-## Lo que tienes que poner tú
+```bash
+export CLOUDSDK_ACTIVE_CONFIG_NAME=volvia
+REPO="us-east4-docker.pkg.dev/somosvolvia-prod/volvia/api"
+TAG="$(git rev-parse --short HEAD)"
+docker buildx build --platform linux/amd64 -f infra/Dockerfile.api -t "${REPO}:${TAG}" --push .
+gcloud run deploy volvia-api --region us-east4 --image "${REPO}:${TAG}"
+gcloud beta run worker-pools deploy volvia-worker --region us-east4 --image "${REPO}:${TAG}"
+```
 
-- **Apple.** Un Pass Type ID y su certificado en Apple Developer, exportado como `.p12`.
-  Hasta entonces `WALLET_MODE=stub` genera pases correctos que un iPhone rechaza.
-- **Google Wallet.** Una cuenta de servicio con la API habilitada y el issuer ID.
-- **Stripe.** Clave secreta, secreto de webhook y un precio por plan e intervalo.
-- **Wompi.** Llaves de producción y los secretos de eventos e integridad.
-- **Google OAuth.** Cliente y secreto, con el callback de la API en las URIs permitidas.
+Escribe `"${REPO}:${TAG}"` con llaves: en zsh, `$REPO:latest` aplica el modificador `:l` y
+publica la imagen en otro repositorio.
 
-## Antes del primer despliegue
+**Las migraciones** van antes de desplegar una imagen que las necesite:
+`pnpm db:migrate`, con `DATABASE_URL_UNPOOLED` apuntando a la URL directa de Neon.
 
-1. Genera secretos nuevos para `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` y `TOKEN_PEPPER`.
-   Los locales están en el repositorio y no valen para producción.
-2. Deja `RATE_LIMIT_ENABLED=true`. En local está en `false` para que la suite E2E pueda
-   registrar muchos negocios desde una IP.
-3. Pon `CORS_ORIGINS` con los dominios reales y `COOKIE_DOMAIN` con el dominio raíz.
-4. Corre las migraciones contra la URL directa de Neon antes de levantar los servicios.
+## Cuidado con el `.env` local
 
-No hace falta que te acuerdes de los puntos 1 a 3: con `NODE_ENV=production` la API se
-niega a arrancar si encuentra los secretos de ejemplo, el límite de peticiones apagado,
-cookies en `localhost`, orígenes en `http://` o URLs apuntando a tu máquina. Falla al
-arrancar, con la lista completa de lo que hay que corregir, en vez de quedarse sirviendo
-con una configuración insegura. La comprobación vive en `unsafeForProduction`
+Si tu `.env` apunta a Neon y Redis de producción, `pnpm db:seed` y `pnpm db:reset` actúan
+sobre producción. Para desarrollar, vuelve a los valores de `.env.example`, que usan los
+contenedores locales.
+
+## Lo que todavía no está encendido
+
+- **Wallet**: `WALLET_MODE=disabled`. Hace falta el Pass Type ID de Apple con su
+  certificado y una cuenta de servicio de Google Wallet; los pasos están en
+  [WALLET-SETUP.md](WALLET-SETUP.md).
+- **Cobros**: `BILLING_ENABLED=false`. Faltan las llaves de producción de Stripe y Wompi,
+  sus secretos de webhook y un precio por plan e intervalo.
+- **Google OAuth**: falta el cliente, con `https://api.somosvolvia.com` en las URIs de
+  callback.
+
+## Lo que la API comprueba sola
+
+Con `NODE_ENV=production` la API se niega a arrancar si encuentra los secretos de ejemplo,
+el límite de peticiones apagado, cookies en `localhost`, orígenes en `http://` o URLs
+apuntando a tu máquina. La comprobación vive en `unsafeForProduction`
 (`apps/api/src/env.ts`) y está cubierta por pruebas.
 
 ## Cambiar el token del pase
