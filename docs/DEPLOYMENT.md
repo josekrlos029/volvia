@@ -15,7 +15,8 @@ vive cada pieza y cómo se publica un cambio.
 | Base de datos | Neon, AWS us-east-1 | URL *pooled* para la API, directa para migraciones |
 | Redis | Redis Cloud, AWS us-east-1 | Sesiones, idempotencia, nonces, límites y colas |
 | Archivos | Cloudflare R2, bucket `volvia-uploads` | Lectura pública en `files.somosvolvia.com` |
-| Correo | Resend por SMTP | Dominio `somosvolvia.com` verificado |
+| Correo saliente | Resend por SMTP | Dominio `somosvolvia.com` verificado |
+| Correo entrante | Cloudflare Email Routing | `hola@somosvolvia.com` se reenvía al Gmail del dueño |
 | DNS | Cloudflare | Todo en DNS-only: Vercel y Google emiten sus propios certificados |
 
 El proyecto de GCP es `somosvolvia-prod`, en la región `us-east4`, al lado de Neon y Redis.
@@ -53,6 +54,13 @@ publica la imagen en otro repositorio.
 Si tu `.env` apunta a Neon y Redis de producción, `pnpm db:seed` y `pnpm db:reset` actúan
 sobre producción. Para desarrollar, vuelve a los valores de `.env.example`, que usan los
 contenedores locales.
+
+## Redis sin cifrar
+
+La base de Redis Cloud no tiene TLS activado, así que la conexión desde Cloud Run viaja
+sin cifrar por internet. Solo la protege la contraseña. Para cifrarla hay que activar
+*Transport layer security* en la base (plan de pago) y cambiar el secreto `REDIS_URL` a
+`rediss://`. ioredis lo soporta sin cambios de código.
 
 ## Lo que todavía no está encendido
 
