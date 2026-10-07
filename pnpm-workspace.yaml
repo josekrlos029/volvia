@@ -1,4 +1,9 @@
 packages:
-  - "apps/*"
+  # The native apps live under apps/ too, but they are built by Xcode and Gradle,
+  # not by pnpm. Listing the JS ones explicitly keeps them out of the workspace.
+  - "apps/api"
+  - "apps/app"
+  - "apps/pass"
+  - "apps/web"
   - "packages/*"
   - "tests/*"

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      A pure-Compose app needs almost nothing from the XML theme: Material 3 lives in
+      the composables, not here. This exists so the window has no title bar and the
+      system bars get out of the camera's way.
+    -->
+    <style name="Theme.VolviaBiz" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

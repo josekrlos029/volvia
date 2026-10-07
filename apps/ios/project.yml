@@ -1,0 +1,64 @@
+name: VolviaBiz
+options:
+  bundleIdPrefix: co.volvia
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    CODE_SIGN_STYLE: Automatic
+    # Nothing here is signed for distribution: the Team ID is set when the Apple
+    # Developer account exists. Until then the app builds and runs on a simulator.
+    DEVELOPMENT_TEAM: ""
+
+targets:
+  VolviaBiz:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Volvia Biz
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # The scanner is the whole app; the reason has to say so plainly.
+        NSCameraUsageDescription: >-
+          Volvia Biz usa la cámara para leer el código de la tarjeta de tus
+          clientes y sumarles un sello.
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.volvia.biz
+        GENERATE_INFOPLIST_FILE: NO
+
+  VolviaBizTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: VolviaBiz
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.volvia.biz.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  VolviaBiz:
+    build:
+      targets:
+        VolviaBiz: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - VolviaBizTests

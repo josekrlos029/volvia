@@ -1,0 +1,5 @@
+# Generated from project.yml by `xcodegen generate`; never hand-edited, so never committed.
+VolviaBiz.xcodeproj/
+DerivedData/
+build/
+*.xcuserstate

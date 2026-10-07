@@ -40,6 +40,33 @@ jobs:
       - name: Unit tests
         run: pnpm --filter '!@volvia/e2e' test
 
+  android:
+    name: Android app
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Unit tests
+        working-directory: apps/android
+        run: ./gradlew :app:testDebugUnitTest --console=plain
+
+      - name: Debug build
+        working-directory: apps/android
+        run: ./gradlew :app:assembleDebug --console=plain
+
+  # The iOS app is not built here on purpose: it needs a macOS runner, which bills at
+  # ten times the rate of this one. Run it locally before releasing:
+  #   cd apps/ios && xcodegen generate && xcodebuild test -scheme VolviaBiz \
+  #     -destination 'platform=iOS Simulator,name=iPhone 17'
+
   e2e:
     name: End to end
     runs-on: ubuntu-latest

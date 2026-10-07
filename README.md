@@ -44,10 +44,12 @@ El seed crea tres negocios con historial real de visitas. La contraseña es
 
 ```
 apps/
-  api/    Fastify sobre Node 22. API, webhooks, wallet y worker de trabajos.
-  app/    Panel del negocio, escáner PWA y pantalla de kiosko.
-  pass/   Superficies del cliente: alta, tarjeta y página pública del negocio.
-  web/    Sitio de marketing con blog en MDX y páginas por sector.
+  api/      Fastify sobre Node 22. API, webhooks, wallet y worker de trabajos.
+  app/      Panel del negocio, escáner PWA y pantalla de kiosko.
+  pass/     Superficies del cliente: alta, tarjeta y página pública del negocio.
+  web/      Sitio de marketing con blog en MDX y páginas por sector.
+  ios/      Volvia Biz para iPhone: Swift, SwiftUI y AVFoundation.
+  android/  Volvia Biz para Android: Kotlin, Compose y CameraX.
 packages/
   db/       Esquema Drizzle, migraciones y seed.
   shared/   Esquemas zod, matriz de planes y cliente HTTP tipado.
@@ -90,3 +92,4 @@ apunten a algo que existe.
 - [Operación](docs/RUNBOOK.md), qué hacer cuando algo falla.
 - [Producción](docs/DEPLOYMENT.md), lo que falta para desplegar.
 - [Wallet](docs/WALLET-SETUP.md), certificados de Apple y Google paso a paso.
+- [Apps nativas](docs/APPS-NATIVAS.md), las dos apps del personal y qué falta para publicarlas.
