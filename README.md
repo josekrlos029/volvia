@@ -9,7 +9,7 @@ celular, y al completarla se libera una recompensa.
 ```bash
 pnpm install
 cp .env.example .env                      # los valores por defecto ya funcionan
-pnpm infra:up                             # postgres, redis, mailpit y minio en Docker
+pnpm infra:up                             # postgres, redis, mailpit y almacenamiento
 pnpm certs:dev                            # certificados de desarrollo para wallet
 pnpm db:migrate && pnpm db:seed           # esquema y datos de prueba
 pnpm dev                                  # las cuatro apps y el worker
@@ -22,7 +22,7 @@ pnpm dev                                  # las cuatro apps y el worker
 | Tarjeta | http://localhost:3002 | Alta, tarjeta del cliente y página del negocio |
 | API | http://localhost:8080 | REST, webhooks y wallet. Documentación en `/docs` |
 | Correo | http://localhost:58025 | Todo el correo que envía la plataforma |
-| Archivos | http://localhost:59001 | Consola de MinIO |
+| Archivos | http://localhost:59000 | Almacenamiento S3 local |
 
 Los puertos de infraestructura son poco comunes a propósito (55432, 56379, 51025, 59000):
 esta máquina ya tiene otros proyectos ocupando los puertos habituales, y conectarse por
