@@ -802,7 +802,7 @@ export const features: Feature[] = [
       },
       how: {
         title: 'Cómo funciona',
-        body: 'Cada negocio tiene una página en volvia.co con su nombre. Ahí está la tarjeta para unirse, tus enlaces, tus sedes con horario y mapa, y el aviso de privacidad a tu nombre.',
+        body: 'Cada negocio tiene una página en somosvolvia.com con su nombre. Ahí está la tarjeta para unirse, tus enlaces, tus sedes con horario y mapa, y el aviso de privacidad a tu nombre.',
       },
       details: [
         {
@@ -822,7 +822,7 @@ export const features: Feature[] = [
         'No es un constructor de webs. Es una página buena para lo que hace; si necesitas secciones, blog y tienda, necesitas otra cosa.',
       question: '¿Puedo usar mi propio dominio?',
       answer:
-        'Hoy la página vive en volvia.co con tu nombre. Un dominio propio no está disponible todavía.',
+        'Hoy la página vive en somosvolvia.com con tu nombre. Un dominio propio no está disponible todavía.',
     },
     en: {
       name: 'Your public page',
@@ -837,7 +837,7 @@ export const features: Feature[] = [
       },
       how: {
         title: 'How it works',
-        body: 'Every shop gets a page at volvia.co under its own name. The card to join is there, with your links, your locations with hours and a map, and a privacy notice in your name.',
+        body: 'Every shop gets a page at somosvolvia.com under its own name. The card to join is there, with your links, your locations with hours and a map, and a privacy notice in your name.',
       },
       details: [
         {
@@ -857,7 +857,7 @@ export const features: Feature[] = [
         'It is not a website builder. It is a good page for what it does; if you need sections, a blog and a shop, you need something else.',
       question: 'Can I use my own domain?',
       answer:
-        'Today the page lives at volvia.co under your name. A custom domain is not available yet.',
+        'Today the page lives at somosvolvia.com under your name. A custom domain is not available yet.',
     },
   },
   {

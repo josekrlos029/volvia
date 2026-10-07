@@ -22,6 +22,10 @@ COPY tsconfig.base.json ./
 COPY packages ./packages
 COPY apps/api ./apps/api
 RUN pnpm --filter @volvia/api build
+# The bundle inlines workspace packages but imports npm dependencies at runtime, so the
+# runtime image needs the API's production node_modules (and nothing else).
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm --filter @volvia/api deploy --prod /prod
 
 FROM node:22-slim AS runtime
 ENV NODE_ENV=production
@@ -33,6 +37,7 @@ RUN groupadd --system --gid 1001 volvia \
  && apt-get update && apt-get install -y --no-install-recommends dumb-init \
  && rm -rf /var/lib/apt/lists/*
 
+COPY --from=build --chown=volvia:volvia /prod/node_modules ./node_modules
 COPY --from=build --chown=volvia:volvia /app/apps/api/dist ./dist
 # Migrations ship with the image so a release can apply its own schema change.
 COPY --from=build --chown=volvia:volvia /app/packages/db/drizzle ./drizzle

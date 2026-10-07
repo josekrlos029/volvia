@@ -19,7 +19,7 @@ export const organizations = pgTable(
   {
     id: uuid().primaryKey().default(sql`gen_random_uuid()`),
     name: text().notNull(),
-    /** Public handle: volvia.co/b/<slug> */
+    /** Public handle: somosvolvia.com/b/<slug> */
     slug: text().notNull(),
     category: text().notNull().default('other'),
     tagline: text().notNull().default(''),

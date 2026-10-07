@@ -14,12 +14,12 @@ class CardTokenTest {
 
     @Test
     fun `reads the token from a card url`() {
-        assertEquals(token, CardToken.parse("https://tarjeta.volvia.co/c/$token"))
+        assertEquals(token, CardToken.parse("https://tarjeta.somosvolvia.com/c/$token"))
     }
 
     @Test
     fun `ignores a query string`() {
-        assertEquals(token, CardToken.parse("https://tarjeta.volvia.co/c/$token?stamped=1"))
+        assertEquals(token, CardToken.parse("https://tarjeta.somosvolvia.com/c/$token?stamped=1"))
     }
 
     @Test
@@ -29,7 +29,7 @@ class CardTokenTest {
 
     @Test
     fun `trims what the camera leaves behind`() {
-        assertEquals(token, CardToken.parse("  https://tarjeta.volvia.co/c/$token\n"))
+        assertEquals(token, CardToken.parse("  https://tarjeta.somosvolvia.com/c/$token\n"))
     }
 
     @Test
@@ -42,6 +42,6 @@ class CardTokenTest {
 
     @Test
     fun `rejects something too short to be a token`() {
-        assertNull(CardToken.parse("https://tarjeta.volvia.co/c/abc123"))
+        assertNull(CardToken.parse("https://tarjeta.somosvolvia.com/c/abc123"))
     }
 }

@@ -7,12 +7,12 @@ final class CardTokenTests: XCTestCase {
     private let token = "DAAhsNXnnW5ZCHA9rKVHMke7m0B7mVaE"
 
     func testReadsTheTokenFromACardUrl() {
-        XCTAssertEqual(CardToken.parse("https://tarjeta.volvia.co/c/\(token)"), token)
+        XCTAssertEqual(CardToken.parse("https://tarjeta.somosvolvia.com/c/\(token)"), token)
     }
 
     func testIgnoresAQueryString() {
         // The customer opened their card from an email, and the tracking stayed on.
-        XCTAssertEqual(CardToken.parse("https://tarjeta.volvia.co/c/\(token)?stamped=1"), token)
+        XCTAssertEqual(CardToken.parse("https://tarjeta.somosvolvia.com/c/\(token)?stamped=1"), token)
     }
 
     func testAcceptsABareToken() {
@@ -21,7 +21,7 @@ final class CardTokenTests: XCTestCase {
     }
 
     func testTrimsWhatTheCameraLeavesBehind() {
-        XCTAssertEqual(CardToken.parse("  https://tarjeta.volvia.co/c/\(token)\n"), token)
+        XCTAssertEqual(CardToken.parse("  https://tarjeta.somosvolvia.com/c/\(token)\n"), token)
     }
 
     func testRejectsSomebodyElsesQrCode() {
@@ -33,10 +33,10 @@ final class CardTokenTests: XCTestCase {
     }
 
     func testRejectsSomethingTooShortToBeAToken() {
-        XCTAssertNil(CardToken.parse("https://tarjeta.volvia.co/c/abc123"))
+        XCTAssertNil(CardToken.parse("https://tarjeta.somosvolvia.com/c/abc123"))
     }
 
     func testRejectsCharactersATokenNeverContains() {
-        XCTAssertNil(CardToken.parse("https://tarjeta.volvia.co/c/\(token)<script>"))
+        XCTAssertNil(CardToken.parse("https://tarjeta.somosvolvia.com/c/\(token)<script>"))
     }
 }

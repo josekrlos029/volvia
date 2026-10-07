@@ -20,7 +20,7 @@ const COPY = {
     sentTitle: 'Recibido',
     sentBody:
       'Te contesta una persona, normalmente el mismo día. Revisa también la carpeta de no deseados.',
-    error: 'No pudimos enviarlo. Prueba otra vez o escríbenos directo a hola@volvia.co.',
+    error: 'No pudimos enviarlo. Prueba otra vez o escríbenos directo a hola@somosvolvia.com.',
     topics: {
       question: 'Una duda antes de empezar',
       demo: 'Ver una demostración',
@@ -41,7 +41,7 @@ const COPY = {
     submitting: 'Sending',
     sentTitle: 'Got it',
     sentBody: 'A person answers, usually the same day. Check your spam folder too.',
-    error: 'We could not send it. Try again, or write to us directly at hola@volvia.co.',
+    error: 'We could not send it. Try again, or write to us directly at hola@somosvolvia.com.',
     topics: {
       question: 'A question before starting',
       demo: 'See a demo',

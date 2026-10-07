@@ -287,10 +287,10 @@ sin barra de navegador.
    organización no.
 2. Generar el proyecto:
    ```bash
-   npx @bubblewrap/cli init --manifest https://app.volvia.co/manifest.webmanifest
+   npx @bubblewrap/cli init --manifest https://app.somosvolvia.com/manifest.webmanifest
    npx @bubblewrap/cli build
    ```
-3. **Digital Asset Links**: publica en `https://app.volvia.co/.well-known/assetlinks.json`
+3. **Digital Asset Links**: publica en `https://app.somosvolvia.com/.well-known/assetlinks.json`
    la huella SHA-256 del certificado de firma. Sin esto la app abre con la barra
    de Chrome visible, que es exactamente lo que quieres evitar.
    La huella correcta es la de **Play App Signing** (Play Console → Integridad de

@@ -14,8 +14,8 @@ export const brand = {
     es: 'Tarjetas de fidelización que hacen volver a tus clientes',
     en: 'Loyalty cards that bring your customers back',
   },
-  domain: 'volvia.co',
-  supportEmail: 'hola@volvia.co',
+  domain: 'somosvolvia.com',
+  supportEmail: 'hola@somosvolvia.com',
 
   colors: {
     /**

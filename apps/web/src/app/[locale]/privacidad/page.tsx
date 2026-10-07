@@ -49,7 +49,7 @@ export default async function PrivacyPage({ params }: { params: Promise<{ locale
           </p>
         </LegalSection>
         <LegalSection title="Contact">
-          <p>Write to hola@volvia.co with any question about this policy.</p>
+          <p>Write to hola@somosvolvia.com with any question about this policy.</p>
         </LegalSection>
       </LegalPage>
     )
@@ -83,7 +83,7 @@ export default async function PrivacyPage({ params }: { params: Promise<{ locale
         </p>
       </LegalSection>
       <LegalSection title="Contacto">
-        <p>Escribe a hola@volvia.co con cualquier duda sobre esta política.</p>
+        <p>Escribe a hola@somosvolvia.com con cualquier duda sobre esta política.</p>
       </LegalSection>
     </LegalPage>
   )

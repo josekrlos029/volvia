@@ -32,7 +32,7 @@ function assertUploadable(contentType: string, contentLength: number): void {
   }
 }
 
-/** S3-compatible: MinIO locally, and any S3 API in production (GCS via its S3 endpoint). */
+/** S3-compatible: MinIO locally, and any S3 API in production (Cloudflare R2). */
 class S3Storage implements StorageAdapter {
   private readonly client: S3Client
 

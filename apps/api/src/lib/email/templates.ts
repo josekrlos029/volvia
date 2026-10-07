@@ -212,7 +212,7 @@ export function contactRequestTemplate(input: {
   const text = `${header}\n\n${input.message}\n`
 
   return {
-    subject: `[volvia.co] ${input.topic} · ${input.name}`,
+    subject: `[somosvolvia.com] ${input.topic} · ${input.name}`,
     text,
     html: `<pre style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;line-height:1.55;white-space:pre-wrap">${escapeHtml(
       text,
