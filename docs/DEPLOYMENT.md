@@ -42,6 +42,13 @@ un escaneo en el mostrador se siente mal); el worker puede escalar a cero.
 3. Pon `CORS_ORIGINS` con los dominios reales y `COOKIE_DOMAIN` con el dominio raíz.
 4. Corre las migraciones contra la URL directa de Neon antes de levantar los servicios.
 
+No hace falta que te acuerdes de los puntos 1 a 3: con `NODE_ENV=production` la API se
+niega a arrancar si encuentra los secretos de ejemplo, el límite de peticiones apagado,
+cookies en `localhost`, orígenes en `http://` o URLs apuntando a tu máquina. Falla al
+arrancar, con la lista completa de lo que hay que corregir, en vez de quedarse sirviendo
+con una configuración insegura. La comprobación vive en `unsafeForProduction`
+(`apps/api/src/env.ts`) y está cubierta por pruebas.
+
 ## Cambiar el token del pase
 
 `TOKEN_PEPPER` deriva el token de autenticación de cada pase de Apple. Cambiarlo invalida

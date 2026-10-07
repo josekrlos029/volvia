@@ -6,6 +6,7 @@ import {
   type StampRules,
   type UpdateCardInput,
   cardDesignSchema,
+  cardMessagesSchema,
   stampRulesBaseSchema,
 } from '@volvia/shared'
 import { AppError } from '../../lib/errors'
@@ -131,6 +132,8 @@ export async function createCard(
         terms: input.data.terms,
         inactivityExpiryDays: input.data.inactivityExpiryDays,
         collectBirthday: input.data.collectBirthday,
+        initialStamps: input.data.initialStamps,
+        messages: cardMessagesSchema.parse(input.data.messages ?? {}),
         signupQuestionIds: input.data.signupQuestionIds,
         joinSlug,
         status: 'draft',
@@ -154,26 +157,57 @@ export async function createCard(
   })
 }
 
+/**
+ * Whether a reward edit is a real change or just the same list sent back.
+ *
+ * The editor re-sends every reward on each save, so comparing by identity would lock a
+ * card the moment anyone opened it.
+ */
+function rewardsDiffer(
+  current: Array<{ atStamp: number; title: string; description: string }>,
+  next: Array<{ atStamp: number; title: string; description: string }>,
+): boolean {
+  if (current.length !== next.length) return true
+
+  const key = (reward: { atStamp: number; title: string; description: string }) =>
+    `${reward.atStamp}|${reward.title.trim()}|${reward.description.trim()}`
+  const before = current.map(key).sort()
+  const after = next.map(key).sort()
+
+  return before.some((value, index) => value !== after[index])
+}
+
 export async function updateCard(
   db: Database,
   input: { orgId: string; cardId: string; entitlements: Entitlements; data: UpdateCardInput },
 ) {
   const current = await getCard(db, input.orgId, input.cardId)
 
-  // Changing the length of a live card would silently move everyone's finish line.
-  if (
-    input.data.stampsRequired !== undefined &&
-    input.data.stampsRequired !== current.stampsRequired &&
-    current.status === 'active'
-  ) {
-    const [holders] = await db
-      .select({ value: count() })
-      .from(customerCards)
-      .where(eq(customerCards.cardId, input.cardId))
-    if ((holders?.value ?? 0) > 0) {
-      throw new AppError('CONFLICT', {
-        message: 'cannot change the stamp count of a card that already has customers',
-      })
+  /**
+   * The deal is frozen once people are collecting against it.
+   *
+   * Moving the finish line, changing what is waiting there or handing out a different
+   * head start all rewrite a promise customers have already started working towards.
+   * Everything else — colours, wording, rules for staff — stays editable.
+   */
+  if (current.status === 'active') {
+    const changesTheDeal =
+      (input.data.stampsRequired !== undefined &&
+        input.data.stampsRequired !== current.stampsRequired) ||
+      (input.data.initialStamps !== undefined &&
+        input.data.initialStamps !== current.initialStamps) ||
+      (input.data.rewards !== undefined && rewardsDiffer(current.rewards, input.data.rewards))
+
+    if (changesTheDeal) {
+      const [holders] = await db
+        .select({ value: count() })
+        .from(customerCards)
+        .where(eq(customerCards.cardId, input.cardId))
+      if ((holders?.value ?? 0) > 0) {
+        throw new AppError('CONFLICT', {
+          message: 'cannot change the stamps or the rewards of a card that already has customers',
+        })
+      }
     }
   }
 
@@ -209,6 +243,10 @@ export async function updateCard(
             ? current.inactivityExpiryDays
             : input.data.inactivityExpiryDays,
         collectBirthday: input.data.collectBirthday ?? current.collectBirthday,
+        initialStamps: input.data.initialStamps ?? current.initialStamps,
+        messages: input.data.messages
+          ? cardMessagesSchema.parse({ ...current.messages, ...input.data.messages })
+          : current.messages,
         signupQuestionIds: input.data.signupQuestionIds ?? current.signupQuestionIds,
         status: input.data.status ?? current.status,
         updatedAt: new Date(),

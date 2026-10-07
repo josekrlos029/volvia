@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/main.ts",
+    "dev:worker": "tsx watch --clear-screen=false src/worker.ts",
     "build": "tsup",
     "start": "node dist/main.js",
     "worker": "tsx src/worker.ts",

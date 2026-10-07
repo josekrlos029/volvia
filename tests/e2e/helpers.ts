@@ -106,3 +106,121 @@ export async function signIn(page: Page, email: string, password: string): Promi
   await page.click('button[type=submit]')
   await page.waitForURL(`${urls.app}/`)
 }
+
+export const MAILPIT = process.env.MAILPIT_URL ?? 'http://localhost:58025'
+
+/**
+ * Pulls a token out of the newest email sent to an address.
+ *
+ * The screens behind our emails can only be tested by reading the real message, which
+ * is the whole point: four of these links shipped broken precisely because every test
+ * went straight to the API instead of following what the customer receives.
+ */
+export async function tokenFromEmail(
+  request: APIRequestContext,
+  email: string,
+  path: string,
+): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const list = await request.get(
+      `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`,
+    )
+    if (list.ok()) {
+      const { messages = [] } = (await list.json()) as { messages?: Array<{ ID: string }> }
+      for (const message of messages) {
+        const detail = await request.get(`${MAILPIT}/api/v1/message/${message.ID}`)
+        if (!detail.ok()) continue
+        const body = (await detail.json()) as { Text?: string; HTML?: string }
+        const found = `${body.Text ?? ''}${body.HTML ?? ''}`.match(
+          new RegExp(`/${path}\\?token=([A-Za-z0-9_.~-]+)`),
+        )
+        if (found?.[1]) return found[1]
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  throw new Error(`no ${path} email arrived for ${email}`)
+}
+
+/** A business that signs itself up through the form, the way a real one would. */
+export async function signUpThroughTheForm(page: Page, business = uniqueBusiness()) {
+  await page.goto(`${urls.app}/signup`)
+  await page.fill('#businessName', business.businessName)
+  await page.fill('#name', business.name)
+  await page.fill('#email', business.email)
+  await page.fill('#password', business.password)
+  await page.click('button[type=submit]')
+  await page.waitForURL(`${urls.app}/onboarding`)
+  return business
+}
+
+/** Connects the business to a Google place, which is what unlocks review prompts. */
+export async function connectGooglePlace(
+  request: APIRequestContext,
+  session: Session,
+  placeId = 'ChIJe2etest00000',
+): Promise<void> {
+  const response = await request.patch(`${urls.api}/v1/org`, {
+    headers: authHeaders(session),
+    data: { googlePlaceId: placeId },
+  })
+  expect(response.ok(), await response.text()).toBeTruthy()
+}
+
+export async function createSurvey(
+  request: APIRequestContext,
+  session: Session,
+  overrides: Record<string, unknown> = {},
+): Promise<{ id: string }> {
+  const response = await request.post(`${urls.api}/v1/surveys`, {
+    headers: authHeaders(session),
+    data: {
+      name: 'Cómo nos fue',
+      trigger: 'after_join',
+      triggerStamp: null,
+      cardIds: [],
+      questions: [
+        { type: 'rating', prompt: '¿Cómo estuvo tu visita?', scale: 5 },
+        { type: 'text', prompt: '¿Algo que podamos mejorar?', maxLength: 280 },
+      ],
+      isAnonymous: false,
+      routeToReviewFromRating: 4,
+      isActive: true,
+      ...overrides,
+    },
+  })
+  expect(response.ok(), await response.text()).toBeTruthy()
+  return (await response.json()) as { id: string }
+}
+
+/**
+ * Rewrites a customer's history so a segment can be tested without waiting months.
+ *
+ * Goes straight to the database on purpose: the point is to check that the SQL the API
+ * runs agrees with `classifyCustomer`, and the only honest way to do that is to put a
+ * real aged row in front of it.
+ */
+export async function ageCustomer(
+  session: Session,
+  email: string,
+  history: { joinedDaysAgo: number; lastStampDaysAgo: number | null; totalStamps: number },
+): Promise<void> {
+  const { and, createDatabase, customers, eq, sql } = await import('@volvia/db')
+  const connection = createDatabase({ url: process.env.DATABASE_URL ?? '', max: 1 })
+
+  try {
+    await connection.db
+      .update(customers)
+      .set({
+        joinedAt: sql`now() - make_interval(days => ${history.joinedDaysAgo})`,
+        lastStampAt:
+          history.lastStampDaysAgo === null
+            ? null
+            : sql`now() - make_interval(days => ${history.lastStampDaysAgo})`,
+        totalStamps: history.totalStamps,
+      })
+      .where(and(eq(customers.orgId, session.orgId), eq(customers.email, email.toLowerCase())))
+  } finally {
+    await connection.close()
+  }
+}

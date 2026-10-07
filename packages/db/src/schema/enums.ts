@@ -47,6 +47,11 @@ export const campaignTemplateEnum = pgEnum('campaign_template', [
   'happy_hour',
   'win_back',
   'double_stamps',
+  'spend_and_get',
+  'new_offer',
+  'vip_thanks',
+  'last_chance',
+  'special_deal',
   'custom',
 ])
 export const surveyTriggerEnum = pgEnum('survey_trigger', [

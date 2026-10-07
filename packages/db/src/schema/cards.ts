@@ -10,7 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
-import type { CardDesign, StampRules } from '../types'
+import type { CardDesign, CardMessages, StampRules } from '../types'
 import { cardStatusEnum, rewardKindEnum } from './enums'
 import { organizations } from './org'
 
@@ -30,6 +30,9 @@ export const stampCards = pgTable(
     /** Progress is wiped after this many days without a stamp; null = never. */
     inactivityExpiryDays: integer(),
     collectBirthday: boolean().notNull().default(true),
+    /** Stamps granted on joining, so a new card never starts empty. */
+    initialStamps: integer().notNull().default(0),
+    messages: jsonb().$type<CardMessages>().notNull().default({ variants: [], perStamp: {} }),
     signupQuestionIds: jsonb().$type<string[]>().notNull().default([]),
     /** Public join handle used by the QR: /j/<joinSlug> */
     joinSlug: text().notNull(),

@@ -29,6 +29,7 @@ export default async function IndustriesPage({ params }: { params: Promise<{ loc
   return (
     <Section>
       <SectionTitle
+        as="h1"
         title={isSpanish ? 'Cada negocio tiene su ritmo' : 'Every trade has its own rhythm'}
         body={
           isSpanish

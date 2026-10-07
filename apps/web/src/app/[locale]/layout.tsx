@@ -7,6 +7,8 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import '../globals.css'
 
+const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000'
+
 export function generateStaticParams() {
   return LOCALES.map((locale) => ({ locale }))
 }
@@ -60,9 +62,38 @@ export default async function LocaleLayout({
    * the real language: a screen reader announcing Spanish copy in an English voice is a
    * genuine accessibility failure, not a formality.
    */
+  /**
+   * Who we are, once, on every page. Declared here rather than per page so a search
+   * engine never has to reconcile two different descriptions of the same company.
+   */
+  const organisationJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Volvia',
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web',
+    url: `${webUrl}/${locale}`,
+    inLanguage: locale,
+    description:
+      locale === 'es'
+        ? 'Tarjeta de sellos digital para negocios locales, sin app para el cliente.'
+        : 'A digital stamp card for local businesses, with no app for the customer.',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      description: locale === 'es' ? 'Plan gratuito permanente' : 'Permanent free plan',
+    },
+  }
+
   return (
     <html lang={locale} className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="flex min-h-[100dvh] flex-col">
+        <script
+          type="application/ld+json"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: structured data, built from our own content
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organisationJsonLd) }}
+        />
         <Header locale={locale} copy={copy} />
         <div className="flex-1">{children}</div>
         <Footer locale={locale} copy={copy} />

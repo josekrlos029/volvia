@@ -70,7 +70,7 @@ export default async function IndustryPage({
               {copy.intro}
             </p>
             <a
-              href={`${appUrl}/login`}
+              href={`${appUrl}/signup`}
               className="mt-7 inline-block rounded-[10px] bg-[var(--color-primary)] px-5 py-3 text-[15px] font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-[var(--color-primary-hover)] active:scale-[0.985]"
             >
               {site.hero.cta}

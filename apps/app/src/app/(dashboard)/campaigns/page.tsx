@@ -23,7 +23,11 @@ const STATUS = {
   cancelled: { label: 'Cancelada', tone: 'neutral' },
 } as const
 
-export default async function CampaignsPage() {
+export default async function CampaignsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ customers?: string }>
+}) {
   const org = await apiFetch<{
     entitlements: { features: Record<string, boolean> }
   }>('/v1/org')
@@ -39,21 +43,46 @@ export default async function CampaignsPage() {
     )
   }
 
-  const [campaigns, cards] = await Promise.all([
-    apiFetch<Campaign[]>('/v1/campaigns'),
+  const [list, cards] = await Promise.all([
+    apiFetch<{ campaigns: Campaign[]; thisMonth: { used: number; limit: number | null } }>(
+      '/v1/campaigns',
+    ),
     apiFetch<Array<{ id: string; name: string; status: string }>>('/v1/cards'),
   ])
+  const campaigns = list.campaigns
+  const { used, limit } = list.thisMonth
+  const selection = (await searchParams).customers
+    ?.split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-[22px] font-semibold tracking-[-0.01em]">Campañas</h1>
-        <p className="mt-1 text-[14px] text-[var(--color-ink-muted)]">
-          Una promoción temporal que aparece en la tarjeta y se retira sola al terminar.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[22px] font-semibold tracking-[-0.01em]">Campañas</h1>
+          <p className="mt-1 text-[14px] text-[var(--color-ink-muted)]">
+            Una promoción temporal que aparece en la tarjeta y se retira sola al terminar.
+          </p>
+        </div>
+        {limit !== null ? (
+          <p
+            className={`tabular rounded-full px-3 py-1.5 text-[13px] font-medium ${
+              used >= limit
+                ? 'bg-[var(--color-accent-soft)] text-[var(--color-warning)]'
+                : 'bg-[var(--color-surface-muted)] text-[var(--color-ink-muted)]'
+            }`}
+          >
+            {used} de {limit} este mes
+          </p>
+        ) : null}
       </header>
 
-      <CampaignComposer cards={cards.filter((card) => card.status === 'active')} />
+      <CampaignComposer
+        cards={cards.filter((card) => card.status === 'active')}
+        selectedCustomerIds={selection}
+        remainingThisMonth={limit === null ? null : Math.max(0, limit - used)}
+      />
 
       {campaigns.length === 0 ? (
         <Panel>

@@ -29,16 +29,24 @@ export function SectionTitle({
   title,
   body,
   align = 'left',
+  as = 'h2',
 }: {
   title: string
   body?: string
   align?: 'left' | 'center'
+  /**
+   * The page's own title passes `h1`. Every indexable page needs exactly one, and
+   * leaving that to each page meant four of them shipped without any.
+   */
+  as?: 'h1' | 'h2'
 }) {
+  const Heading = as
+
   return (
     <header className={align === 'center' ? 'mx-auto max-w-[46ch] text-center' : 'max-w-[30ch]'}>
-      <h2 className="text-[clamp(24px,3.4vw,34px)] font-semibold leading-[1.12] tracking-[-0.02em]">
+      <Heading className="text-[clamp(24px,3.4vw,34px)] font-semibold leading-[1.12] tracking-[-0.02em]">
         {title}
-      </h2>
+      </Heading>
       {body ? (
         <p className="mt-3 max-w-[52ch] text-[16px] leading-relaxed text-[var(--color-ink-muted)]">
           {body}

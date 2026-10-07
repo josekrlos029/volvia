@@ -174,7 +174,7 @@ export function PricingTable({ locale }: { locale: Locale }) {
               </ul>
 
               <a
-                href={`${appUrl}/login`}
+                href={`${appUrl}/signup`}
                 className={[
                   'mt-6 rounded-[9px] px-4 py-2.5 text-center text-[14px] font-semibold transition-transform duration-150 active:scale-[0.985]',
                   isRecommended

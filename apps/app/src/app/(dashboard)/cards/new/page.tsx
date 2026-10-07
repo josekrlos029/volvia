@@ -1,4 +1,5 @@
 import { CardEditor } from '@/components/CardEditor'
+import type { ProfileQuestion } from '@/components/SignupFormEditor'
 import { apiFetch } from '@/lib/session'
 
 interface Org {
@@ -7,7 +8,10 @@ interface Org {
 }
 
 export default async function NewCardPage() {
-  const org = await apiFetch<Org>('/v1/org')
+  const [org, profileQuestions] = await Promise.all([
+    apiFetch<Org>('/v1/org'),
+    apiFetch<ProfileQuestion[]>('/v1/org/profile-questions'),
+  ])
 
   return (
     <div className="flex flex-col gap-6">
@@ -22,6 +26,7 @@ export default async function NewCardPage() {
         businessName={org.name}
         canCustomiseBranding={org.entitlements.features.custom_branding ?? false}
         canUseKiosk={org.entitlements.features.kiosk_mode ?? false}
+        profileQuestions={profileQuestions}
         lengthLocked={false}
         initial={{
           name: '',
@@ -31,12 +36,19 @@ export default async function NewCardPage() {
             foregroundColor: '#FFFFFF',
             accentColor: '#E9A23B',
             emptyStampColor: '#31363A',
+            stampStyle: 'circle',
+            banner: { kind: 'solid' },
+            bannerPattern: 'none',
+            bannerPatternOpacity: 12,
             headline: '',
             subheadline: '',
           },
           rewards: [{ atStamp: 8, title: '', description: '' }],
+          signupQuestionIds: [],
           terms: '',
           collectBirthday: true,
+          initialStamps: 0,
+          messages: { variants: [], perStamp: {} },
           rules: { cooldownMinutes: 30, dailyCap: 2, kioskEnabled: false },
         }}
       />

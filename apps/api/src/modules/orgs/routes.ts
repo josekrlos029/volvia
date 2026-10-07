@@ -1,10 +1,12 @@
 import { and, eq, invites, isNull, organizations } from '@volvia/db'
 import {
   ALLOWED_IMAGE_TYPES,
+  DEFAULT_ORG_SETTINGS,
   MAX_UPLOAD_BYTES,
   acceptInviteSchema,
   inviteMemberSchema,
   locationSchema,
+  passwordSchema,
   profileQuestionListSchema,
   roleSchema,
   updateOrgSchema,
@@ -19,8 +21,11 @@ import { AppError } from '../../lib/errors'
 import { redisKeys } from '../../lib/redis'
 import { rateLimits } from '../../plugins/security'
 import { typed } from '../../types'
+import { setAuthCookies } from '../auth/cookies'
+import { issueSession } from '../auth/issue'
 import {
   acceptInvite,
+  claimInvite,
   countSeats,
   createLocation,
   deleteLocation,
@@ -29,6 +34,7 @@ import {
   listLocations,
   listMembers,
   listProfileQuestions,
+  previewInvite,
   removeMember,
   replaceProfileQuestions,
   suggestSlug,
@@ -48,6 +54,8 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
       const entitlements = request.org!.entitlements
       return {
         ...org,
+        // Filled in, so the dashboard never has to guess a default.
+        settings: { ...DEFAULT_ORG_SETTINGS, ...org.settings },
         entitlements: {
           plan: entitlements.plan,
           effectivePlan: entitlements.effectivePlan,
@@ -343,6 +351,51 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
     },
   )
 
+  /**
+   * Closing the business.
+   *
+   * A soft delete: the organisation disappears from every query the product makes, its
+   * public page and cards stop resolving, and the data stays recoverable for as long as
+   * the retention policy says. The owner has to type the name, because this is the one
+   * action in the dashboard nobody should be able to take by mis-clicking.
+   */
+  app.post(
+    '/close',
+    {
+      preHandler: [app.requireOrg('owner')],
+      schema: {
+        body: z.object({ confirmName: z.string().min(1).max(120) }),
+        response: { 200: z.object({ deleted: z.boolean() }) },
+        tags: ['org'],
+      },
+    },
+    async (request) => {
+      const org = await getOrg(app.db, request.org!.orgId)
+      if (request.body.confirmName.trim().toLowerCase() !== org.name.trim().toLowerCase()) {
+        throw new AppError('VALIDATION_FAILED', {
+          message: 'the name does not match the business name',
+        })
+      }
+
+      await app.db
+        .update(organizations)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(eq(organizations.id, org.id))
+
+      await invalidateEntitlements(app.redis, org.id)
+      await audit(app.db, {
+        orgId: org.id,
+        actorUserId: request.auth!.userId,
+        action: AUDIT_ACTIONS.orgDeleted,
+        targetType: 'organization',
+        targetId: org.id,
+        ip: request.ip,
+      })
+
+      return { deleted: true }
+    },
+  )
+
   // ── Profile questions ──────────────────────────────────────────────────────
   app.get(
     '/profile-questions',
@@ -360,6 +413,71 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
       const saved = await replaceProfileQuestions(app.db, request.org!.orgId, request.body)
       await invalidateEntitlements(app.redis, request.org!.orgId)
       return saved
+    },
+  )
+}
+
+/**
+ * Invitation screens, reachable without an account.
+ *
+ * A staff member invited by email has nowhere to sign in yet, so these two endpoints let
+ * the invitation page name the business and then create the account bound to it. The
+ * authenticated `POST /v1/org/members/accept` stays the path for people who already
+ * have a Volvia account.
+ */
+export async function publicInviteRoutes(fastify: FastifyInstance): Promise<void> {
+  const app = typed(fastify)
+
+  app.get(
+    '/invite',
+    {
+      config: { rateLimit: rateLimits.publicRead },
+      schema: {
+        querystring: z.object({ token: z.string().min(16).max(400) }),
+        response: {
+          200: z.object({
+            email: z.string().email(),
+            orgName: z.string(),
+            role: roleSchema,
+            needsAccount: z.boolean(),
+          }),
+        },
+        tags: ['public'],
+      },
+    },
+    async (request) => previewInvite(app.db, request.query.token),
+  )
+
+  app.post(
+    '/invite/accept',
+    {
+      config: { rateLimit: rateLimits.auth },
+      schema: {
+        body: z.object({
+          token: z.string().min(16).max(400),
+          name: z.string().trim().min(2).max(120),
+          password: passwordSchema,
+        }),
+        tags: ['public'],
+      },
+    },
+    async (request, reply) => {
+      const claimed = await claimInvite(app.db, request.body)
+      await audit(app.db, {
+        orgId: claimed.orgId,
+        actorUserId: claimed.userId,
+        action: AUDIT_ACTIONS.memberAccepted,
+        targetType: 'membership',
+        ip: request.ip,
+        meta: { role: claimed.role },
+      })
+
+      const session = await issueSession(app, claimed.userId, claimed.email, {
+        ip: request.ip,
+        userAgent: request.headers['user-agent'] ?? '',
+      })
+      setAuthCookies(reply, session)
+      return reply.status(201).send(session)
     },
   )
 }

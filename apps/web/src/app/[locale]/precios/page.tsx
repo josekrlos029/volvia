@@ -70,7 +70,12 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   return (
     <>
       <Section>
-        <SectionTitle align="center" title={copy.pricing.title} body={copy.pricing.subtitle} />
+        <SectionTitle
+          as="h1"
+          align="center"
+          title={copy.pricing.title}
+          body={copy.pricing.subtitle}
+        />
         <div className="mt-10">
           <PricingTable locale={locale} />
         </div>

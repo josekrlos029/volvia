@@ -1,10 +1,20 @@
 'use client'
 
 import { api } from '@/lib/api-client'
+import {
+  BANNER_PATTERNS,
+  type CardMessages,
+  MAX_CARD_MESSAGE_VARIANTS,
+  MAX_INITIAL_STAMPS,
+  STAMP_STYLES,
+  pickCardMessage,
+} from '@volvia/shared'
 import { ApiError } from '@volvia/shared/client'
+import { STAMP_RADIUS, hexWithAlpha, patternLayer } from '@volvia/ui'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { CardPreview, type PreviewDesign } from './CardPreview'
+import { type ProfileQuestion, SignupFormEditor } from './SignupFormEditor'
 import { buttonClass } from './ui'
 
 interface Reward {
@@ -15,11 +25,14 @@ interface Reward {
 
 export interface CardEditorValue {
   name: string
+  signupQuestionIds: string[]
   stampsRequired: number
   design: PreviewDesign
   rewards: Reward[]
   terms: string
   collectBirthday: boolean
+  initialStamps: number
+  messages: CardMessages
   rules: { cooldownMinutes: number; dailyCap: number; kioskEnabled: boolean }
 }
 
@@ -29,11 +42,60 @@ interface CardEditorProps {
   cardId?: string
   canCustomiseBranding: boolean
   canUseKiosk: boolean
-  /** A card with holders cannot change length without moving everyone's finish line. */
+  /** The business's own signup questions, shared across its cards. */
+  profileQuestions: ProfileQuestion[]
+  /** A card with holders cannot change the deal people are already working towards. */
   lengthLocked: boolean
 }
 
 const STAMP_CHOICES = [4, 5, 6, 8, 9, 10, 12]
+
+/** None, or a head start small enough that the reward is still earned. */
+const HEAD_START_CHOICES = Array.from({ length: MAX_INITIAL_STAMPS + 1 }, (_, value) => value)
+
+const STAMP_STYLE_LABELS: Record<(typeof STAMP_STYLES)[number], string> = {
+  circle: 'Redondo',
+  rounded: 'Redondeado',
+  square: 'Cuadrado',
+  badge: 'Con aro',
+}
+
+const BANNER_KIND_LABELS = {
+  solid: 'Color plano',
+  gradient: 'Degradado',
+  image: 'Imagen',
+} as const
+
+const PATTERN_LABELS: Record<string, string> = {
+  none: 'Sin textura',
+  dots: 'Puntos',
+  grid: 'Cuadrícula',
+  diagonal: 'Diagonales',
+  chevron: 'Galones',
+  waves: 'Olas',
+  confetti: 'Confeti',
+  cross: 'Cruces',
+  circles: 'Círculos',
+  triangles: 'Triángulos',
+  stripes: 'Rayas',
+  zigzag: 'Zigzag',
+  scales: 'Escamas',
+  noise: 'Granulado',
+}
+
+/** Switching banner type keeps the card's own colours instead of inventing new ones. */
+function defaultBanner(
+  kind: 'solid' | 'gradient' | 'image',
+  design: PreviewDesign,
+): PreviewDesign['banner'] {
+  if (kind === 'gradient') {
+    return { kind: 'gradient', from: design.backgroundColor, to: design.accentColor, angle: 160 }
+  }
+  if (kind === 'image') {
+    return { kind: 'image', url: design.banner.kind === 'image' ? design.banner.url : '' }
+  }
+  return { kind: 'solid' }
+}
 
 const PALETTES = [
   { name: 'Carbón', background: '#14171A', accent: '#E9A23B', empty: '#31363A' },
@@ -49,6 +111,7 @@ export function CardEditor({
   cardId,
   canCustomiseBranding,
   canUseKiosk,
+  profileQuestions,
   lengthLocked,
 }: CardEditorProps) {
   const router = useRouter()
@@ -60,6 +123,20 @@ export function CardEditor({
     () => value.rewards.map((reward) => reward.atStamp),
     [value.rewards],
   )
+
+  // The preview shows a half-filled card, so it shows the line that moment would get.
+  const previewMessage = useMemo(() => {
+    const shown = Math.max(value.initialStamps, Math.floor(value.stampsRequired / 2))
+    return pickCardMessage(
+      {
+        variants: value.messages.variants.filter((line) => line.trim().length > 0),
+        perStamp: Object.fromEntries(
+          Object.entries(value.messages.perStamp).filter(([, line]) => line.trim().length > 0),
+        ),
+      },
+      shown,
+    )
+  }, [value.messages, value.initialStamps, value.stampsRequired])
 
   function update(patch: Partial<CardEditorValue>) {
     setValue((current) => ({ ...current, ...patch }))
@@ -148,8 +225,17 @@ export function CardEditor({
       })),
       terms: value.terms,
       collectBirthday: value.collectBirthday,
+      initialStamps: value.initialStamps,
+      messages: {
+        variants: value.messages.variants.map((line) => line.trim()).filter(Boolean),
+        perStamp: Object.fromEntries(
+          Object.entries(value.messages.perStamp)
+            .map(([stamp, line]) => [stamp, line.trim()] as const)
+            .filter(([, line]) => line.length > 0),
+        ),
+      },
       inactivityExpiryDays: null,
-      signupQuestionIds: [],
+      signupQuestionIds: value.signupQuestionIds,
     }
 
     try {
@@ -207,6 +293,36 @@ export function CardEditor({
                   className={[
                     'tabular h-10 w-11 rounded-[9px] border text-[14px] font-medium transition-colors',
                     value.stampsRequired === choice
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                      : 'border-[var(--color-line)] bg-white hover:bg-[var(--color-surface-muted)]',
+                    lengthLocked ? 'cursor-not-allowed opacity-50' : '',
+                  ].join(' ')}
+                >
+                  {choice}
+                </button>
+              ))}
+            </div>
+          </Labelled>
+
+          <Labelled
+            label="Sellos de regalo al unirse"
+            htmlFor="initial-stamps"
+            help={
+              lengthLocked
+                ? 'No se puede cambiar: ya hay clientes con sellos en esta tarjeta.'
+                : 'Una tarjeta que empieza en cero se siente como una tarea. Con uno o dos ya hechos, se siente empezada.'
+            }
+          >
+            <div className="flex flex-wrap gap-2">
+              {HEAD_START_CHOICES.map((choice) => (
+                <button
+                  key={choice}
+                  type="button"
+                  disabled={lengthLocked}
+                  onClick={() => update({ initialStamps: choice })}
+                  className={[
+                    'tabular h-10 w-11 rounded-[9px] border text-[14px] font-medium transition-colors',
+                    value.initialStamps === choice
                       ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
                       : 'border-[var(--color-line)] bg-white hover:bg-[var(--color-surface-muted)]',
                     lengthLocked ? 'cursor-not-allowed opacity-50' : '',
@@ -335,6 +451,194 @@ export function CardEditor({
             </div>
           </Labelled>
 
+          <Labelled
+            label="Forma del sello"
+            htmlFor="stamp-style"
+            help="La misma forma que verá el cliente en su teléfono."
+          >
+            <div className="flex flex-wrap gap-2">
+              {STAMP_STYLES.map((style) => (
+                <button
+                  key={style}
+                  type="button"
+                  disabled={!canCustomiseBranding}
+                  onClick={() => updateDesign({ stampStyle: style })}
+                  aria-label={STAMP_STYLE_LABELS[style]}
+                  aria-pressed={value.design.stampStyle === style}
+                  className={[
+                    'flex h-11 w-14 items-center justify-center rounded-[9px] border transition-colors',
+                    value.design.stampStyle === style
+                      ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/25'
+                      : 'border-[var(--color-line)] bg-white',
+                    canCustomiseBranding ? '' : 'cursor-not-allowed opacity-50',
+                  ].join(' ')}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="h-5 w-5"
+                    style={{
+                      background: value.design.accentColor,
+                      borderRadius: STAMP_RADIUS[style],
+                      boxShadow:
+                        style === 'badge'
+                          ? `0 0 0 2px ${hexWithAlpha(value.design.accentColor, 0.4)}`
+                          : undefined,
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+          </Labelled>
+
+          <Labelled
+            label="Fondo de la tarjeta"
+            htmlFor="banner-kind"
+            help="Un color plano, un degradado entre dos colores, o una foto tuya."
+          >
+            <div className="flex flex-wrap gap-2">
+              {(['solid', 'gradient', 'image'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  disabled={!canCustomiseBranding}
+                  onClick={() => updateDesign({ banner: defaultBanner(kind, value.design) })}
+                  aria-pressed={value.design.banner.kind === kind}
+                  className={[
+                    'rounded-[9px] border px-3 py-2 text-[13px] font-medium transition-colors',
+                    value.design.banner.kind === kind
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                      : 'border-[var(--color-line)] bg-white',
+                    canCustomiseBranding ? '' : 'cursor-not-allowed opacity-50',
+                  ].join(' ')}
+                >
+                  {BANNER_KIND_LABELS[kind]}
+                </button>
+              ))}
+            </div>
+          </Labelled>
+
+          {value.design.banner.kind === 'gradient' ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Labelled label="Desde" htmlFor="gradient-from">
+                <input
+                  id="gradient-from"
+                  type="color"
+                  value={value.design.banner.from}
+                  onChange={(event) =>
+                    updateDesign({
+                      banner: { ...value.design.banner, from: event.target.value } as never,
+                    })
+                  }
+                  className="h-10 w-full rounded-[9px] border border-[var(--color-line)]"
+                />
+              </Labelled>
+              <Labelled label="Hasta" htmlFor="gradient-to">
+                <input
+                  id="gradient-to"
+                  type="color"
+                  value={value.design.banner.to}
+                  onChange={(event) =>
+                    updateDesign({
+                      banner: { ...value.design.banner, to: event.target.value } as never,
+                    })
+                  }
+                  className="h-10 w-full rounded-[9px] border border-[var(--color-line)]"
+                />
+              </Labelled>
+              <Labelled label="Inclinación" htmlFor="gradient-angle">
+                <input
+                  id="gradient-angle"
+                  type="range"
+                  min={0}
+                  max={360}
+                  value={value.design.banner.angle}
+                  onChange={(event) =>
+                    updateDesign({
+                      banner: {
+                        ...value.design.banner,
+                        angle: Number(event.target.value),
+                      } as never,
+                    })
+                  }
+                  className="w-full"
+                />
+              </Labelled>
+            </div>
+          ) : null}
+
+          {value.design.banner.kind === 'image' ? (
+            <Labelled
+              label="Dirección de la imagen"
+              htmlFor="banner-url"
+              help="Pega el enlace de una foto tuya. Se recorta al ancho de la tarjeta."
+            >
+              <input
+                id="banner-url"
+                value={value.design.banner.url}
+                onChange={(event) =>
+                  updateDesign({
+                    banner: { kind: 'image', url: event.target.value } as never,
+                  })
+                }
+                placeholder="https://..."
+                className={fieldClass}
+              />
+            </Labelled>
+          ) : null}
+
+          <Labelled
+            label="Textura encima"
+            htmlFor="banner-pattern"
+            help="Se dibuja con los colores de tu tarjeta, así que si cambias la paleta la textura te sigue."
+          >
+            <div className="flex flex-wrap gap-2">
+              {BANNER_PATTERNS.map((pattern) => {
+                const layer = patternLayer(pattern, value.design.foregroundColor, 65)
+                return (
+                  <button
+                    key={pattern}
+                    type="button"
+                    disabled={!canCustomiseBranding}
+                    onClick={() => updateDesign({ bannerPattern: pattern })}
+                    aria-label={PATTERN_LABELS[pattern] ?? pattern}
+                    aria-pressed={value.design.bannerPattern === pattern}
+                    title={PATTERN_LABELS[pattern] ?? pattern}
+                    className={[
+                      'h-10 w-10 overflow-hidden rounded-[9px] border transition-colors',
+                      value.design.bannerPattern === pattern
+                        ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/25'
+                        : 'border-[var(--color-line)]',
+                      canCustomiseBranding ? '' : 'cursor-not-allowed opacity-50',
+                    ].join(' ')}
+                    style={{
+                      background: value.design.backgroundColor,
+                      ...(layer ?? {}),
+                    }}
+                  />
+                )
+              })}
+            </div>
+          </Labelled>
+
+          {value.design.bannerPattern !== 'none' ? (
+            <Labelled
+              label={`Intensidad de la textura: ${value.design.bannerPatternOpacity}%`}
+              htmlFor="pattern-opacity"
+            >
+              <input
+                id="pattern-opacity"
+                type="range"
+                min={0}
+                max={60}
+                value={value.design.bannerPatternOpacity}
+                onChange={(event) =>
+                  updateDesign({ bannerPatternOpacity: Number(event.target.value) })
+                }
+                className="w-full"
+              />
+            </Labelled>
+          ) : null}
+
           <Labelled label="Título en la tarjeta" htmlFor="headline">
             <input
               id="headline"
@@ -356,6 +660,117 @@ export function CardEditor({
               className={fieldClass}
             />
           </Labelled>
+        </Section>
+
+        <Section
+          title="Lo que dice la tarjeta"
+          action={
+            value.messages.variants.length < MAX_CARD_MESSAGE_VARIANTS ? (
+              <button
+                type="button"
+                onClick={() =>
+                  update({
+                    messages: {
+                      ...value.messages,
+                      variants: [...value.messages.variants, ''],
+                    },
+                  })
+                }
+                className={buttonClass('secondary', 'sm')}
+              >
+                Añadir frase
+              </button>
+            ) : null
+          }
+        >
+          <p className="mb-3 text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+            Una línea debajo de los sellos. Si escribes varias, van rotando entre visitas, así la
+            tarjeta no dice siempre lo mismo.
+          </p>
+
+          {value.messages.variants.length === 0 ? (
+            <p className="rounded-[9px] bg-[var(--color-surface-muted)] px-3.5 py-2.5 text-[13px] text-[var(--color-ink-muted)]">
+              Sin frases, la tarjeta solo muestra los sellos. Está bien, pero una frase tuya suena a
+              tu negocio.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {value.messages.variants.map((variant, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: the list is reordered by position
+                <li key={index} className="flex items-center gap-2">
+                  <input
+                    value={variant}
+                    onChange={(event) =>
+                      update({
+                        messages: {
+                          ...value.messages,
+                          variants: value.messages.variants.map((line, i) =>
+                            i === index ? event.target.value : line,
+                          ),
+                        },
+                      })
+                    }
+                    maxLength={90}
+                    placeholder="Gracias por volver, la casa invita pronto"
+                    aria-label={`Frase ${index + 1}`}
+                    className={fieldClass}
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      update({
+                        messages: {
+                          ...value.messages,
+                          variants: value.messages.variants.filter((_, i) => i !== index),
+                        },
+                      })
+                    }
+                    aria-label={`Quitar la frase ${index + 1}`}
+                    className={buttonClass('ghost', 'sm')}
+                  >
+                    Quitar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="mt-5 border-t border-[var(--color-line)] pt-4">
+            <p className="text-[13px] font-medium">Frases para un momento exacto</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+              Estas mandan sobre las anteriores. Sirven para los dos momentos que más importan: el
+              primer sello y el que falta para la recompensa.
+            </p>
+
+            <div className="mt-3 flex flex-col gap-2">
+              {[0, value.stampsRequired - 1].map((stamp) => (
+                <label key={stamp} className="flex items-center gap-3 text-[13px]">
+                  <span className="tabular w-28 shrink-0 text-[var(--color-ink-muted)]">
+                    {stamp === 0 ? 'Recién unido' : `Con ${stamp} sellos`}
+                  </span>
+                  <input
+                    value={value.messages.perStamp[String(stamp)] ?? ''}
+                    onChange={(event) =>
+                      update({
+                        messages: {
+                          ...value.messages,
+                          perStamp: {
+                            ...value.messages.perStamp,
+                            [String(stamp)]: event.target.value,
+                          },
+                        },
+                      })
+                    }
+                    maxLength={90}
+                    placeholder={
+                      stamp === 0 ? 'Bienvenido, tu primer café cuenta' : '¡Una más y es tuyo!'
+                    }
+                    className={fieldClass}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
         </Section>
 
         <Section title="Reglas de sellado">
@@ -417,6 +832,15 @@ export function CardEditor({
           </label>
         </Section>
 
+        <Section title="Qué pides al darse de alta">
+          <SignupFormEditor
+            questions={profileQuestions}
+            selectedIds={value.signupQuestionIds}
+            collectBirthday={value.collectBirthday}
+            onChange={update}
+          />
+        </Section>
+
         <Section title="Términos">
           <textarea
             value={value.terms}
@@ -456,6 +880,8 @@ export function CardEditor({
           cardName={value.name}
           stampsRequired={value.stampsRequired}
           rewardPositions={rewardPositions}
+          initialStamps={value.initialStamps}
+          message={previewMessage}
         />
       </aside>
     </div>

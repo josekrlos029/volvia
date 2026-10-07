@@ -1,4 +1,5 @@
 import { AutomationToggle } from '@/components/AutomationToggle'
+import { WelcomeEmailEditor } from '@/components/WelcomeEmailEditor'
 import { EmptyState, Panel } from '@/components/ui'
 import { formatRelative } from '@/lib/format'
 import { apiFetch } from '@/lib/session'
@@ -17,11 +18,12 @@ interface AutomationsResponse {
 export default async function AutomationsPage() {
   const [data, org] = await Promise.all([
     apiFetch<AutomationsResponse>('/v1/automations'),
-    apiFetch<{ entitlements: { features: Record<string, boolean> } }>('/v1/org'),
+    apiFetch<{ name: string; entitlements: { features: Record<string, boolean> } }>('/v1/org'),
   ])
 
   const canUse = org.entitlements.features.birthday_automation ?? false
   const birthday = data.automations.find((automation) => automation.type === 'birthday')
+  const welcome = data.automations.find((automation) => automation.type === 'welcome')
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,6 +64,24 @@ export default async function AutomationsPage() {
           </div>
         </Panel>
       )}
+
+      {/* The welcome email goes out on every plan: it is the first thing a customer
+          reads from the business, not a premium extra. */}
+      <Panel title="Correo de bienvenida">
+        <div className="flex flex-col gap-4">
+          <p className="text-[14px] leading-relaxed text-[var(--color-ink-muted)]">
+            Llega segundos después de que alguien se una, cuando todavía está en tu mostrador. Es el
+            correo que más se abre de todos.
+          </p>
+
+          <WelcomeEmailEditor
+            active={welcome?.isActive ?? true}
+            headline={welcome?.config.headline ?? ''}
+            body={welcome?.config.body ?? ''}
+            businessName={org.name}
+          />
+        </div>
+      </Panel>
     </div>
   )
 }

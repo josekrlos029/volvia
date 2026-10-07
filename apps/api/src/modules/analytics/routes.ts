@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { redisKeys } from '../../lib/redis'
 import { typed } from '../../types'
-import { loadBusiest, loadOverview, loadRetention, loadTimeseries } from './service'
+import { loadBusiest, loadOverview, loadPulse, loadRetention, loadTimeseries } from './service'
 
 /** Dashboard reads are cached briefly — the numbers move by the minute, not the second. */
 const CACHE_SECONDS = 60
@@ -49,6 +49,12 @@ export async function analyticsRoutes(fastify: FastifyInstance): Promise<void> {
       schema: { querystring: analyticsRangeSchema, tags: ['analytics'] },
     },
     async (request) => loadTimeseries(app.db, request.org!.orgId, request.query),
+  )
+
+  app.get(
+    '/pulse',
+    { preHandler: [app.requireOrg('staff')], schema: { tags: ['analytics'] } },
+    async (request) => loadPulse(app.db, request.org!.orgId, request.org!.timezone),
   )
 
   app.get(

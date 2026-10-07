@@ -8,10 +8,12 @@ import {
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { AUDIT_ACTIONS, audit } from '../../lib/audit'
+import { redisKeys } from '../../lib/redis'
 import { rateLimits } from '../../plugins/security'
 import { typed } from '../../types'
 import {
   birthdayReach,
+  campaignsThisMonth,
   cancelCampaign,
   createCampaign,
   launchCampaign,
@@ -19,7 +21,9 @@ import {
   listCampaigns,
   listSurveyResponses,
   listSurveys,
+  markReviewClicked,
   previewAudience,
+  reviewStats,
   submitSurveyResponse,
   upsertAutomation,
   upsertSurvey,
@@ -35,7 +39,17 @@ export async function engagementRoutes(fastify: FastifyInstance): Promise<void> 
       preHandler: [app.requireOrg('admin'), app.requireFeature('campaigns')],
       schema: { tags: ['engagement'] },
     },
-    async (request) => listCampaigns(app.db, request.org!.orgId),
+    async (request) => {
+      const limit = request.org!.entitlements.limit('campaignsPerMonth')
+      return {
+        campaigns: await listCampaigns(app.db, request.org!.orgId),
+        // Shown as "3 de 10 este mes" rather than only refusing the eleventh.
+        thisMonth: {
+          used: await campaignsThisMonth(app.db, request.org!.orgId),
+          limit,
+        },
+      }
+    },
   )
 
   app.post(
@@ -60,7 +74,8 @@ export async function engagementRoutes(fastify: FastifyInstance): Promise<void> 
       preHandler: [app.requireOrg('admin'), app.requireFeature('campaigns')],
       schema: { body: audienceSchema, tags: ['engagement'] },
     },
-    async (request) => previewAudience(app.db, request.org!.orgId, request.body),
+    async (request) =>
+      previewAudience(app.db, request.org!.orgId, request.body, request.org!.visitFrequency),
   )
 
   app.post(
@@ -135,6 +150,27 @@ export async function engagementRoutes(fastify: FastifyInstance): Promise<void> 
     async (request) => listSurveyResponses(app.db, request.org!.orgId, request.params.surveyId),
   )
 
+  app.get(
+    '/reviews',
+    {
+      preHandler: [app.requireOrg('admin')],
+      schema: {
+        response: {
+          200: z.object({
+            connected: z.boolean(),
+            paused: z.boolean(),
+            shown: z.number().int(),
+            opened: z.number().int(),
+            shownLast30: z.number().int(),
+            openedLast30: z.number().int(),
+          }),
+        },
+        tags: ['engagement'],
+      },
+    },
+    async (request) => reviewStats(app.db, request.org!.orgId),
+  )
+
   // ── Automations ────────────────────────────────────────────────────────────
   app.get(
     '/automations',
@@ -166,14 +202,45 @@ export async function publicSurveyRoutes(fastify: FastifyInstance): Promise<void
       schema: {
         params: z.object({ surveyId: z.string().uuid() }),
         body: surveyResponseSchema.extend({ cardToken: z.string().min(16).max(128).optional() }),
+        response: {
+          200: z.object({
+            thanks: z.boolean(),
+            reviewRequestId: z.string().uuid().nullable(),
+            reviewUrl: z.string().nullable(),
+          }),
+        },
         tags: ['public'],
       },
     },
-    async (request) =>
-      submitSurveyResponse(app.db, {
+    async (request) => {
+      const result = await submitSurveyResponse(app.db, {
         surveyId: request.params.surveyId,
         cardToken: request.body.cardToken ?? null,
         answers: request.body.answers,
-      }),
+      })
+
+      // The answered survey must stop being offered on the next card load.
+      if (request.body.cardToken) {
+        await app.redis.del(redisKeys.cardState(request.body.cardToken))
+      }
+
+      return result
+    },
+  )
+
+  app.post(
+    '/review/:requestId/click',
+    {
+      config: { rateLimit: rateLimits.join },
+      schema: {
+        params: z.object({ requestId: z.string().uuid() }),
+        response: { 204: z.null() },
+        tags: ['public'],
+      },
+    },
+    async (request, reply) => {
+      await markReviewClicked(app.db, request.params.requestId)
+      return reply.status(204).send(null)
+    },
   )
 }

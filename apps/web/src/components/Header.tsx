@@ -19,7 +19,20 @@ export function Header({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
     { href: `${base}/funciones`, label: copy.nav.features },
     { href: `${base}/precios`, label: copy.nav.pricing },
     { href: `${base}/sectores`, label: copy.nav.industries },
+    { href: `${base}/guia`, label: copy.nav.resources },
+  ]
+
+  /**
+   * The long tail. It lives in the mobile sheet and the footer rather than in the top
+   * row, because a marketing nav with nine items reads as a sitemap.
+   */
+  const more = [
+    { href: `${base}/plantillas`, label: locale === 'es' ? 'Plantillas' : 'Templates' },
+    { href: `${base}/referencias`, label: locale === 'es' ? 'Números típicos' : 'Benchmarks' },
+    { href: `${base}/comparativas`, label: locale === 'es' ? 'Comparativas' : 'Comparisons' },
+    { href: `${base}/preguntas`, label: locale === 'es' ? 'Preguntas' : 'FAQ' },
     { href: `${base}/blog`, label: copy.nav.blog },
+    { href: `${base}/contacto`, label: locale === 'es' ? 'Contacto' : 'Contact' },
   ]
 
   return (
@@ -49,7 +62,7 @@ export function Header({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
             {copy.nav.login}
           </a>
           <a
-            href={`${appUrl}/login`}
+            href={`${appUrl}/signup`}
             className="rounded-[9px] bg-[var(--color-ink)] px-4 py-2 text-[14px] font-medium text-white transition-transform duration-150 active:scale-[0.985]"
           >
             {copy.nav.cta}
@@ -74,7 +87,7 @@ export function Header({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
           aria-label="Principal"
         >
           <ul className="flex flex-col gap-1">
-            {links.map((link) => (
+            {[...links, ...more].map((link) => (
               <li key={link.href}>
                 <Link
                   href={link.href}
@@ -87,7 +100,7 @@ export function Header({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
             ))}
           </ul>
           <a
-            href={`${appUrl}/login`}
+            href={`${appUrl}/signup`}
             className="mt-3 block rounded-[9px] bg-[var(--color-ink)] px-4 py-3 text-center text-[15px] font-medium text-white"
           >
             {copy.nav.cta}

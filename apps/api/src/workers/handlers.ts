@@ -1,5 +1,6 @@
 import {
   and,
+  automations,
   campaigns,
   customerCards,
   customers,
@@ -13,6 +14,7 @@ import {
   stampCards,
   walletPasses,
 } from '@volvia/db'
+import { type Audience, audienceSchema, renderCampaignText } from '@volvia/shared'
 import { env } from '../env'
 import {
   type Mailer,
@@ -21,6 +23,8 @@ import {
   welcomeCustomerTemplate,
 } from '../lib/email'
 import { OUTBOX_KINDS } from '../lib/outbox'
+import { visitFrequencyOf } from '../lib/segments'
+import { audienceConditions } from '../modules/engagement/audience'
 import { walletPushCounter } from '../plugins/observability'
 import type { OutboxHandler, OutboxHandlerContext } from './outbox'
 import { patchGooglePass, pushAppleUpdate } from './wallet-push'
@@ -90,11 +94,33 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
       const unsubscribeUrl = `${env.PASS_URL}/c/${token}/preferences`
 
       if (type === 'customer_welcome') {
-        const [finalReward] = await context.db
-          .select({ title: rewards.title })
-          .from(rewards)
-          .where(and(eq(rewards.cardId, row.card.id), eq(rewards.atStamp, row.card.stampsRequired)))
-          .limit(1)
+        const [finalReward, welcome] = await Promise.all([
+          context.db
+            .select({ title: rewards.title })
+            .from(rewards)
+            .where(
+              and(eq(rewards.cardId, row.card.id), eq(rewards.atStamp, row.card.stampsRequired)),
+            )
+            .limit(1)
+            .then(([reward]) => reward),
+          context.db
+            .select({ config: automations.config, isActive: automations.isActive })
+            .from(automations)
+            .where(and(eq(automations.orgId, row.org.id), eq(automations.type, 'welcome')))
+            .limit(1)
+            .then(([automation]) => automation),
+        ])
+
+        // A business that switched the welcome off means it: send nothing.
+        if (welcome && !welcome.isActive) return
+
+        const context_ = {
+          name: row.customer.firstName,
+          business: row.org.name,
+          stamps: 0,
+          remaining: row.card.stampsRequired,
+          hour: null,
+        }
 
         await deps.mailer.send({
           to: row.customer.email,
@@ -102,6 +128,8 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
             orgName: row.org.name,
             cardUrl,
             rewardTitle: finalReward?.title ?? '',
+            headline: renderCampaignText(String(welcome?.config?.headline ?? ''), context_),
+            body: renderCampaignText(String(welcome?.config?.body ?? ''), context_),
           }),
           listUnsubscribeUrl: unsubscribeUrl,
         })
@@ -154,7 +182,10 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
         .limit(1)
       if (!campaign || campaign.status === 'cancelled') return
 
-      const targets = await resolveAudience(context, campaign.orgId, campaign.audience)
+      // The audience was written as jsonb, possibly by an older version of the app, so
+      // it is validated on the way back out rather than trusted.
+      const audience = audienceSchema.parse(campaign.audience)
+      const targets = await resolveAudience(context, campaign.orgId, audience)
 
       await context.db
         .update(campaigns)
@@ -211,25 +242,31 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
   }
 }
 
-/** Resolves a campaign or message audience to the customer cards it touches. */
+/**
+ * Resolves a campaign or message audience to the customer cards it touches.
+ *
+ * Built from the same conditions as the preview the business approved. Until this was
+ * shared, the preview counted a segment and the send ignored it, so a campaign aimed at
+ * twenty customers at risk went to the entire list.
+ */
 async function resolveAudience(
   context: OutboxHandlerContext,
   orgId: string,
-  audience: { segment: string; cardIds: string[]; customerIds: string[]; consentOnly: boolean },
+  audience: Audience,
 ): Promise<string[]> {
-  const conditions = [eq(customerCards.orgId, orgId), eq(customerCards.status, 'active')]
-  if (audience.cardIds.length > 0) conditions.push(inArray(customerCards.cardId, audience.cardIds))
-  if (audience.customerIds.length > 0) {
-    conditions.push(inArray(customerCards.customerId, audience.customerIds))
-  }
+  const [org] = await context.db
+    .select({ settings: organizations.settings })
+    .from(organizations)
+    .where(eq(organizations.id, orgId))
+    .limit(1)
 
   const rows = await context.db
-    .select({ id: customerCards.id, consent: customers.marketingConsent })
+    .select({ id: customerCards.id })
     .from(customerCards)
     .innerJoin(customers, eq(customers.id, customerCards.customerId))
-    .where(and(...conditions))
+    .where(audienceConditions(orgId, audience, visitFrequencyOf(org?.settings)))
 
-  return rows.filter((row) => !audience.consentOnly || row.consent).map((row) => row.id)
+  return rows.map((row) => row.id)
 }
 
 export { resolveAudience }

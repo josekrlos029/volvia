@@ -4,6 +4,7 @@ import {
   type FeatureKey,
   type LimitKey,
   type Role,
+  type VisitFrequency,
   roleAtLeast,
 } from '@volvia/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
@@ -12,6 +13,7 @@ import { loadEntitlements } from '../lib/entitlements'
 import { AppError } from '../lib/errors'
 import { verifyAccessToken } from '../lib/jwt'
 import { redisKeys } from '../lib/redis'
+import { visitFrequencyOf } from '../lib/segments'
 
 export interface AuthContext {
   userId: string
@@ -25,6 +27,8 @@ export interface OrgContext {
   /** Non-null when the member is pinned to a single location. */
   locationId: string | null
   timezone: string
+  /** How often this business expects a good customer back; drives the segments. */
+  visitFrequency: VisitFrequency
   entitlements: Entitlements
 }
 
@@ -58,13 +62,20 @@ async function resolveMembership(
   db: Database,
   userId: string,
   requestedOrgId: string | null,
-): Promise<{ orgId: string; role: Role; locationId: string | null; timezone: string }> {
+): Promise<{
+  orgId: string
+  role: Role
+  locationId: string | null
+  timezone: string
+  visitFrequency: VisitFrequency
+}> {
   const rows = await db
     .select({
       orgId: memberships.orgId,
       role: memberships.role,
       locationId: memberships.locationId,
       timezone: organizations.timezone,
+      settings: organizations.settings,
     })
     .from(memberships)
     .innerJoin(organizations, eq(organizations.id, memberships.orgId))
@@ -87,7 +98,9 @@ async function resolveMembership(
       message: 'x-org-id header required: user belongs to multiple organizations',
     })
   }
-  return rows[0]!
+  const row = rows[0]!
+  const { settings, ...membership } = row
+  return { ...membership, visitFrequency: visitFrequencyOf(settings) }
 }
 
 export const authPlugin = fp(async (app: FastifyInstance) => {

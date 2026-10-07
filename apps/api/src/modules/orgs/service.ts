@@ -20,6 +20,7 @@ import {
   type UpdateOrgInput,
 } from '@volvia/shared'
 import { AppError } from '../../lib/errors'
+import { hashPassword } from '../../lib/passwords'
 import { hashToken, randomToken, slugify } from '../../lib/tokens'
 import { assertWithinLimit } from '../../plugins/auth'
 
@@ -42,9 +43,15 @@ export async function updateOrg(db: Database, orgId: string, input: UpdateOrgInp
     }
   }
 
+  // Settings arrive as a patch — saving one preference must not wipe the rest.
+  const { settings, ...fields } = input
+  const merged = settings
+    ? { settings: { ...(await getOrg(db, orgId)).settings, ...settings } }
+    : {}
+
   const [updated] = await db
     .update(organizations)
-    .set({ ...input, updatedAt: new Date() })
+    .set({ ...fields, ...merged, updatedAt: new Date() })
     .where(eq(organizations.id, orgId))
     .returning()
 
@@ -249,6 +256,110 @@ export async function acceptInvite(
     await tx.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, invite.id))
 
     return { orgId: invite.orgId, role: invite.role }
+  })
+}
+
+/**
+ * Public view of an invitation, for the screen the invited person lands on before they
+ * have an account. Returns no identifiers — only what the page needs to say who is
+ * inviting them and whether they still have to pick a password.
+ */
+export async function previewInvite(
+  db: Database,
+  token: string,
+): Promise<{ email: string; orgName: string; role: Role; needsAccount: boolean }> {
+  const [row] = await db
+    .select({
+      email: invites.email,
+      role: invites.role,
+      acceptedAt: invites.acceptedAt,
+      revokedAt: invites.revokedAt,
+      expiresAt: invites.expiresAt,
+      orgName: organizations.name,
+    })
+    .from(invites)
+    .innerJoin(organizations, eq(organizations.id, invites.orgId))
+    .where(eq(invites.tokenHash, hashToken(token)))
+    .limit(1)
+
+  if (!row) throw new AppError('TOKEN_EXPIRED', { message: 'invitation is invalid' })
+  if (row.acceptedAt) throw new AppError('CONFLICT', { message: 'invitation was already used' })
+  if (row.revokedAt) throw new AppError('FORBIDDEN', { message: 'invitation was revoked' })
+  if (row.expiresAt.getTime() < Date.now()) {
+    throw new AppError('TOKEN_EXPIRED', { message: 'invitation has expired' })
+  }
+
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.email, row.email), isNull(users.deletedAt)))
+    .limit(1)
+
+  return { email: row.email, orgName: row.orgName, role: row.role, needsAccount: !existing }
+}
+
+/**
+ * Accepts an invitation for someone who has no account yet, creating the user and the
+ * membership in one transaction.
+ *
+ * The address comes from the invitation and never from the request, so a leaked link
+ * cannot be turned into an account for a different email. Following a link out of their
+ * own inbox is proof enough that the address works, so it starts verified.
+ */
+export async function claimInvite(
+  db: Database,
+  input: { token: string; name: string; password: string },
+): Promise<{ userId: string; email: string; orgId: string; role: Role }> {
+  const hash = hashToken(input.token)
+  const passwordHash = await hashPassword(input.password)
+
+  return db.transaction(async (tx) => {
+    const [invite] = await tx
+      .select()
+      .from(invites)
+      .where(eq(invites.tokenHash, hash))
+      .for('update')
+      .limit(1)
+
+    if (!invite) throw new AppError('TOKEN_EXPIRED', { message: 'invitation is invalid' })
+    if (invite.acceptedAt)
+      throw new AppError('CONFLICT', { message: 'invitation was already used' })
+    if (invite.revokedAt) throw new AppError('FORBIDDEN', { message: 'invitation was revoked' })
+    if (invite.expiresAt.getTime() < Date.now()) {
+      throw new AppError('TOKEN_EXPIRED', { message: 'invitation has expired' })
+    }
+
+    const [existing] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.email, invite.email), isNull(users.deletedAt)))
+      .limit(1)
+    if (existing) {
+      throw new AppError('EMAIL_TAKEN', {
+        message: 'that email already has an account — sign in to accept',
+      })
+    }
+
+    const [user] = await tx
+      .insert(users)
+      .values({
+        email: invite.email,
+        passwordHash,
+        name: input.name,
+        emailVerifiedAt: new Date(),
+      })
+      .returning()
+
+    await tx.insert(memberships).values({
+      orgId: invite.orgId,
+      userId: user!.id,
+      role: invite.role,
+      locationId: invite.locationId,
+    })
+
+    await tx.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, invite.id))
+
+    return { userId: user!.id, email: user!.email, orgId: invite.orgId, role: invite.role }
   })
 }
 

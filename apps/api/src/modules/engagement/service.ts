@@ -9,6 +9,7 @@ import {
   desc,
   eq,
   gte,
+  isNull,
   organizations,
   outbox,
   reviewRequests,
@@ -16,6 +17,7 @@ import {
   surveyResponses,
   surveys,
 } from '@volvia/db'
+import { REVIEW_REQUEST_COOLDOWN_DAYS, type VisitFrequency } from '@volvia/shared'
 import type {
   AutomationInput,
   AutomationType,
@@ -40,7 +42,7 @@ export async function listCampaigns(db: Database, orgId: string) {
 }
 
 /** Campaigns are metered per calendar month, so the count resets with the billing view. */
-async function campaignsThisMonth(db: Database, orgId: string): Promise<number> {
+export async function campaignsThisMonth(db: Database, orgId: string): Promise<number> {
   const monthStart = new Date()
   monthStart.setUTCDate(1)
   monthStart.setUTCHours(0, 0, 0, 0)
@@ -129,8 +131,9 @@ export async function previewAudience(
   db: Database,
   orgId: string,
   audience: CampaignInput['audience'],
+  frequency: VisitFrequency,
 ) {
-  return { size: await resolveAudienceSize(db, orgId, audience) }
+  return { size: await resolveAudienceSize(db, orgId, audience, frequency) }
 }
 
 // ── Surveys ──────────────────────────────────────────────────────────────────
@@ -252,30 +255,118 @@ export async function submitSurveyResponse(
   })
 
   const [org] = await db
-    .select({ googlePlaceId: organizations.googlePlaceId })
+    .select({ googlePlaceId: organizations.googlePlaceId, settings: organizations.settings })
     .from(organizations)
     .where(eq(organizations.id, survey.orgId))
     .limit(1)
 
-  const shouldAskForReview =
+  const paused = org?.settings?.reviewRequestsPaused === true
+
+  const happyEnough =
     survey.routeToReviewFromRating !== null &&
     rating !== null &&
     rating >= survey.routeToReviewFromRating &&
-    Boolean(org?.googlePlaceId)
+    Boolean(org?.googlePlaceId) &&
+    !paused
 
-  if (shouldAskForReview && customerCardId) {
-    await db.insert(reviewRequests).values({
-      orgId: survey.orgId,
-      customerCardId,
-      trigger: 'after_survey',
-    })
+  // Nobody should be asked for a public review twice in the same half year, however
+  // many surveys they answer. An unhappy rating never reaches this branch at all.
+  const askedRecently = customerCardId
+    ? await db
+        .select({ id: reviewRequests.id })
+        .from(reviewRequests)
+        .where(
+          and(
+            eq(reviewRequests.customerCardId, customerCardId),
+            gte(
+              reviewRequests.shownAt,
+              new Date(Date.now() - REVIEW_REQUEST_COOLDOWN_DAYS * 24 * 60 * 60 * 1000),
+            ),
+          ),
+        )
+        .limit(1)
+    : []
+
+  const shouldAskForReview = happyEnough && customerCardId !== null && askedRecently.length === 0
+
+  let reviewRequestId: string | null = null
+  if (shouldAskForReview) {
+    const [created] = await db
+      .insert(reviewRequests)
+      .values({ orgId: survey.orgId, customerCardId, trigger: 'after_survey' })
+      .returning({ id: reviewRequests.id })
+    reviewRequestId = created?.id ?? null
   }
 
   return {
     thanks: true,
+    reviewRequestId,
     reviewUrl: shouldAskForReview
       ? `https://search.google.com/local/writereview?placeid=${org!.googlePlaceId}`
       : null,
+  }
+}
+
+/**
+ * Marks that the customer actually went to Google. Shown-versus-clicked is the only
+ * honest measure of whether these prompts are worth showing at all.
+ */
+export async function markReviewClicked(db: Database, requestId: string): Promise<void> {
+  await db
+    .update(reviewRequests)
+    .set({ clickedAt: new Date() })
+    .where(and(eq(reviewRequests.id, requestId), isNull(reviewRequests.clickedAt)))
+}
+
+/**
+ * How the review prompts are doing.
+ *
+ * Shown and opened, not "sent": we never post a review, we only put the ask in front of
+ * a customer who already said they were happy. The gap between the two numbers is the
+ * only honest measure of whether the ask is worth making at all.
+ */
+export async function reviewStats(
+  db: Database,
+  orgId: string,
+): Promise<{
+  connected: boolean
+  paused: boolean
+  shown: number
+  opened: number
+  shownLast30: number
+  openedLast30: number
+}> {
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+  const [[org], [totals], [recent]] = await Promise.all([
+    db
+      .select({ googlePlaceId: organizations.googlePlaceId, settings: organizations.settings })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1),
+    db
+      .select({
+        shown: count(),
+        opened: sql<number>`count(${reviewRequests.clickedAt})::int`,
+      })
+      .from(reviewRequests)
+      .where(eq(reviewRequests.orgId, orgId)),
+    db
+      .select({
+        shown: count(),
+        opened: sql<number>`count(${reviewRequests.clickedAt})::int`,
+      })
+      .from(reviewRequests)
+      .where(and(eq(reviewRequests.orgId, orgId), gte(reviewRequests.shownAt, since))),
+  ])
+
+  return {
+    connected: Boolean(org?.googlePlaceId),
+    paused: org?.settings?.reviewRequestsPaused === true,
+    shown: totals?.shown ?? 0,
+    opened: totals?.opened ?? 0,
+    shownLast30: recent?.shown ?? 0,
+    openedLast30: recent?.opened ?? 0,
   }
 }
 

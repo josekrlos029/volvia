@@ -1,6 +1,8 @@
 'use client'
 
 import { api } from '@/lib/api-client'
+import { FREQUENCY_LABELS } from '@/lib/segments'
+import { BUSINESS_CATEGORIES, type OrgSettings, VISIT_FREQUENCIES } from '@volvia/shared'
 import { ApiError } from '@volvia/shared/client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -9,12 +11,35 @@ import { Panel, buttonClass } from './ui'
 interface Org {
   name: string
   slug: string
+  category: string
   tagline: string
   about: string
   contactEmail: string | null
   contactPhone: string | null
   googlePlaceId: string | null
   publicUrl: string
+  settings: OrgSettings
+}
+
+/** Plain names for the trades Volvia is built for. */
+const CATEGORY_LABELS: Record<string, string> = {
+  cafe: 'Cafetería',
+  restaurant: 'Restaurante',
+  bakery: 'Panadería',
+  bar: 'Bar',
+  juice_bar: 'Jugos y batidos',
+  ice_cream: 'Heladería',
+  barber: 'Barbería',
+  hair_salon: 'Peluquería',
+  nail_salon: 'Manicura',
+  beauty: 'Estética',
+  spa: 'Spa',
+  fitness: 'Gimnasio',
+  pet_grooming: 'Peluquería canina',
+  tattoo: 'Tatuajes',
+  car_wash: 'Lavado de autos',
+  retail: 'Tienda',
+  other: 'Otro',
 }
 
 const field =
@@ -33,11 +58,13 @@ export function BusinessSettings({ org }: { org: Org }) {
       await api.patch('/v1/org', {
         name: value.name,
         slug: value.slug,
+        category: value.category,
         tagline: value.tagline,
         about: value.about,
         contactEmail: value.contactEmail || null,
         contactPhone: value.contactPhone || null,
         googlePlaceId: value.googlePlaceId || null,
+        settings: value.settings,
       })
       setStatus('saved')
       router.refresh()
@@ -80,6 +107,48 @@ export function BusinessSettings({ org }: { org: Org }) {
             }
             className={field}
           />
+        </Labelled>
+
+        <Labelled label="Tipo de negocio" htmlFor="org-category">
+          <select
+            id="org-category"
+            value={value.category}
+            onChange={(event) => setValue({ ...value, category: event.target.value })}
+            className={field}
+          >
+            {BUSINESS_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {CATEGORY_LABELS[category] ?? category}
+              </option>
+            ))}
+          </select>
+        </Labelled>
+
+        <Labelled
+          label="Cada cuánto esperas que vuelva un buen cliente"
+          htmlFor="org-frequency"
+          help="Con esto medimos quién es habitual y quién se está alejando. Un gimnasio y una barbería no se miden igual."
+        >
+          <select
+            id="org-frequency"
+            value={value.settings.visitFrequency}
+            onChange={(event) =>
+              setValue({
+                ...value,
+                settings: {
+                  ...value.settings,
+                  visitFrequency: event.target.value as OrgSettings['visitFrequency'],
+                },
+              })
+            }
+            className={field}
+          >
+            {VISIT_FREQUENCIES.map((frequency) => (
+              <option key={frequency} value={frequency}>
+                {FREQUENCY_LABELS[frequency]}
+              </option>
+            ))}
+          </select>
         </Labelled>
 
         <Labelled label="Frase corta" htmlFor="org-tagline">

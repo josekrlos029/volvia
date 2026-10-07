@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { MAX_STAMPS_PER_SCAN } from '../constants'
 import { publicTokenSchema } from './common'
+import { surveyQuestionSchema } from './engagement'
 
 /** Sources that can add a stamp, used for auditing and per-source limits. */
 export const STAMP_SOURCES = [
@@ -141,5 +142,20 @@ export const publicCardStateSchema = z.object({
     .nullable(),
   walletPasses: z.object({ appleUrl: z.string().nullable(), googleUrl: z.string().nullable() }),
   lastStampAt: z.coerce.date().nullable(),
+  /** The card's own line for this visit, already chosen server-side. */
+  message: z.string().nullable(),
+  /**
+   * The survey this customer should be asked right now, if any. Resolved server-side
+   * from the survey's trigger and what the customer has already answered, so the card
+   * page never has to decide whether it is the right moment.
+   */
+  pendingSurvey: z
+    .object({
+      id: z.string().uuid(),
+      name: z.string(),
+      isAnonymous: z.boolean(),
+      questions: z.array(surveyQuestionSchema),
+    })
+    .nullable(),
 })
 export type PublicCardState = z.infer<typeof publicCardStateSchema>

@@ -92,7 +92,8 @@ export async function findActiveCardByJoinSlug(db: Database, joinSlug: string) {
     .limit(1)
 
   if (!row) throw new AppError('CARD_NOT_FOUND', { message: 'card not found' })
-  if (row.card.status !== 'active') {
+  // Closing the business closes its cards with it, whatever their own status says.
+  if (row.org.deletedAt || row.card.status !== 'active') {
     throw new AppError('CARD_NOT_ACTIVE', { message: 'this card is not accepting new members' })
   }
   return row
@@ -173,13 +174,43 @@ export async function joinCard(
     }
 
     const token = randomToken()
-    await tx.insert(customerCards).values({
-      orgId: org.id,
-      cardId: card.id,
-      customerId,
-      token,
-      expiresAt: card.inactivityExpiryDays ? addDays(now, card.inactivityExpiryDays) : null,
-    })
+    // A head start the business configured: the card is never handed over empty.
+    const headStart = Math.max(0, Math.min(card.initialStamps, card.stampsRequired - 1))
+
+    const [createdCard] = await tx
+      .insert(customerCards)
+      .values({
+        orgId: org.id,
+        cardId: card.id,
+        customerId,
+        token,
+        stampsCount: headStart,
+        lifetimeStamps: headStart,
+        expiresAt: card.inactivityExpiryDays ? addDays(now, card.inactivityExpiryDays) : null,
+      })
+      .returning({ id: customerCards.id })
+
+    if (headStart > 0) {
+      // Recorded like any other stamp, so the history explains where they came from.
+      await tx.insert(stampEvents).values({
+        orgId: org.id,
+        customerCardId: createdCard!.id,
+        source: 'manual',
+        delta: headStart,
+        resultingCount: headStart,
+        cycleIndex: 0,
+        note: 'head start',
+        idempotencyKey: `head-start:${createdCard!.id}`,
+        occurredAt: now,
+      })
+      await tx
+        .update(customers)
+        .set({
+          totalStamps: sql`${customers.totalStamps} + ${headStart}`,
+          updatedAt: now,
+        })
+        .where(eq(customers.id, customerId))
+    }
 
     // Answers to the card's signup questions, if any were asked.
     const answerEntries = Object.entries(input.data.answers ?? {})

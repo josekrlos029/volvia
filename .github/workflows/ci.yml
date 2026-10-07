@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The same services the project runs locally, so a green pipeline means the same
+  # thing a green laptop does.
+  DOCKER_COMPOSE: infra/docker-compose.yml
+
+jobs:
+  check:
+    name: Lint, types and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Environment
+        run: cp .env.example .env
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
+
+      - name: Unit tests
+        run: pnpm --filter '!@volvia/e2e' test
+
+  e2e:
+    name: End to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Environment
+        run: |
+          cp .env.example .env
+          # The suite signs up many businesses from one address.
+          sed -i 's/^RATE_LIMIT_ENABLED=.*/RATE_LIMIT_ENABLED=false/' .env
+
+      - name: Services
+        run: docker compose -f "$DOCKER_COMPOSE" up -d --wait
+
+      - run: pnpm db:migrate
+
+      - name: Wallet signing certificates
+        run: pnpm certs:dev
+
+      - run: pnpm build
+
+      - name: Browsers
+        run: pnpm --filter @volvia/e2e exec playwright install --with-deps chromium webkit
+
+      - name: Start the stack
+        run: |
+          pnpm start > /tmp/stack.log 2>&1 &
+          for url in \
+            http://localhost:8080/readyz \
+            http://localhost:3000/es \
+            http://localhost:3001/login \
+            http://localhost:3002/; do
+            for _ in $(seq 1 60); do
+              curl -sf -o /dev/null "$url" && break
+              sleep 2
+            done
+            curl -sf -o /dev/null "$url" || { echo "no arrancó: $url"; exit 1; }
+          done
+          curl -s http://localhost:8080/readyz
+
+      - name: End-to-end suite
+        run: pnpm test:e2e
+
+      - name: Logs on failure
+        if: failure()
+        run: |
+          tail -n 200 /tmp/stack.log || true
+          docker compose -f "$DOCKER_COMPOSE" logs --tail 100 || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            tests/e2e/test-results
+            tests/e2e/playwright-report
+          retention-days: 7

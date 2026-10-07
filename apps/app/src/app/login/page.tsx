@@ -1,27 +1,44 @@
 import { LoginForm } from '@/components/LoginForm'
+import { AuthShell } from '@/components/auth/AuthShell'
 import { getSession } from '@/lib/session'
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = { title: 'Entrar · Volvia' }
 
-export default async function LoginPage() {
+/** Only same-site paths are accepted, so `?next=` cannot bounce anyone off Volvia. */
+function safeNext(value: string | undefined): string | undefined {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return undefined
+  return value
+}
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>
+}) {
+  const next = safeNext((await searchParams).next)
   const session = await getSession()
-  if (session) redirect('/')
+  if (session) redirect(next ?? '/')
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-sm flex-col justify-center px-5 py-12">
-      <header className="mb-8">
-        <p className="text-[15px] font-semibold tracking-[-0.01em]">Volvia</p>
-        <h1 className="mt-6 text-[26px] font-semibold leading-tight tracking-[-0.01em]">
-          Entra a tu panel
-        </h1>
-        <p className="mt-2 text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
-          Gestiona tu tarjeta, tus clientes y tus recompensas.
-        </p>
-      </header>
-
-      <LoginForm />
-    </main>
+    <AuthShell
+      title="Entra a tu panel"
+      lead="Gestiona tu tarjeta, tus clientes y tus recompensas."
+      footer={
+        <>
+          ¿Aún no tienes cuenta?{' '}
+          <Link
+            href="/signup"
+            className="font-medium text-[var(--color-primary)] underline underline-offset-2"
+          >
+            Crea tu negocio gratis
+          </Link>
+        </>
+      }
+    >
+      <LoginForm next={next} />
+    </AuthShell>
   )
 }

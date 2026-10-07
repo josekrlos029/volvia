@@ -1,4 +1,6 @@
 import { ActivityChart } from '@/components/ActivityChart'
+import { ActivityFeed, type ActivityItem } from '@/components/ActivityFeed'
+import { ShareCard } from '@/components/ShareCard'
 import { Badge, EmptyState, Metric, Panel, buttonClass } from '@/components/ui'
 import { formatNumber, formatPercent, formatRelative } from '@/lib/format'
 import { apiFetch } from '@/lib/session'
@@ -32,14 +34,22 @@ interface CustomerRow {
   lastStampAt: string | null
 }
 
+interface Pulse {
+  today: { stamps: number; joins: number; rewards: number }
+  activity: ActivityItem[]
+  birthdays: Array<{ customerId: string; firstName: string; month: number; day: number }>
+}
+
 export default async function DashboardHome() {
-  const [overview, series, cards, customers] = await Promise.all([
+  const [overview, series, cards, customers, pulse, org] = await Promise.all([
     apiFetch<Overview>('/v1/analytics/overview?preset=30d'),
     apiFetch<Array<{ date: string; stamps: number; joins: number }>>(
       '/v1/analytics/timeseries?preset=30d',
     ),
     apiFetch<CardSummary[]>('/v1/cards'),
     apiFetch<{ items: CustomerRow[] }>('/v1/customers?pageSize=5&sortBy=lastStampAt'),
+    apiFetch<Pulse>('/v1/analytics/pulse'),
+    apiFetch<{ publicUrl: string }>('/v1/org'),
   ])
 
   const activeCard = cards.find((card) => card.status === 'active')
@@ -73,6 +83,39 @@ export default async function DashboardHome() {
           </Link>
         ) : null}
       </header>
+
+      <Panel title="Hoy">
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <p className="tabular text-[26px] font-semibold leading-none tracking-[-0.02em]">
+              {formatNumber(pulse.today.stamps)}
+            </p>
+            <p className="mt-1.5 text-[13px] text-[var(--color-ink-muted)]">sellos</p>
+          </div>
+          <div>
+            <p className="tabular text-[26px] font-semibold leading-none tracking-[-0.02em]">
+              {formatNumber(pulse.today.joins)}
+            </p>
+            <p className="mt-1.5 text-[13px] text-[var(--color-ink-muted)]">se unieron</p>
+          </div>
+          <div>
+            <p className="tabular text-[26px] font-semibold leading-none tracking-[-0.02em]">
+              {formatNumber(pulse.today.rewards)}
+            </p>
+            <p className="mt-1.5 text-[13px] text-[var(--color-ink-muted)]">canjes</p>
+          </div>
+        </div>
+
+        {activeCard ? (
+          <div className="mt-4 border-t border-[var(--color-line)] pt-4">
+            <ShareCard
+              joinUrl={activeCard.joinUrl}
+              publicUrl={org.publicUrl}
+              cardId={activeCard.id}
+            />
+          </div>
+        ) : null}
+      </Panel>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric
@@ -112,6 +155,40 @@ export default async function DashboardHome() {
           />
         )}
       </Panel>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Lo último">
+          <ActivityFeed items={pulse.activity} />
+        </Panel>
+
+        <Panel title="Cumpleaños en dos semanas">
+          {pulse.birthdays.length === 0 ? (
+            <EmptyState
+              title="Nadie cumple pronto"
+              body="Cuando pidas el cumpleaños al unirse, aquí verás a quién felicitar."
+            />
+          ) : (
+            <ul className="flex flex-col divide-y divide-[var(--color-line)]">
+              {pulse.birthdays.map((birthday) => (
+                <li
+                  key={birthday.customerId}
+                  className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
+                >
+                  <Link
+                    href={`/customers/${birthday.customerId}`}
+                    className="text-[14px] font-medium"
+                  >
+                    {birthday.firstName}
+                  </Link>
+                  <span className="tabular text-[13px] text-[var(--color-ink-muted)]">
+                    {birthday.day}/{birthday.month}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel

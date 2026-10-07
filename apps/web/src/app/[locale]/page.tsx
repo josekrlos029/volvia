@@ -29,7 +29,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <a
-                href={`${appUrl}/login`}
+                href={`${appUrl}/signup`}
                 className="rounded-[10px] bg-[var(--color-primary)] px-5 py-3 text-[15px] font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-[var(--color-primary-hover)] active:scale-[0.985]"
               >
                 {copy.hero.cta}
@@ -232,7 +232,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </h2>
           <p className="mt-3 text-[16px] leading-relaxed text-white/70">{copy.finalCta.body}</p>
           <a
-            href={`${appUrl}/login`}
+            href={`${appUrl}/signup`}
             className="mt-7 inline-block rounded-[10px] bg-white px-5 py-3 text-[15px] font-semibold text-[var(--color-ink)] transition-transform duration-150 active:scale-[0.985]"
           >
             {copy.finalCta.cta}

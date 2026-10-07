@@ -50,6 +50,8 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_SECURE: bool.default(false),
   MAIL_FROM: z.string().default('Volvia <hola@volvia.local>'),
+  /** Where the marketing site's contact form lands. Falls back to the sender. */
+  SUPPORT_EMAIL: z.string().default(''),
 
   STORAGE_DRIVER: z.enum(['s3', 'memory']).default('s3'),
   STORAGE_BUCKET: z.string().default('volvia-uploads'),
@@ -99,6 +101,50 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>
 
+/**
+ * Values that are fine on a laptop and dangerous anywhere else.
+ *
+ * The `.env.example` secrets are in the repository, so anyone could forge a session on
+ * a deployment that kept them. Length validation alone would accept them happily, which
+ * is why production refuses to start rather than warn.
+ */
+export function unsafeForProduction(env: Env): string[] {
+  const problems: string[] = []
+
+  const placeholder = (value: string) => /dev-only|change-me|^changeme|^secret$|^test$/i.test(value)
+  for (const key of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'TOKEN_PEPPER'] as const) {
+    if (placeholder(env[key])) problems.push(`${key} still holds the development placeholder`)
+  }
+
+  if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
+    problems.push('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different')
+  }
+  if (!env.RATE_LIMIT_ENABLED) {
+    problems.push('RATE_LIMIT_ENABLED is off; it may only be off for the end-to-end suite')
+  }
+  if (env.CORS_ORIGINS.length === 0) {
+    problems.push('CORS_ORIGINS is empty; set the real dashboard and card domains')
+  }
+  if (env.CORS_ORIGINS.some((origin) => origin.startsWith('http://'))) {
+    problems.push('CORS_ORIGINS contains a plaintext http:// origin')
+  }
+  if (env.COOKIE_DOMAIN === 'localhost') {
+    problems.push('COOKIE_DOMAIN is still localhost')
+  }
+  for (const [key, value] of Object.entries({
+    APP_URL: env.APP_URL,
+    WEB_URL: env.WEB_URL,
+    PASS_URL: env.PASS_URL,
+    API_URL: env.API_URL,
+  })) {
+    if (value.includes('localhost') || value.startsWith('http://')) {
+      problems.push(`${key} points at ${value}, which cannot be right in production`)
+    }
+  }
+
+  return problems
+}
+
 function load(): Env {
   const parsed = envSchema.safeParse(process.env)
   if (!parsed.success) {
@@ -107,6 +153,18 @@ function load(): Env {
       .join('\n')
     throw new Error(`Invalid environment configuration:\n${issues}`)
   }
+
+  if (parsed.data.NODE_ENV === 'production') {
+    const problems = unsafeForProduction(parsed.data)
+    if (problems.length > 0) {
+      throw new Error(
+        `Refusing to start in production with an unsafe configuration:\n${problems
+          .map((problem) => `  - ${problem}`)
+          .join('\n')}`,
+      )
+    }
+  }
+
   return parsed.data
 }
 

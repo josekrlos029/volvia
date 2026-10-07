@@ -9,6 +9,7 @@ import {
   eq,
   gte,
   ilike,
+  inArray,
   isNull,
   lte,
   or,
@@ -19,35 +20,9 @@ import {
   stampCards,
   stampEvents,
 } from '@volvia/db'
-import { type CustomerListQuery, type CustomerSegment, SEGMENT_RULES } from '@volvia/shared'
+import { COMMUNITY_SEGMENTS, type CustomerListQuery, type VisitFrequency } from '@volvia/shared'
 import { AppError } from '../../lib/errors'
-import { daysAgo } from '../../lib/time'
-
-/**
- * Turns a segment name into a SQL condition.
- *
- * Segments are defined by behaviour, not tags, so they stay accurate without the
- * business maintaining anything: a regular is someone who actually came back.
- */
-function segmentCondition(segment: CustomerSegment) {
-  switch (segment) {
-    case 'regulars':
-      return gte(customers.totalStamps, SEGMENT_RULES.regulars.minStampsLast90Days)
-    case 'at_risk':
-      return and(
-        lte(customers.lastStampAt, daysAgo(SEGMENT_RULES.at_risk.inactiveDaysMin)),
-        gte(customers.lastStampAt, daysAgo(SEGMENT_RULES.at_risk.inactiveDaysMax)),
-      )
-    case 'inactive':
-      return lte(customers.lastStampAt, daysAgo(SEGMENT_RULES.inactive.inactiveDaysMin))
-    case 'new':
-      return gte(customers.joinedAt, daysAgo(SEGMENT_RULES.new.joinedWithinDays))
-    case 'birthday_month':
-      return eq(customers.birthdayMonth, new Date().getMonth() + 1)
-    default:
-      return undefined
-  }
-}
+import { filterConditions, segmentCondition, visitFrequencyOf } from '../../lib/segments'
 
 function sortColumn(sortBy: CustomerListQuery['sortBy']) {
   switch (sortBy) {
@@ -62,21 +37,42 @@ function sortColumn(sortBy: CustomerListQuery['sortBy']) {
   }
 }
 
-export async function listCustomers(db: Database, orgId: string, query: CustomerListQuery) {
+/**
+ * Everything that narrows a customer list, in one place: ownership, the segment, the
+ * card, the free-text search and the filters. Shared by the list, the counts and the
+ * CSV export so the three can never disagree about who is in scope.
+ */
+export function customerScope(orgId: string, query: CustomerListQuery, frequency: VisitFrequency) {
   const conditions = [eq(customers.orgId, orgId), isNull(customers.deletedAt)]
 
-  const segment = segmentCondition(query.segment)
+  const segment = segmentCondition(query.segment, frequency)
   if (segment) conditions.push(segment)
 
   if (query.search) {
     const pattern = `%${query.search}%`
     conditions.push(or(ilike(customers.firstName, pattern), ilike(customers.email, pattern))!)
   }
-  if (query.hasConsent !== undefined) {
-    conditions.push(eq(customers.marketingConsent, query.hasConsent))
+
+  conditions.push(...filterConditions(query))
+
+  if (query.ids && query.ids.length > 0) conditions.push(inArray(customers.id, query.ids))
+
+  if (query.cardId) {
+    conditions.push(
+      sql`exists (select 1 from ${customerCards} where ${customerCards.customerId} = ${customers.id} and ${customerCards.cardId} = ${query.cardId})`,
+    )
   }
 
-  const where = and(...conditions)
+  return and(...conditions)
+}
+
+export async function listCustomers(
+  db: Database,
+  orgId: string,
+  query: CustomerListQuery,
+  frequency: VisitFrequency,
+) {
+  const where = customerScope(orgId, query, frequency)
   const column = sortColumn(query.sortBy)
 
   /**
@@ -114,6 +110,42 @@ export async function listCustomers(db: Database, orgId: string, query: Customer
     pageSize: query.pageSize,
     total: total?.value ?? 0,
     hasMore: query.page * query.pageSize < (total?.value ?? 0),
+  }
+}
+
+/**
+ * How the community is doing, in one query.
+ *
+ * Counted with the same conditions the list filters by, so clicking a bucket always
+ * lands on exactly the people the number promised. The five buckets partition the
+ * customers, so they add up to the total — if they ever stop adding up, the rules have
+ * developed a hole.
+ */
+export async function communityCounts(
+  db: Database,
+  orgId: string,
+  query: CustomerListQuery,
+  frequency: VisitFrequency,
+): Promise<{ total: number; segments: Record<string, number> }> {
+  const base = { ...query, segment: 'all' as const }
+
+  const [[total], ...buckets] = await Promise.all([
+    db
+      .select({ value: count() })
+      .from(customers)
+      .where(customerScope(orgId, base, frequency)),
+    ...COMMUNITY_SEGMENTS.map((segment) =>
+      db
+        .select({ value: count() })
+        .from(customers)
+        .where(customerScope(orgId, { ...base, segment }, frequency))
+        .then(([row]) => [segment, row?.value ?? 0] as const),
+    ),
+  ])
+
+  return {
+    total: total?.value ?? 0,
+    segments: Object.fromEntries(buckets),
   }
 }
 
@@ -241,8 +273,9 @@ export async function exportCustomersCsv(
   db: Database,
   orgId: string,
   query: CustomerListQuery,
+  frequency: VisitFrequency,
 ): Promise<string> {
-  const all = await listCustomers(db, orgId, { ...query, page: 1, pageSize: 10_000 })
+  const all = await listCustomers(db, orgId, { ...query, page: 1, pageSize: 10_000 }, frequency)
 
   const header = [
     'nombre',

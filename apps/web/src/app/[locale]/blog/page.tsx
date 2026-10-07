@@ -31,6 +31,7 @@ export default async function BlogIndex({ params }: { params: Promise<{ locale: 
   return (
     <Section>
       <SectionTitle
+        as="h1"
         title={isSpanish ? 'Cómo hacer que vuelvan' : 'How to make them come back'}
         body={
           isSpanish

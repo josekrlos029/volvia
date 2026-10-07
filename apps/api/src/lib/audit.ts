@@ -40,6 +40,7 @@ export const AUDIT_ACTIONS = {
   authPasswordReset: 'auth.password_reset',
   authRefreshReuse: 'auth.refresh_reuse_detected',
   memberInvited: 'member.invited',
+  memberAccepted: 'member.accepted',
   memberRemoved: 'member.removed',
   memberRoleChanged: 'member.role_changed',
   cardCreated: 'card.created',
@@ -55,4 +56,5 @@ export const AUDIT_ACTIONS = {
   kioskRevoked: 'kiosk.revoked',
   campaignLaunched: 'campaign.launched',
   planChanged: 'plan.changed',
+  orgDeleted: 'org.deleted',
 } as const

@@ -32,6 +32,18 @@ export const EMAIL_VERIFICATION_TTL_SECONDS = 24 * 60 * 60
 export const PASSWORD_RESET_TTL_SECONDS = 60 * 60
 export const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 
+/** A head start, capped so the reward still has to be earned. */
+export const MAX_INITIAL_STAMPS = 3
+
+/** Rotating card messages. More than five and a business stops writing good ones. */
+export const MAX_CARD_MESSAGE_VARIANTS = 5
+
+/** How many customers one selection in the list can carry into an action. */
+export const MAX_SELECTED_CUSTOMERS = 500
+
+/** Nobody is asked for a public Google review more than twice a year. */
+export const REVIEW_REQUEST_COOLDOWN_DAYS = 180
+
 /** Idempotency window for a stamp scan replay. */
 export const IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
 

@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { MAX_PROFILE_QUESTIONS } from '../constants'
+import { MAX_PROFILE_QUESTIONS, MAX_SELECTED_CUSTOMERS } from '../constants'
+import { COMMUNITY_SEGMENTS } from '../segments'
 import {
   birthdaySchema,
   emailSchema,
@@ -30,32 +31,61 @@ export const updateCustomerSchema = z.object({
   notes: z.string().trim().max(1000).optional(),
 })
 
-/** Segments the dashboard and campaign audiences share. */
+/**
+ * Segments the dashboard and campaign audiences share: the five community buckets,
+ * plus the two that answer a question rather than describe a state.
+ */
 export const CUSTOMER_SEGMENTS = [
   'all',
-  'regulars',
-  'at_risk',
-  'inactive',
-  'new',
+  ...COMMUNITY_SEGMENTS,
   'birthday_month',
+  'never_visited',
 ] as const
 export type CustomerSegment = (typeof CUSTOMER_SEGMENTS)[number]
 
-/** Thresholds that define each segment, in days / visits. */
-export const SEGMENT_RULES = {
-  regulars: { minStampsLast90Days: 4 },
-  at_risk: { inactiveDaysMin: 30, inactiveDaysMax: 59 },
-  inactive: { inactiveDaysMin: 60 },
-  new: { joinedWithinDays: 14 },
-} as const
+const dateFilter = z.coerce.date().optional()
 
 export const customerListQuerySchema = paginationSchema.extend({
   cardId: z.string().uuid().optional(),
   segment: z.enum(CUSTOMER_SEGMENTS).default('all'),
   search: z.string().trim().max(120).optional(),
-  sortBy: z.enum(['joinedAt', 'lastStampAt', 'stamps', 'rewards']).default('lastStampAt'),
+  sortBy: z
+    .enum(['joinedAt', 'lastStampAt', 'stamps', 'rewards', 'firstName'])
+    .default('lastStampAt'),
   sortOrder: sortOrderSchema,
   hasConsent: z.coerce.boolean().optional(),
+
+  /** Everything below narrows the list without changing what a segment means. */
+  minStamps: z.coerce.number().int().min(0).max(100000).optional(),
+  maxStamps: z.coerce.number().int().min(0).max(100000).optional(),
+  minRewards: z.coerce.number().int().min(0).max(100000).optional(),
+  joinedAfter: dateFilter,
+  joinedBefore: dateFilter,
+  lastVisitAfter: dateFilter,
+  lastVisitBefore: dateFilter,
+  /** Month 1-12, for planning a birthday campaign ahead of time. */
+  birthdayMonth: z.coerce.number().int().min(1).max(12).optional(),
+  hasBirthday: z.coerce.boolean().optional(),
+  hasRedeemed: z.coerce.boolean().optional(),
+
+  /**
+   * An explicit selection, as a comma-separated list. Capped because it travels in a
+   * URL: beyond this the business is better served by filtering and acting on the
+   * whole result.
+   */
+  ids: z
+    .string()
+    .max(20_000)
+    .optional()
+    .transform((value) =>
+      value
+        ? value
+            .split(',')
+            .map((id) => id.trim())
+            .filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+            .slice(0, MAX_SELECTED_CUSTOMERS)
+        : undefined,
+    ),
 })
 export type CustomerListQuery = z.infer<typeof customerListQuerySchema>
 

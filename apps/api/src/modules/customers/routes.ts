@@ -1,11 +1,17 @@
 import { and, customers, eq } from '@volvia/db'
-import { customerListQuerySchema, updateCustomerSchema } from '@volvia/shared'
+import { VISIT_FREQUENCIES, customerListQuerySchema, updateCustomerSchema } from '@volvia/shared'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { AUDIT_ACTIONS, audit } from '../../lib/audit'
 import { AppError } from '../../lib/errors'
 import { typed } from '../../types'
-import { deleteCustomer, exportCustomersCsv, getCustomer, listCustomers } from './service'
+import {
+  communityCounts,
+  deleteCustomer,
+  exportCustomersCsv,
+  getCustomer,
+  listCustomers,
+} from './service'
 
 const customerParams = z.object({ customerId: z.string().uuid() })
 
@@ -19,7 +25,12 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
       schema: { querystring: customerListQuerySchema, tags: ['customers'] },
     },
     async (request) => {
-      const page = await listCustomers(app.db, request.org!.orgId, request.query)
+      const page = await listCustomers(
+        app.db,
+        request.org!.orgId,
+        request.query,
+        request.org!.visitFrequency,
+      )
 
       // Contact details are a paid feature: mask them rather than hiding the customer,
       // so a free plan still sees who its regulars are.
@@ -93,13 +104,45 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
   )
 
   app.get(
+    '/segments',
+    {
+      preHandler: [app.requireOrg('staff')],
+      schema: {
+        querystring: customerListQuerySchema,
+        response: {
+          200: z.object({
+            total: z.number().int(),
+            frequency: z.enum(VISIT_FREQUENCIES),
+            segments: z.record(z.string(), z.number().int()),
+          }),
+        },
+        tags: ['customers'],
+      },
+    },
+    async (request) => ({
+      ...(await communityCounts(
+        app.db,
+        request.org!.orgId,
+        request.query,
+        request.org!.visitFrequency,
+      )),
+      frequency: request.org!.visitFrequency,
+    }),
+  )
+
+  app.get(
     '/export.csv',
     {
       preHandler: [app.requireOrg('admin'), app.requireFeature('csv_export')],
       schema: { querystring: customerListQuerySchema, tags: ['customers'] },
     },
     async (request, reply) => {
-      const csv = await exportCustomersCsv(app.db, request.org!.orgId, request.query)
+      const csv = await exportCustomersCsv(
+        app.db,
+        request.org!.orgId,
+        request.query,
+        request.org!.visitFrequency,
+      )
       await audit(app.db, {
         orgId: request.org!.orgId,
         actorUserId: request.auth!.userId,

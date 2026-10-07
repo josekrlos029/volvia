@@ -6,7 +6,7 @@ import { cardRoutes } from '../modules/cards/routes'
 import { customerRoutes } from '../modules/customers/routes'
 import { engagementRoutes, publicSurveyRoutes } from '../modules/engagement/routes'
 import { loyaltyRoutes } from '../modules/loyalty/routes'
-import { orgRoutes } from '../modules/orgs/routes'
+import { orgRoutes, publicInviteRoutes } from '../modules/orgs/routes'
 import { publicRoutes } from '../modules/public/routes'
 import { walletRoutes } from '../modules/wallet/routes'
 import { healthRoutes } from './health'
@@ -23,6 +23,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(engagementRoutes, { prefix: '/v1' })
   await app.register(publicRoutes, { prefix: '/p' })
   await app.register(publicSurveyRoutes, { prefix: '/p' })
+  await app.register(publicInviteRoutes, { prefix: '/p' })
   await app.register(orgRoutes, { prefix: '/v1/org' })
   await app.register(customerRoutes, { prefix: '/v1/customers' })
   await app.register(analyticsRoutes, { prefix: '/v1/analytics' })

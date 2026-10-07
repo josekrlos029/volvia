@@ -1,6 +1,10 @@
 import { BusinessSettings } from '@/components/BusinessSettings'
+import { DangerZone } from '@/components/DangerZone'
+import { LegalSettings } from '@/components/LegalSettings'
+import { PublicPageSettings } from '@/components/PublicPageSettings'
 import { Panel } from '@/components/ui'
 import { apiFetch } from '@/lib/session'
+import type { OrgSettings } from '@volvia/shared'
 import Link from 'next/link'
 
 interface Org {
@@ -14,8 +18,10 @@ interface Org {
   contactPhone: string | null
   googlePlaceId: string | null
   timezone: string
-  socialLinks: Array<{ platform: string; url: string }>
+  brandColor: string
+  socialLinks: Array<{ platform: string; url: string; label?: string }>
   publicUrl: string
+  settings: OrgSettings
 }
 
 export default async function SettingsPage() {
@@ -45,6 +51,13 @@ export default async function SettingsPage() {
 
       <BusinessSettings org={org} />
 
+      <PublicPageSettings
+        links={org.socialLinks}
+        brandColor={org.brandColor}
+        ctaLabel={org.settings.pageCtaLabel}
+        publicUrl={org.publicUrl}
+      />
+
       <Panel title="Sedes">
         <ul className="flex flex-col divide-y divide-[var(--color-line)]">
           {locations.map((location) => (
@@ -57,6 +70,10 @@ export default async function SettingsPage() {
           ))}
         </ul>
       </Panel>
+
+      <LegalSettings settings={org.settings} slug={org.slug} />
+
+      <DangerZone businessName={org.name} />
     </div>
   )
 }

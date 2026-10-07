@@ -2,6 +2,7 @@ import { Shell } from '@/components/Shell'
 import { api } from '@/lib/api'
 import { t } from '@/lib/i18n'
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 interface BusinessPage {
@@ -15,6 +16,8 @@ interface BusinessPage {
     coverUrl: string | null
     brandColor: string
     socialLinks: Array<{ platform: string; url: string; label?: string }>
+    ctaLabel: string
+    legal: { name: string; taxId: string; address: string; email: string }
     contactPhone: string | null
     googleReviewUrl: string | null
   }
@@ -70,6 +73,7 @@ const SOCIAL_LABELS: Record<string, string> = {
   facebook: 'Facebook',
   tiktok: 'TikTok',
   whatsapp: 'WhatsApp',
+  telegram: 'Telegram',
   x: 'X',
   youtube: 'YouTube',
   website: 'Sitio web',
@@ -132,7 +136,7 @@ export default async function BusinessPageRoute({ params }: { params: Promise<{ 
             className="mt-4 block rounded-[10px] px-4 py-3.5 text-center text-[16px] font-semibold text-[#14171A] transition-transform duration-150 active:scale-[0.985]"
             style={{ background: cardDesign?.accentColor ?? '#E9A23B' }}
           >
-            {copy.business.cardCta}
+            {page.business.ctaLabel || copy.business.cardCta}
           </a>
         </section>
       ) : null}
@@ -214,9 +218,12 @@ export default async function BusinessPageRoute({ params }: { params: Promise<{ 
         </section>
       ) : null}
 
-      <p className="mt-2 text-center text-[12px] text-[var(--color-ink-muted)]">
-        {copy.business.poweredBy}
-      </p>
+      <footer className="mt-2 flex flex-col items-center gap-1.5 text-center text-[12px] text-[var(--color-ink-muted)]">
+        <Link href={`/b/${slug}/privacidad`} className="underline underline-offset-2">
+          Cómo tratamos tus datos
+        </Link>
+        <p>{copy.business.poweredBy}</p>
+      </footer>
     </Shell>
   )
 }

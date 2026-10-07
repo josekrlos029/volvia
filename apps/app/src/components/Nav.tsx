@@ -18,6 +18,7 @@ const SECTIONS = [
   { href: '/customers', label: 'Clientes' },
   { href: '/campaigns', label: 'Campañas', feature: 'campaigns' },
   { href: '/surveys', label: 'Encuestas', feature: 'surveys' },
+  { href: '/reviews', label: 'Reseñas', feature: 'google_review_requests' },
   { href: '/automations', label: 'Automatizaciones', feature: 'birthday_automation' },
   { href: '/team', label: 'Equipo', feature: 'team_accounts' },
   { href: '/settings', label: 'Ajustes' },

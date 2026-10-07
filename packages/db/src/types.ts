@@ -1,8 +1,8 @@
 /** Shapes stored inside jsonb columns. Kept structural so Drizzle stays decoupled from zod. */
-import type { CardDesign, StampRules } from '@volvia/shared'
+import type { CardDesign, CardMessages, StampRules } from '@volvia/shared'
 
 export type SocialLink = { platform: string; url: string; label?: string }
-export type { CardDesign, StampRules }
+export type { CardDesign, CardMessages, StampRules }
 
 export type CampaignOffer =
   | { kind: 'bonus_stamps'; amount: number }

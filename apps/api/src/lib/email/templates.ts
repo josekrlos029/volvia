@@ -125,15 +125,26 @@ export function inviteTemplate(locale: Locale, url: string, orgName: string): Em
 
 export function welcomeCustomerTemplate(
   locale: Locale,
-  input: { orgName: string; cardUrl: string; rewardTitle: string },
+  input: {
+    orgName: string
+    cardUrl: string
+    rewardTitle: string
+    /** What the business wrote itself. Empty falls back to our wording. */
+    headline?: string
+    body?: string
+  },
 ): EmailTemplate {
   const copy = brandCopy[locale].customerWelcome
+  const title = input.headline?.trim() || copy.title(input.orgName)
+
   return {
+    // The subject still names the business: that is what makes it recognisable in a
+    // crowded inbox, whatever the shop chose to say inside.
     subject: copy.subject(input.orgName),
     ...render({
       locale,
-      title: copy.title(input.orgName),
-      intro: copy.intro(input.rewardTitle),
+      title,
+      intro: input.body?.trim() || copy.intro(input.rewardTitle),
       cta: { label: copy.cta, url: input.cardUrl },
       footnote: copy.footnote,
     }),
@@ -172,4 +183,47 @@ export function rewardReadyTemplate(
       footnote: copy.footnote,
     }),
   }
+}
+
+/**
+ * A contact request from the marketing site, sent to us rather than to a customer.
+ *
+ * Deliberately plain: it is read by a person, so the message is the body and the
+ * reply-to is the address that wrote it.
+ */
+export function contactRequestTemplate(input: {
+  name: string
+  email: string
+  businessName: string
+  topic: string
+  message: string
+  locale: Locale
+}): EmailTemplate {
+  const header = [
+    `Nombre: ${input.name}`,
+    `Correo: ${input.email}`,
+    input.businessName ? `Negocio: ${input.businessName}` : null,
+    `Tema: ${input.topic}`,
+    `Idioma: ${input.locale}`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const text = `${header}\n\n${input.message}\n`
+
+  return {
+    subject: `[volvia.co] ${input.topic} · ${input.name}`,
+    text,
+    html: `<pre style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;line-height:1.55;white-space:pre-wrap">${escapeHtml(
+      text,
+    )}</pre>`,
+  }
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }

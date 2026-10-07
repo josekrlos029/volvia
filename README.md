@@ -12,7 +12,7 @@ cp .env.example .env                      # los valores por defecto ya funcionan
 pnpm infra:up                             # postgres, redis, mailpit y minio en Docker
 pnpm certs:dev                            # certificados de desarrollo para wallet
 pnpm db:migrate && pnpm db:seed           # esquema y datos de prueba
-pnpm dev                                  # las cuatro apps a la vez
+pnpm dev                                  # las cuatro apps y el worker
 ```
 
 | Servicio | URL | Qué es |
@@ -59,13 +59,29 @@ packages/
 ## Comandos
 
 ```bash
-pnpm dev            # todas las apps
+pnpm dev            # todas las apps y el worker de la bandeja de salida
 pnpm typecheck      # tipos en todo el monorepo
-pnpm test           # unitarios e integración
-pnpm test:e2e       # Playwright, requiere pnpm dev corriendo
+pnpm test           # unitarios, integración y la suite end to end
+pnpm test:e2e       # solo Playwright, requiere pnpm dev corriendo
 pnpm db:reset       # borra y recrea la base local
 pnpm infra:logs     # logs de los contenedores
 ```
+
+Cada push corre lo mismo en GitHub Actions (`.github/workflows/ci.yml`): lint, tipos,
+build y unitarios en un trabajo, y la suite end to end contra el build de producción en
+otro, con los mismos contenedores que usas aquí.
+
+## El sitio público
+
+El sitio de marketing vive en `apps/web` y es casi todo contenido: `src/lib` tiene un
+módulo por colección (funciones, sectores, comparativas, glosario, referencias, guía,
+plantillas, preguntas) y las páginas los recorren. Añadir un sector o una función es
+añadir una entrada, no una página.
+
+Está en español e inglés, con `hreflang`, canónicas y datos estructurados por página.
+Las pruebas de `apps/web/test/content.test.ts` comprueban lo que un build no ve: que cada
+entrada exista en los dos idiomas, que los slugs sean únicos y que los enlaces internos
+apunten a algo que existe.
 
 ## Documentación
 

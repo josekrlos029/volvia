@@ -11,9 +11,48 @@ export const CAMPAIGN_TEMPLATES = [
   'happy_hour',
   'win_back',
   'double_stamps',
+  'spend_and_get',
+  'new_offer',
+  'vip_thanks',
+  'last_chance',
+  'special_deal',
   'custom',
 ] as const
 export type CampaignTemplate = (typeof CAMPAIGN_TEMPLATES)[number]
+
+/**
+ * Placeholders a business can drop into a campaign's wording.
+ *
+ * Resolved for each customer at the moment they open their card, so "quedan 2 sellos"
+ * is their number and not an average. Anything unknown is replaced with an empty
+ * string: a message reading "Hola {{name}}" to someone whose name we never asked for
+ * is worse than one that simply reads "Hola".
+ */
+export const CAMPAIGN_VARIABLES = ['name', 'business', 'stamps', 'remaining', 'hour'] as const
+export type CampaignVariable = (typeof CAMPAIGN_VARIABLES)[number]
+
+export interface CampaignTextContext {
+  name?: string | null
+  business?: string | null
+  stamps?: number | null
+  remaining?: number | null
+  /** The hour where the business is, not where the server is. */
+  hour?: number | null
+}
+
+export function renderCampaignText(text: string, context: CampaignTextContext): string {
+  return text.replace(/\{\{\s*([a-z]+)\s*\}\}/gi, (match, rawName: string) => {
+    const name = rawName.toLowerCase() as CampaignVariable
+    if (!(CAMPAIGN_VARIABLES as readonly string[]).includes(name)) return match
+
+    const value = context[name]
+    if (value === null || value === undefined) return ''
+    if (name === 'hour' && typeof value === 'number') {
+      return `${String(value).padStart(2, '0')}:00`
+    }
+    return String(value)
+  })
+}
 
 export const CAMPAIGN_STATUSES = ['draft', 'scheduled', 'running', 'finished', 'cancelled'] as const
 

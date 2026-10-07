@@ -1,15 +1,17 @@
 'use client'
 
 import { ApiError } from '@volvia/shared/client'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { GoogleButton, OrDivider } from './auth/GoogleButton'
 import { buttonClass } from './ui'
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
 type Mode = 'password' | 'magic'
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const router = useRouter()
   const [mode, setMode] = useState<Mode>('password')
   const [status, setStatus] = useState<'idle' | 'working' | 'sent'>('idle')
@@ -29,7 +31,7 @@ export function LoginForm() {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email, redirectTo: next }),
         })
         if (!response.ok) throw new Error('No pudimos enviar el enlace.')
         setStatus('sent')
@@ -49,7 +51,7 @@ export function LoginForm() {
       }
 
       // The API sets httpOnly cookies; a refresh is enough for the server to see them.
-      router.push('/')
+      router.push(next ?? '/')
       router.refresh()
     } catch (caught) {
       setStatus('idle')
@@ -82,70 +84,75 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <label htmlFor="email" className="text-[14px] font-medium">
-          Correo
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          required
-          className="w-full rounded-[9px] border border-[var(--color-line)] bg-white px-3.5 py-2.5 text-[15px] placeholder:text-[#8A908A] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25"
-          placeholder="hola@tunegocio.com"
-        />
-      </div>
+    <div className="flex flex-col gap-5">
+      <GoogleButton label="Entrar con Google" redirectTo={next} />
+      <OrDivider />
 
-      {mode === 'password' ? (
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <label htmlFor="password" className="text-[14px] font-medium">
-            Contraseña
+          <label htmlFor="email" className="text-[14px] font-medium">
+            Correo
           </label>
           <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
             required
-            className="w-full rounded-[9px] border border-[var(--color-line)] bg-white px-3.5 py-2.5 text-[15px] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25"
+            className="w-full rounded-[9px] border border-[var(--color-line)] bg-white px-3.5 py-2.5 text-[15px] placeholder:text-[#8A908A] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25"
+            placeholder="hola@tunegocio.com"
           />
         </div>
-      ) : null}
 
-      {error ? (
-        <p
-          role="alert"
-          className="rounded-[9px] bg-[#FBEBEA] px-3.5 py-2.5 text-[14px] text-[var(--color-danger)]"
-        >
-          {error}
-        </p>
-      ) : null}
+        {mode === 'password' ? (
+          <div className="flex flex-col gap-2">
+            <label htmlFor="password" className="text-[14px] font-medium">
+              Contraseña
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              className="w-full rounded-[9px] border border-[var(--color-line)] bg-white px-3.5 py-2.5 text-[15px] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25"
+            />
+          </div>
+        ) : null}
 
-      <button
-        type="submit"
-        disabled={status === 'working'}
-        className={`${buttonClass('primary')} w-full`}
-      >
-        {status === 'working' ? 'Entrando' : mode === 'magic' ? 'Enviar enlace' : 'Entrar'}
-      </button>
+        {error ? (
+          <p
+            role="alert"
+            className="rounded-[9px] bg-[#FBEBEA] px-3.5 py-2.5 text-[14px] text-[var(--color-danger)]"
+          >
+            {error}
+          </p>
+        ) : null}
 
-      <div className="flex items-center justify-between text-[14px]">
         <button
-          type="button"
-          onClick={() => setMode(mode === 'password' ? 'magic' : 'password')}
-          className="font-medium text-[var(--color-primary)] underline underline-offset-2"
+          type="submit"
+          disabled={status === 'working'}
+          className={`${buttonClass('primary')} w-full`}
         >
-          {mode === 'password' ? 'Entrar con un enlace' : 'Usar contraseña'}
+          {status === 'working' ? 'Entrando' : mode === 'magic' ? 'Enviar enlace' : 'Entrar'}
         </button>
-        <a
-          href="/reset-password"
-          className="text-[var(--color-ink-muted)] underline underline-offset-2"
-        >
-          Olvidé mi contraseña
-        </a>
-      </div>
-    </form>
+
+        <div className="flex items-center justify-between text-[14px]">
+          <button
+            type="button"
+            onClick={() => setMode(mode === 'password' ? 'magic' : 'password')}
+            className="font-medium text-[var(--color-primary)] underline underline-offset-2"
+          >
+            {mode === 'password' ? 'Entrar con un enlace' : 'Usar contraseña'}
+          </button>
+          <Link
+            href="/reset-password"
+            className="text-[var(--color-ink-muted)] underline underline-offset-2"
+          >
+            Olvidé mi contraseña
+          </Link>
+        </div>
+      </form>
+    </div>
   )
 }

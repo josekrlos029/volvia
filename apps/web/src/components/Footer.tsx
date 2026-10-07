@@ -2,13 +2,24 @@ import type { Locale, SiteCopy } from '@/lib/i18n'
 import { industries } from '@/lib/industries'
 import Link from 'next/link'
 
+/** The pages people arrive on from a search, kept one click from everywhere. */
+const RESOURCES = [
+  { path: '/guia', es: 'Guía de 30 días', en: '30-day guide' },
+  { path: '/plantillas', es: 'Plantillas', en: 'Templates' },
+  { path: '/referencias', es: 'Números típicos', en: 'Benchmarks' },
+  { path: '/glosario', es: 'Glosario', en: 'Glossary' },
+  { path: '/comparativas', es: 'Comparativas', en: 'Comparisons' },
+  { path: '/generador-qr-resenas', es: 'Generador de QR', en: 'QR generator' },
+  { path: '/preguntas', es: 'Preguntas', en: 'FAQ' },
+] as const
+
 export function Footer({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
   const base = `/${locale}`
   const other: Locale = locale === 'es' ? 'en' : 'es'
 
   return (
     <footer className="border-t border-[var(--color-line)] bg-[var(--color-surface-muted)]">
-      <div className="mx-auto grid max-w-[1180px] gap-8 px-5 py-12 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
+      <div className="mx-auto grid max-w-[1180px] gap-8 px-5 py-12 sm:grid-cols-2 lg:grid-cols-5 lg:px-8">
         <div>
           <p className="text-[17px] font-semibold tracking-[-0.02em]">Volvia</p>
           <p className="mt-2 max-w-[28ch] text-[14px] leading-relaxed text-[var(--color-ink-muted)]">
@@ -60,9 +71,29 @@ export function Footer({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
           </ul>
         </nav>
 
+        <nav aria-label={locale === 'es' ? 'Recursos' : 'Resources'}>
+          <h2 className="text-[13px] font-semibold">
+            {locale === 'es' ? 'Recursos' : 'Resources'}
+          </h2>
+          <ul className="mt-3 flex flex-col gap-2 text-[14px] text-[var(--color-ink-muted)]">
+            {RESOURCES.map((resource) => (
+              <li key={resource.path}>
+                <Link href={`${base}${resource.path}`} className="hover:text-[var(--color-ink)]">
+                  {resource[locale]}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
         <nav aria-label={copy.footer.legal}>
           <h2 className="text-[13px] font-semibold">{copy.footer.legal}</h2>
           <ul className="mt-3 flex flex-col gap-2 text-[14px] text-[var(--color-ink-muted)]">
+            <li>
+              <Link href={`${base}/contacto`} className="hover:text-[var(--color-ink)]">
+                {locale === 'es' ? 'Contacto' : 'Contact'}
+              </Link>
+            </li>
             <li>
               <Link href={`${base}/privacidad`} className="hover:text-[var(--color-ink)]">
                 {locale === 'es' ? 'Privacidad' : 'Privacy'}

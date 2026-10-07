@@ -28,6 +28,7 @@ export default async function CalculatorPage({ params }: { params: Promise<{ loc
   return (
     <Section>
       <SectionTitle
+        as="h1"
         title={isSpanish ? 'Cuánto vale una visita más' : 'What one more visit is worth'}
         body={
           isSpanish

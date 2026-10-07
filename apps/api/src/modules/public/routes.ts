@@ -1,9 +1,10 @@
 import { and, eq, inArray, profileQuestions, stampCards } from '@volvia/db'
-import { joinCardSchema, publicCardStateSchema } from '@volvia/shared'
+import { contactRequestSchema, joinCardSchema, publicCardStateSchema } from '@volvia/shared'
 import type { FastifyInstance } from 'fastify'
 import QRCode from 'qrcode'
 import { z } from 'zod'
 import { env } from '../../env'
+import { contactRequestTemplate } from '../../lib/email'
 import { invalidateEntitlements } from '../../lib/entitlements'
 import { AppError } from '../../lib/errors'
 import { redisKeys } from '../../lib/redis'
@@ -115,6 +116,46 @@ export async function publicRoutes(fastify: FastifyInstance): Promise<void> {
       await app.redis.set(key, JSON.stringify(state), 'EX', CARD_CACHE_SECONDS)
       reply.header('x-cache', 'miss')
       return state
+    },
+  )
+
+  /**
+   * The contact form on the marketing site.
+   *
+   * It reaches a person, not a ticket queue. Rate limited and protected by a field no
+   * human can see, because a public form with an email sink behind it is a spam target
+   * within a day of going live.
+   */
+  app.post(
+    '/contact',
+    {
+      config: { rateLimit: rateLimits.authStrict },
+      schema: {
+        body: contactRequestSchema,
+        response: { 202: z.object({ sent: z.boolean() }) },
+        tags: ['public'],
+      },
+    },
+    async (request, reply) => {
+      // A bot filled the hidden field. Answer exactly as if it had worked.
+      if (request.body.website.trim().length > 0) {
+        return reply.status(202).send({ sent: true })
+      }
+
+      await app.mailer.send({
+        to: env.SUPPORT_EMAIL || env.MAIL_FROM,
+        replyTo: request.body.email,
+        template: contactRequestTemplate({
+          name: request.body.name,
+          email: request.body.email,
+          businessName: request.body.businessName,
+          topic: request.body.topic,
+          message: request.body.message,
+          locale: request.body.locale,
+        }),
+      })
+
+      return reply.status(202).send({ sent: true })
     },
   )
 

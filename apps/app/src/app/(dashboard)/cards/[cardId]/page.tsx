@@ -1,8 +1,11 @@
 import { CardEditor } from '@/components/CardEditor'
+import type { PreviewDesign } from '@/components/CardPreview'
 import { CardQr } from '@/components/CardQr'
 import { PublishButton } from '@/components/PublishButton'
+import type { ProfileQuestion } from '@/components/SignupFormEditor'
 import { Badge, Panel } from '@/components/ui'
 import { apiFetch } from '@/lib/session'
+import type { CardMessages } from '@volvia/shared'
 import Link from 'next/link'
 
 interface CardDetail {
@@ -10,17 +13,13 @@ interface CardDetail {
   name: string
   status: 'draft' | 'active' | 'archived'
   stampsRequired: number
-  design: {
-    backgroundColor: string
-    foregroundColor: string
-    accentColor: string
-    emptyStampColor: string
-    headline: string
-    subheadline: string
-  }
+  design: PreviewDesign
   rules: { cooldownMinutes: number; dailyCap: number; kioskEnabled: boolean }
   terms: string
   collectBirthday: boolean
+  initialStamps: number
+  signupQuestionIds: string[]
+  messages: CardMessages
   joinUrl: string
   rewards: Array<{ atStamp: number; title: string; description: string }>
 }
@@ -32,10 +31,11 @@ interface Org {
 
 export default async function CardDetailPage({ params }: { params: Promise<{ cardId: string }> }) {
   const { cardId } = await params
-  const [card, org, cards] = await Promise.all([
+  const [card, org, cards, profileQuestions] = await Promise.all([
     apiFetch<CardDetail>(`/v1/cards/${cardId}`),
     apiFetch<Org>('/v1/org'),
     apiFetch<Array<{ id: string; holders: number }>>('/v1/cards'),
+    apiFetch<ProfileQuestion[]>('/v1/org/profile-questions'),
   ])
 
   const holders = cards.find((row) => row.id === cardId)?.holders ?? 0
@@ -82,6 +82,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ car
           businessName={org.name}
           canCustomiseBranding={org.entitlements.features.custom_branding ?? false}
           canUseKiosk={org.entitlements.features.kiosk_mode ?? false}
+          profileQuestions={profileQuestions}
           lengthLocked={card.status === 'active' && holders > 0}
           initial={{
             name: card.name,
@@ -94,6 +95,9 @@ export default async function CardDetailPage({ params }: { params: Promise<{ car
             })),
             terms: card.terms,
             collectBirthday: card.collectBirthday,
+            signupQuestionIds: card.signupQuestionIds,
+            initialStamps: card.initialStamps,
+            messages: card.messages,
             rules: card.rules,
           }}
         />

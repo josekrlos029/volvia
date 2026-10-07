@@ -1,7 +1,9 @@
 import { Section, SectionTitle } from '@/components/Section'
+import { features } from '@/lib/features'
 import { copyFor, isLocale } from '@/lib/i18n'
 import type { Metadata } from 'next'
 import Image from 'next/image'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001'
@@ -154,6 +156,7 @@ export default async function FeaturesPage({ params }: { params: Promise<{ local
     <>
       <Section>
         <SectionTitle
+          as="h1"
           title={
             isSpanish
               ? 'Todo lo que hace falta, nada que sobre'
@@ -196,6 +199,32 @@ export default async function FeaturesPage({ params }: { params: Promise<{ local
         </Section>
       ))}
 
+      <Section>
+        <SectionTitle
+          title={isSpanish ? 'Una página por función' : 'A page for each feature'}
+          body={
+            isSpanish
+              ? 'Cada una explica el problema que resuelve antes de contar lo que hace, y dónde no sirve.'
+              : 'Each one explains the problem it solves before describing itself — and where it does not help.'
+          }
+        />
+        <ul className="mt-9 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((feature) => (
+            <li key={feature.slug}>
+              <Link
+                href={`/${locale}/funciones/${feature.slug}`}
+                className="block h-full rounded-[12px] border border-[var(--color-line)] p-5 transition-colors hover:border-[var(--color-primary)]/45"
+              >
+                <h3 className="text-[16px] font-semibold">{feature[locale].name}</h3>
+                <p className="mt-2 text-[14px] leading-relaxed text-[var(--color-ink-muted)]">
+                  {feature[locale].lede}
+                </p>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
       <Section tone="ink">
         <div className="mx-auto max-w-[36ch] text-center">
           <h2 className="text-[clamp(26px,3.6vw,38px)] font-semibold leading-[1.1] tracking-[-0.02em]">
@@ -203,7 +232,7 @@ export default async function FeaturesPage({ params }: { params: Promise<{ local
           </h2>
           <p className="mt-3 text-[16px] leading-relaxed text-white/70">{copy.finalCta.body}</p>
           <a
-            href={`${appUrl}/login`}
+            href={`${appUrl}/signup`}
             className="mt-7 inline-block rounded-[10px] bg-white px-5 py-3 text-[15px] font-semibold text-[var(--color-ink)] transition-transform duration-150 active:scale-[0.985]"
           >
             {copy.finalCta.cta}

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { CURRENCIES } from '../plans'
+import { DEFAULT_VISIT_FREQUENCY, VISIT_FREQUENCIES } from '../segments'
 import { roleSchema } from './auth'
 import {
   countryCodeSchema,
@@ -36,6 +37,7 @@ export const SOCIAL_PLATFORMS = [
   'facebook',
   'tiktok',
   'whatsapp',
+  'telegram',
   'x',
   'youtube',
   'website',
@@ -49,7 +51,29 @@ export const socialLinkSchema = z.object({
   label: z.string().trim().max(40).optional(),
 })
 
+/**
+ * Everything that is a preference rather than an identity, kept in one jsonb column so
+ * adding a setting never needs a migration.
+ */
+export const orgSettingsSchema = z.object({
+  /** How often a good customer is expected back. Drives the community segments. */
+  visitFrequency: z.enum(VISIT_FREQUENCIES).default(DEFAULT_VISIT_FREQUENCY),
+  /** Legal entity shown on the public page and in the privacy notice. */
+  legalName: z.string().trim().max(160).default(''),
+  taxId: z.string().trim().max(40).default(''),
+  legalAddress: z.string().trim().max(200).default(''),
+  privacyEmail: z.string().trim().max(160).default(''),
+  /** Stops asking customers for a public review without unlinking the Google listing. */
+  reviewRequestsPaused: z.boolean().default(false),
+  /** What the button on the public page says. Empty means the default wording. */
+  pageCtaLabel: z.string().trim().max(40).default(''),
+})
+export type OrgSettings = z.infer<typeof orgSettingsSchema>
+
+export const DEFAULT_ORG_SETTINGS: OrgSettings = orgSettingsSchema.parse({})
+
 export const updateOrgSchema = z.object({
+  settings: orgSettingsSchema.partial().optional(),
   name: z.string().trim().min(2).max(120).optional(),
   slug: slugSchema.optional(),
   category: z.enum(BUSINESS_CATEGORIES).optional(),
@@ -114,3 +138,22 @@ export const onboardingStateSchema = z.object({
   firstStamp: z.boolean(),
 })
 export type OnboardingState = z.infer<typeof onboardingStateSchema>
+
+/** What the marketing site's contact form sends. */
+export const CONTACT_TOPICS = ['question', 'demo', 'help', 'press'] as const
+export type ContactTopic = (typeof CONTACT_TOPICS)[number]
+
+export const contactRequestSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  email: emailSchema,
+  businessName: z.string().trim().max(120).default(''),
+  topic: z.enum(CONTACT_TOPICS).default('question'),
+  message: z.string().trim().min(10).max(2000),
+  locale: localeSchema.default('es'),
+  /**
+   * Must stay empty. A field no person can see, filled in only by the scripts that
+   * submit every form they find.
+   */
+  website: z.string().max(200).default(''),
+})
+export type ContactRequest = z.infer<typeof contactRequestSchema>

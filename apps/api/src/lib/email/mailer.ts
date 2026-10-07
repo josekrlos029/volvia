@@ -13,6 +13,8 @@ export interface SendInput {
   template: EmailTemplate
   /** Set for customer-facing mail so unsubscribes are honoured by mail clients. */
   listUnsubscribeUrl?: string
+  /** Where a reply should go when it is not the sending address. */
+  replyTo?: string
 }
 
 export interface Mailer {
@@ -36,6 +38,7 @@ class SmtpMailer implements Mailer {
     await this.transport.sendMail({
       from: env.MAIL_FROM,
       to: input.to,
+      replyTo: input.replyTo,
       subject: input.template.subject,
       text: input.template.text,
       html: input.template.html,

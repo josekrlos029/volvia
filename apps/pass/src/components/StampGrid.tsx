@@ -1,3 +1,5 @@
+import type { StampStyle } from '@volvia/shared'
+import { STAMP_RADIUS, hexWithAlpha } from '@volvia/ui'
 import type { CSSProperties } from 'react'
 
 /**
@@ -22,6 +24,8 @@ interface StampGridProps {
   accentColor: string
   emptyColor: string
   foregroundColor: string
+  /** Shape of a single slot, chosen by the business. */
+  stampStyle?: StampStyle
   /** The most recently earned stamp animates in once, on load. */
   animateLast?: boolean
 }
@@ -40,9 +44,11 @@ export function StampGrid({
   accentColor,
   emptyColor,
   foregroundColor,
+  stampStyle = 'circle',
   animateLast = false,
 }: StampGridProps) {
   const columns = balancedColumns(total)
+  const radius = STAMP_RADIUS[stampStyle]
 
   return (
     <ul
@@ -56,12 +62,19 @@ export function StampGrid({
         const isReward = rewardPositions.includes(position)
         const isLatest = animateLast && position === filled
 
+        const rings = [
+          // A badge carries its own ring in the accent colour, whatever its state.
+          stampStyle === 'badge' ? `0 0 0 2px ${hexWithAlpha(accentColor, 0.55)}` : null,
+          // Reward slots get a ring so the target is visible before it is reached.
+          isReward && !isFilled ? `0 0 0 2px ${emptyColor}` : null,
+        ].filter(Boolean)
+
         const style: CSSProperties = {
           background: isFilled ? accentColor : 'transparent',
           borderColor: isFilled ? accentColor : emptyColor,
           color: isFilled ? '#14171A' : emptyColor,
-          // Reward slots get a ring so the target is visible before it is reached.
-          boxShadow: isReward && !isFilled ? `0 0 0 2px ${emptyColor}` : undefined,
+          borderRadius: radius,
+          boxShadow: rings.length > 0 ? rings.join(', ') : undefined,
         }
 
         return (
@@ -69,7 +82,7 @@ export function StampGrid({
             <div
               style={style}
               className={[
-                'flex h-full w-full items-center justify-center rounded-full border-2',
+                'flex h-full w-full items-center justify-center border-2',
                 'text-[13px] font-semibold tabular-nums transition-colors duration-200',
                 isLatest ? 'stamp-land' : '',
               ].join(' ')}

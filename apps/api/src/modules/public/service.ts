@@ -13,10 +13,16 @@ import {
   rewards,
   stampCards,
 } from '@volvia/db'
-import type { PublicCardState } from '@volvia/shared'
+import {
+  type PublicCardState,
+  cardMessagesSchema,
+  pickCardMessage,
+  renderCampaignText,
+} from '@volvia/shared'
 import { env } from '../../env'
 import { AppError } from '../../lib/errors'
-import { isWithinActiveHours } from '../../lib/time'
+import { isWithinActiveHours, orgHour } from '../../lib/time'
+import { pickPendingSurvey } from './surveys'
 
 /**
  * Everything the customer-facing card needs, in one query set.
@@ -40,7 +46,7 @@ export async function loadPublicCardState(db: Database, token: string): Promise<
     .limit(1)
 
   if (!row) throw new AppError('CUSTOMER_CARD_NOT_FOUND', { message: 'card not found' })
-  if (row.customerCard.status === 'deleted') {
+  if (row.customerCard.status === 'deleted' || row.org.deletedAt) {
     throw new AppError('CUSTOMER_CARD_NOT_FOUND', { message: 'card not found' })
   }
 
@@ -91,6 +97,21 @@ export async function loadPublicCardState(db: Database, token: string): Promise<
   const nextReward =
     cardRewards.find((reward) => reward.atStamp > row.customerCard.stampsCount) ?? null
 
+  const campaignContext = {
+    name: row.customer.firstName,
+    business: row.org.name,
+    stamps: row.customerCard.stampsCount,
+    remaining: nextReward ? nextReward.atStamp - row.customerCard.stampsCount : 0,
+    hour: orgHour(new Date(), row.org.timezone),
+  }
+
+  const pendingSurvey = await pickPendingSurvey(db, {
+    orgId: row.org.id,
+    cardId: row.card.id,
+    customerCardId: row.customerCard.id,
+    stampsCount: row.customerCard.stampsCount,
+  })
+
   return {
     token: row.customerCard.token,
     business: {
@@ -135,8 +156,9 @@ export async function loadPublicCardState(db: Database, token: string): Promise<
     })),
     activeOffer: liveCampaign
       ? {
-          title: liveCampaign.headline,
-          description: liveCampaign.body,
+          // Placeholders resolve against this customer, not an average one.
+          title: renderCampaignText(liveCampaign.headline, campaignContext),
+          description: renderCampaignText(liveCampaign.body, campaignContext),
           endsAt: liveCampaign.endsAt,
         }
       : null,
@@ -145,6 +167,11 @@ export async function loadPublicCardState(db: Database, token: string): Promise<
       googleUrl: `${env.API_URL}/wallet/google/save/${row.customerCard.token}`,
     },
     lastStampAt: row.customerCard.lastStampAt,
+    message: pickCardMessage(
+      cardMessagesSchema.parse(row.card.messages ?? {}),
+      row.customerCard.stampsCount,
+    ),
+    pendingSurvey,
   }
 }
 
@@ -187,6 +214,19 @@ export async function loadBusinessPage(db: Database, slug: string) {
       brandColor: org.brandColor,
       socialLinks: org.socialLinks,
       contactPhone: org.contactPhone,
+      /** Empty when the business kept the default wording. */
+      ctaLabel: typeof org.settings?.pageCtaLabel === 'string' ? org.settings.pageCtaLabel : '',
+      /**
+       * Who is responsible for the customer's data. Shown on the business's own privacy
+       * notice: the customer gave their email to this shop, not to Volvia, and the
+       * notice has to say so in the shop's name.
+       */
+      legal: {
+        name: String(org.settings?.legalName ?? '') || org.name,
+        taxId: String(org.settings?.taxId ?? ''),
+        address: String(org.settings?.legalAddress ?? ''),
+        email: String(org.settings?.privacyEmail ?? '') || org.contactEmail || '',
+      },
       googleReviewUrl: org.googlePlaceId
         ? `https://search.google.com/local/writereview?placeid=${org.googlePlaceId}`
         : null,
@@ -224,7 +264,9 @@ export async function loadJoinPage(db: Database, joinSlug: string) {
     .limit(1)
 
   if (!row) throw new AppError('CARD_NOT_FOUND', { message: 'card not found' })
-  if (row.card.status !== 'active') {
+  // A business that closed stops taking new customers the same second, even though its
+  // cards are still marked active underneath.
+  if (row.org.deletedAt || row.card.status !== 'active') {
     throw new AppError('CARD_NOT_ACTIVE', { message: 'this card is not accepting new members' })
   }
 

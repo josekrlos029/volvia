@@ -19,6 +19,7 @@ import { rateLimits } from '../../plugins/security'
 import { typed } from '../../types'
 import { clearAuthCookies, cookieNames, setAuthCookies } from './cookies'
 import { buildAuthorizeUrl, consumeState, exchangeCodeForProfile, googleConfigured } from './google'
+import { issueSession as issueUserSession } from './issue'
 import {
   buildSessionUser,
   consumeAuthToken,
@@ -31,13 +32,7 @@ import {
   setPassword,
   verifyCredentials,
 } from './service'
-import {
-  createSession,
-  readSession,
-  revokeAllSessions,
-  revokeSession,
-  rotateSession,
-} from './sessions'
+import { readSession, revokeAllSessions, revokeSession, rotateSession } from './sessions'
 
 const tokenPairSchema = z.object({
   accessToken: z.string(),
@@ -49,18 +44,9 @@ const tokenPairSchema = z.object({
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   const app = typed(fastify)
 
-  /** Issues a fresh session and returns the standard token payload. */
-  async function issueSession(
-    userId: string,
-    email: string,
-    meta: { ip: string; userAgent: string },
-  ) {
-    const { sessionId } = await createSession(app.redis, { userId, ...meta })
-    const user = await buildSessionUser(app.db, userId)
-    const accessToken = await signAccessToken({ sub: userId, email, tv: 1, sid: sessionId })
-    const refreshToken = await signRefreshToken({ sub: userId, sid: sessionId, gen: 0, tv: 1 })
-    return { accessToken, refreshToken, expiresIn: 900, user }
-  }
+  /** Every entry point issues sessions through the one shared helper. */
+  const issueSession = (userId: string, email: string, meta: { ip: string; userAgent: string }) =>
+    issueUserSession(app, userId, email, meta)
 
   app.post(
     '/register',
@@ -437,9 +423,14 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         // creating a duplicate business.
         const existing = await findUserByEmail(app.db, profile.email)
         if (!existing) {
-          throw new AppError('NOT_FOUND', {
-            message: 'no Volvia account for that Google address — create one first',
-          })
+          // Google gives us an identity but not a business name, so there is nothing to
+          // create a tenant from. Send them to signup with the address filled in; the
+          // Google identity links itself the next time they use this button.
+          const signup = new URL('/signup', env.APP_URL)
+          signup.searchParams.set('email', profile.email)
+          signup.searchParams.set('from', 'google')
+          if (profile.name) signup.searchParams.set('name', profile.name)
+          return reply.redirect(signup.toString(), 302)
         }
         await linkGoogleIdentity(app.db, {
           userId: existing.id,

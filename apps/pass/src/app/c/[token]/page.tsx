@@ -1,6 +1,7 @@
-import { LoyaltyCard } from '@/components/LoyaltyCard'
+import { type CardDesign, LoyaltyCard } from '@/components/LoyaltyCard'
 import { RewardBanner } from '@/components/RewardBanner'
 import { Shell, VolviaMark } from '@/components/Shell'
+import { type PendingSurvey, SurveyCard } from '@/components/SurveyCard'
 import { WalletButtons } from '@/components/WalletButtons'
 import { api } from '@/lib/api'
 import { t } from '@/lib/i18n'
@@ -35,6 +36,8 @@ interface CardState {
   activeOffer: { title: string; description: string; endsAt: string } | null
   walletPasses: { appleUrl: string | null; googleUrl: string | null }
   lastStampAt: string | null
+  message: string | null
+  pendingSurvey: PendingSurvey | null
 }
 
 // The card changes with every stamp, so it is never served from a static cache.
@@ -63,15 +66,7 @@ export default async function CardPage({
   // The customer's locale is not in the URL; the business decides it.
   const locale = 'es'
   const copy = t(locale)
-  const design = state.card.design as unknown as {
-    backgroundColor: string
-    foregroundColor: string
-    accentColor: string
-    emptyStampColor: string
-    headline: string
-    subheadline: string
-    logoUrl: string | null
-  }
+  const design = state.card.design as unknown as CardDesign
 
   const justArrived = query.welcome === '1' || query.stamped === '1'
 
@@ -87,6 +82,7 @@ export default async function CardPage({
           rewardPositions={state.rewards.map((reward) => reward.atStamp)}
           cycleLabel={state.cycleIndex > 0 ? copy.card.cycle(state.cycleIndex) : null}
           animateLast={query.stamped === '1'}
+          message={state.message}
         />
 
         <RewardBanner
@@ -136,6 +132,15 @@ export default async function CardPage({
               : copy.card.noVisits}
           </p>
         </section>
+
+        {state.pendingSurvey ? (
+          <SurveyCard
+            survey={state.pendingSurvey}
+            cardToken={state.token}
+            locale={locale}
+            accentColor={design.accentColor}
+          />
+        ) : null}
 
         <WalletButtons
           appleUrl={state.walletPasses.appleUrl}
