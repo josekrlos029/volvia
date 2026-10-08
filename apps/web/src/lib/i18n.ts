@@ -26,7 +26,7 @@ export const site = {
       cta: 'Crear mi tarjeta gratis',
       secondary: 'Ver cómo funciona',
     },
-    trust: { title: 'Pensado para negocios de barrio' },
+    trust: { title: 'Pensado para todo tipo de negocio' },
     steps: {
       eyebrow: 'Cómo funciona',
       title: 'De cero a sellando en una tarde',
@@ -96,7 +96,7 @@ export const site = {
       cta: 'Create my free card',
       secondary: 'See how it works',
     },
-    trust: { title: 'Built for neighbourhood businesses' },
+    trust: { title: 'Built for every kind of business' },
     steps: {
       eyebrow: 'How it works',
       title: 'From nothing to stamping in an afternoon',
