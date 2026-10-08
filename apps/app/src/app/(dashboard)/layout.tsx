@@ -1,6 +1,6 @@
 import { Nav } from '@/components/Nav'
 import { PLAN_NAMES } from '@/lib/format'
-import { apiFetch, getSession } from '@/lib/session'
+import { apiFetch, getSession, getUser } from '@/lib/session'
 import { redirect } from 'next/navigation'
 
 interface OrgResponse {
@@ -16,7 +16,11 @@ interface OrgResponse {
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession()
-  if (!session) redirect('/login')
+  if (!session) {
+    // Staff without a business of their own land on the business picker instead.
+    const user = await getUser()
+    redirect(user?.isSuperadmin ? '/admin' : '/login')
+  }
 
   const org = await apiFetch<OrgResponse>('/v1/org', { orgId: session.orgId })
 
@@ -31,6 +35,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         orgName={org.name}
         plan={PLAN_NAMES[org.entitlements.effectivePlan] ?? org.plan}
         userName={session.user.name}
+        isSuperadmin={session.user.isSuperadmin}
         locked={locked}
       />
 

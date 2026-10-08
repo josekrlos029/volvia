@@ -26,6 +26,8 @@ export const users = pgTable(
     /** Bumped to invalidate every issued refresh token for this user at once. */
     tokenVersion: integer().notNull().default(1),
     marketingOptIn: boolean().notNull().default(false),
+    /** Volvia staff: may act as owner in any organisation. Only ever set by hand in the database. */
+    isSuperadmin: boolean().notNull().default(false),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp({ withTimezone: true }),

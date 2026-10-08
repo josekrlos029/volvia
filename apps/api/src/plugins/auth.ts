@@ -19,6 +19,8 @@ export interface AuthContext {
   userId: string
   email: string
   sessionId: string
+  /** Volvia staff: may enter any organisation as its owner. */
+  isSuperadmin: boolean
 }
 
 export interface OrgContext {
@@ -47,6 +49,7 @@ declare module 'fastify' {
     requireFeature: (
       feature: FeatureKey,
     ) => (request: FastifyRequest, reply: FastifyReply) => Promise<void>
+    requireSuperadmin: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
   }
 }
 
@@ -62,6 +65,7 @@ async function resolveMembership(
   db: Database,
   userId: string,
   requestedOrgId: string | null,
+  isSuperadmin: boolean,
 ): Promise<{
   orgId: string
   role: Role
@@ -88,6 +92,24 @@ async function resolveMembership(
           )
         : and(eq(memberships.userId, userId), isNull(organizations.deletedAt)),
     )
+
+  // Staff without a membership enter an explicitly requested organisation as its owner.
+  if (rows.length === 0 && isSuperadmin && requestedOrgId) {
+    const [org] = await db
+      .select({ timezone: organizations.timezone, settings: organizations.settings })
+      .from(organizations)
+      .where(and(eq(organizations.id, requestedOrgId), isNull(organizations.deletedAt)))
+      .limit(1)
+    if (org) {
+      return {
+        orgId: requestedOrgId,
+        role: 'owner',
+        locationId: null,
+        timezone: org.timezone,
+        visitFrequency: visitFrequencyOf(org.settings),
+      }
+    }
+  }
 
   if (rows.length === 0) {
     throw new AppError('NOT_A_MEMBER', { message: 'no access to this organization' })
@@ -120,7 +142,12 @@ export const authPlugin = fp(async (app: FastifyInstance) => {
     if (!alive) throw new AppError('UNAUTHENTICATED', { message: 'session revoked' })
 
     const [user] = await app.db
-      .select({ id: users.id, tokenVersion: users.tokenVersion, deletedAt: users.deletedAt })
+      .select({
+        id: users.id,
+        tokenVersion: users.tokenVersion,
+        deletedAt: users.deletedAt,
+        isSuperadmin: users.isSuperadmin,
+      })
       .from(users)
       .where(eq(users.id, claims.sub))
       .limit(1)
@@ -131,18 +158,30 @@ export const authPlugin = fp(async (app: FastifyInstance) => {
       throw new AppError('TOKEN_EXPIRED', { message: 'credentials changed, sign in again' })
     }
 
-    request.auth = { userId: claims.sub, email: claims.email, sessionId: claims.sid }
+    request.auth = {
+      userId: claims.sub,
+      email: claims.email,
+      sessionId: claims.sid,
+      isSuperadmin: user.isSuperadmin,
+    }
+  })
+
+  app.decorate('requireSuperadmin', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!request.auth) await app.requireAuth(request, reply)
+    if (!request.auth!.isSuperadmin) {
+      throw new AppError('FORBIDDEN', { message: 'requires Volvia staff access' })
+    }
   })
 
   app.decorate('requireOrg', (minimumRole: Role = 'staff') => {
     return async (request: FastifyRequest, reply: FastifyReply) => {
       if (!request.auth) await app.requireAuth(request, reply)
-      const userId = request.auth!.userId
+      const { userId, isSuperadmin } = request.auth!
 
       const header = request.headers['x-org-id']
       const requestedOrgId = typeof header === 'string' && header.length > 0 ? header : null
 
-      const membership = await resolveMembership(app.db, userId, requestedOrgId)
+      const membership = await resolveMembership(app.db, userId, requestedOrgId, isSuperadmin)
       if (!roleAtLeast(membership.role, minimumRole)) {
         throw new AppError('FORBIDDEN', { message: `requires role ${minimumRole} or higher` })
       }

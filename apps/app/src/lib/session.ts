@@ -9,13 +9,13 @@ export const apiUrl =
   process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
 /**
- * Server-side session read.
+ * Server-side read of the signed-in user.
  *
  * Tokens live in httpOnly cookies set by the API, so nothing readable by JavaScript
  * ever holds a credential. This forwards the cookie to `/v1/auth/me` and lets the API
  * be the single authority on whether the session is still valid.
  */
-export async function getSession(): Promise<{ user: SessionUser; orgId: string } | null> {
+export async function getUser(): Promise<SessionUser | null> {
   const jar = await cookies()
   const access = jar.get(ACCESS_COOKIE)?.value
   if (!access) return null
@@ -26,20 +26,25 @@ export async function getSession(): Promise<{ user: SessionUser; orgId: string }
       cache: 'no-store',
     })
     if (!response.ok) return null
-
-    const user = (await response.json()) as SessionUser
-    if (user.memberships.length === 0) return null
-
-    // The selected organisation persists across page loads for multi-business owners.
-    const stored = jar.get(ORG_COOKIE)?.value
-    const orgId =
-      user.memberships.find((membership) => membership.orgId === stored)?.orgId ??
-      user.memberships[0]!.orgId
-
-    return { user, orgId }
+    return (await response.json()) as SessionUser
   } catch {
     return null
   }
+}
+
+/** The signed-in user plus the organisation the dashboard is acting in. */
+export async function getSession(): Promise<{ user: SessionUser; orgId: string } | null> {
+  const user = await getUser()
+  if (!user) return null
+
+  // The selected organisation persists across page loads for multi-business owners.
+  const stored = (await cookies()).get(ORG_COOKIE)?.value
+  const member = user.memberships.find((membership) => membership.orgId === stored)?.orgId
+  // Volvia staff may have entered any business from /admin; the API re-checks the flag.
+  const orgId = member ?? (user.isSuperadmin && stored ? stored : user.memberships[0]?.orgId)
+  if (!orgId) return null
+
+  return { user, orgId }
 }
 
 /** Server-side fetch against the API, carrying the session and selected organisation. */

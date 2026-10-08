@@ -50,6 +50,17 @@ de ese negocio.
   esperado.
 - `RATE_LIMITED` en el login son diez intentos por correo y por IP en quince minutos.
 
+## Dar acceso de superadministrador
+
+Un superadministrador entra a cualquier negocio como dueño desde `app.somosvolvia.com/admin`.
+No hay pantalla para concederlo: se marca a mano en la base.
+
+```sql
+update users set is_superadmin = true where lower(email) = 'persona@ejemplo.com';
+```
+
+Toma efecto en la siguiente petición, sin cerrar sesión. Para quitarlo, `false`.
+
 ## Un webhook de pago no aplicó el plan
 
 Los webhooks se guardan en `webhook_events` antes de procesarse.

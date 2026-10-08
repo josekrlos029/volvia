@@ -71,6 +71,7 @@ export const sessionUserSchema = z.object({
   name: z.string(),
   locale: localeSchema,
   emailVerified: z.boolean(),
+  isSuperadmin: z.boolean(),
   memberships: z.array(
     z.object({
       orgId: z.string().uuid(),

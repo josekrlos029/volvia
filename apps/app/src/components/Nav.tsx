@@ -8,6 +8,7 @@ interface NavProps {
   orgName: string
   plan: string
   userName: string
+  isSuperadmin: boolean
   /** Sections the plan does not include are shown but marked, never hidden. */
   locked: Record<string, boolean>
 }
@@ -24,7 +25,7 @@ const SECTIONS = [
   { href: '/settings', label: 'Ajustes' },
 ] as const
 
-export function Nav({ orgName, plan, userName, locked }: NavProps) {
+export function Nav({ orgName, plan, userName, isSuperadmin, locked }: NavProps) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
@@ -100,6 +101,15 @@ export function Nav({ orgName, plan, userName, locked }: NavProps) {
           >
             Escanear
           </Link>
+          {isSuperadmin ? (
+            <Link
+              href="/admin"
+              onClick={() => setOpen(false)}
+              className="mt-2 flex rounded-[8px] px-3 py-2 text-[14px] text-[var(--color-ink)] hover:bg-[var(--color-surface-muted)]"
+            >
+              Admin Volvia
+            </Link>
+          ) : null}
           <p className="mt-3 px-3 text-[13px] text-[var(--color-ink-muted)]">{userName}</p>
           <form action="/api/logout" method="post">
             <button

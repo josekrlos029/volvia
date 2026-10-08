@@ -264,6 +264,7 @@ export async function buildSessionUser(db: Database, userId: string): Promise<Se
     name: user.name,
     locale: user.locale as Locale,
     emailVerified: Boolean(user.emailVerifiedAt),
+    isSuperadmin: user.isSuperadmin,
     memberships: rows,
   }
 }

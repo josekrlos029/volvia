@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { adminRoutes } from '../modules/admin/routes'
 import { analyticsRoutes } from '../modules/analytics/routes'
 import { authRoutes } from '../modules/auth/routes'
 import { billingRoutes, billingWebhookRoutes } from '../modules/billing/routes'
@@ -28,6 +29,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(customerRoutes, { prefix: '/v1/customers' })
   await app.register(analyticsRoutes, { prefix: '/v1/analytics' })
   await app.register(billingRoutes, { prefix: '/v1/billing' })
+  await app.register(adminRoutes, { prefix: '/v1/admin' })
   await app.register(walletRoutes, { prefix: '/wallet' })
   // Webhooks are isolated so their raw-body parser cannot affect the rest of the API.
   await app.register(billingWebhookRoutes, { prefix: '/webhooks' })
