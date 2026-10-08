@@ -55,12 +55,13 @@ Si tu `.env` apunta a Neon y Redis de producción, `pnpm db:seed` y `pnpm db:res
 sobre producción. Para desarrollar, vuelve a los valores de `.env.example`, que usan los
 contenedores locales.
 
-## Redis sin cifrar
+## Redis sin cifrar, por ahora
 
-La base de Redis Cloud no tiene TLS activado, así que la conexión desde Cloud Run viaja
-sin cifrar por internet. Solo la protege la contraseña. Para cifrarla hay que activar
-*Transport layer security* en la base (plan de pago) y cambiar el secreto `REDIS_URL` a
-`rediss://`. ioredis lo soporta sin cambios de código.
+La conexión a Redis Cloud usa `redis://`, igual que los demás proyectos en producción, y
+cruza internet entre Google y AWS protegida solo por la contraseña. Es una decisión
+consciente: cuando se active *Transport layer security* en Redis Cloud (plan de pago),
+basta con cambiar el secreto `REDIS_URL` a `rediss://`. ioredis lo soporta sin cambios de
+código.
 
 ## Lo que todavía no está encendido
 
