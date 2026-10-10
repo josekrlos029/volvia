@@ -69,9 +69,15 @@ const envSchema = z.object({
   APPLE_PASS_KEY_PATH: z.string().default('infra/certs/pass-key.pem'),
   APPLE_PASS_KEY_PASSPHRASE: z.string().default(''),
   APPLE_WWDR_CERT_PATH: z.string().default('infra/certs/wwdr.pem'),
+  // The same credentials as inline contents, which win over the paths. Cloud Run
+  // worker pools cannot mount secrets as files, only expose them as variables.
+  APPLE_PASS_CERT_PEM: z.string().default(''),
+  APPLE_PASS_KEY_PEM: z.string().default(''),
+  APPLE_WWDR_CERT_PEM: z.string().default(''),
   GOOGLE_WALLET_ISSUER_ID: z.string().default(''),
   GOOGLE_WALLET_SA_EMAIL: z.string().default(''),
   GOOGLE_WALLET_SA_KEY_PATH: z.string().default(''),
+  GOOGLE_WALLET_SA_KEY_JSON: z.string().default(''),
   GOOGLE_WALLET_CLASS_PREFIX: z.string().default('volvia_dev'),
 
   GOOGLE_OAUTH_CLIENT_ID: z.string().default(''),

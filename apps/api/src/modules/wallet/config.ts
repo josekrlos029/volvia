@@ -41,10 +41,15 @@ function readIfPresent(path: string): string | null {
   }
 }
 
+/** Inline contents first, then the file: see `APPLE_PASS_CERT_PEM` in `env.ts`. */
+function inlineOrFile(contents: string, path: string): string | null {
+  return contents || (path ? readIfPresent(path) : null)
+}
+
 function loadApple(): WalletConfig['apple'] {
-  const certificatePem = readIfPresent(env.APPLE_PASS_CERT_PATH)
-  const privateKeyPem = readIfPresent(env.APPLE_PASS_KEY_PATH)
-  const wwdrPem = readIfPresent(env.APPLE_WWDR_CERT_PATH) ?? undefined
+  const certificatePem = inlineOrFile(env.APPLE_PASS_CERT_PEM, env.APPLE_PASS_CERT_PATH)
+  const privateKeyPem = inlineOrFile(env.APPLE_PASS_KEY_PEM, env.APPLE_PASS_KEY_PATH)
+  const wwdrPem = inlineOrFile(env.APPLE_WWDR_CERT_PEM, env.APPLE_WWDR_CERT_PATH) ?? undefined
 
   return {
     available: Boolean(certificatePem && privateKeyPem),
@@ -63,7 +68,7 @@ function loadApple(): WalletConfig['apple'] {
 }
 
 function loadGoogle(): WalletConfig['google'] {
-  const raw = env.GOOGLE_WALLET_SA_KEY_PATH ? readIfPresent(env.GOOGLE_WALLET_SA_KEY_PATH) : null
+  const raw = inlineOrFile(env.GOOGLE_WALLET_SA_KEY_JSON, env.GOOGLE_WALLET_SA_KEY_PATH)
   if (!raw || !env.GOOGLE_WALLET_ISSUER_ID) return { available: false, config: null }
 
   try {

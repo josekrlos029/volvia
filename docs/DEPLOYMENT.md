@@ -50,11 +50,13 @@ publica la imagen en otro repositorio.
 `pnpm db:migrate`, con `DATABASE_URL_UNPOOLED` apuntando a la URL directa de Neon.
 
 **Wallet** necesita las credenciales en la API *y* en el worker: la API firma el
-`.pkpass` y el worker envía los push de APNs y parchea los pases de Google. Los dos montan
-los secretos `APPLE_PASS_CERT`, `APPLE_PASS_KEY`, `APPLE_WWDR_CERT` y
-`GOOGLE_WALLET_SA_KEY` como archivos en `/secrets/...` y leen
-`APPLE_PASS_KEY_PASSPHRASE` como variable. Si el worker no los tiene, los pases se
-emiten bien pero no se actualizan nunca en el teléfono.
+`.pkpass` y el worker envía los push de APNs y parchea los pases de Google. Se usan los
+secretos `APPLE_PASS_CERT`, `APPLE_PASS_KEY`, `APPLE_WWDR_CERT`, `GOOGLE_WALLET_SA_KEY` y
+`APPLE_PASS_KEY_PASSPHRASE`. La API los monta como archivos en `/secrets/...`
+(`*_PATH`). Los worker pools no admiten secretos montados, así que el worker los recibe
+como variables con el contenido: `APPLE_PASS_CERT_PEM`, `APPLE_PASS_KEY_PEM`,
+`APPLE_WWDR_CERT_PEM` y `GOOGLE_WALLET_SA_KEY_JSON`. Si el worker no los tiene, los
+pases se emiten bien pero nunca se actualizan en el teléfono.
 
 ## Cuidado con el `.env` local
 
