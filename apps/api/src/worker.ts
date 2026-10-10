@@ -8,8 +8,8 @@ import { createJobRunner } from './workers/jobs'
 /**
  * Local background worker.
  *
- * Production has no always-on process: Cloud Scheduler calls `/internal/jobs/cron` once
- * a minute and the API kicks its own outbox after each write. On a laptop there is no
+ * Production has no always-on process: Cloud Scheduler calls `/internal/jobs/cron` every
+ * few minutes and the API kicks its own outbox after each write. On a laptop there is no
  * scheduler, so this loop calls the same two ticks on a timer. Same code, two clocks.
  */
 const logger = pino({

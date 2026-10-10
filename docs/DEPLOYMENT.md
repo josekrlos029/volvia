@@ -11,7 +11,7 @@ vive cada pieza y cómo se publica un cambio.
 | Panel | Vercel, proyecto `volvia-app` (`apps/app`) | `app.somosvolvia.com` |
 | Tarjeta del cliente | Vercel, proyecto `volvia-pass` (`apps/pass`) | `tarjeta.somosvolvia.com` |
 | API | Cloud Run, servicio `volvia-api` | `api.somosvolvia.com`, escala a cero; el primer request tras inactividad paga el arranque en frío |
-| Trabajos en segundo plano | Cloud Scheduler, job `volvia-jobs-cron` | Llama a `POST /internal/jobs/cron` de la API cada minuto; no hay ningún proceso encendido todo el tiempo |
+| Trabajos en segundo plano | Cloud Scheduler, job `volvia-jobs-cron` | Llama a `POST /internal/jobs/cron` de la API cada cinco minutos; no hay ningún proceso encendido todo el tiempo |
 | Base de datos | Neon, AWS us-east-1 | URL *pooled* para la API, directa para migraciones |
 | Redis | Redis Cloud, AWS us-east-1 | Sesiones, idempotencia, nonces, límites y colas |
 | Archivos | Cloudflare R2, bucket `volvia-uploads` | Lectura pública en `files.somosvolvia.com` |
@@ -61,12 +61,12 @@ que no admiten secretos montados.
 No hay worker en producción: una instancia fija costaría lo mismo con cero clientes que
 con mil. En su lugar, la API expone dos endpoints protegidos por `JOBS_SECRET`:
 
-- `POST /internal/jobs/cron`: lo llama Cloud Scheduler cada minuto. Corre el
+- `POST /internal/jobs/cron`: lo llama Cloud Scheduler cada cinco minutos. Corre el
   planificador de campañas, cierra mensajes atascados, los cumpleaños y la expiración
   (estos dos como mucho cada quince minutos), y después drena la bandeja de salida.
 - `POST /internal/jobs/outbox`: lo llama la propia API sobre sí misma justo después de
   cualquier petición que escribe (un sello, un mensaje, una sede movida), así el pase se
-  actualiza en segundos y no al minuto siguiente. Es una petición HTTP real porque en
+  actualiza en segundos y no en el siguiente tick. Es una petición HTTP real porque en
   Cloud Run la CPU solo está garantizada mientras hay una petición en vuelo.
 
 La API escala a cero igual que antes; cada tick es una petición normal y se cobra como
@@ -78,11 +78,15 @@ gcloud services enable cloudscheduler.googleapis.com
 openssl rand -base64 48 | tr -d '\n' | gcloud secrets create JOBS_SECRET --data-file=-
 gcloud run services update volvia-api --region us-east4 --update-secrets=JOBS_SECRET=JOBS_SECRET:latest
 gcloud scheduler jobs create http volvia-jobs-cron --location us-east4 \
-  --schedule='* * * * *' --time-zone='Etc/UTC' \
+  --schedule='*/5 * * * *' --time-zone='Etc/UTC' \
   --uri='https://api.somosvolvia.com/internal/jobs/cron' --http-method=POST \
   --headers="authorization=Bearer $(gcloud secrets versions access latest --secret=JOBS_SECRET)" \
   --attempt-deadline=120s
 ```
+
+Cinco minutos es suficiente porque solo los envíos programados y los reintentos dependen
+del tick; lo que nace de una petición se procesa al instante por el auto-aviso. Si algún
+día hace falta más precisión, basta con cambiar el horario del job.
 
 Si el secreto rota, hay que actualizar el job del scheduler con `gcloud scheduler jobs
 update http volvia-jobs-cron --location us-east4 --update-headers=...`. En local no hace

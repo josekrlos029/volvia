@@ -10,7 +10,7 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 /**
  * Background work without a background process.
  *
- * `POST /internal/jobs/cron` is what Cloud Scheduler calls once a minute, and
+ * `POST /internal/jobs/cron` is what Cloud Scheduler calls every few minutes, and
  * `POST /internal/jobs/outbox` is what this API calls on itself right after any request
  * that may have enqueued something, so a stamp still reaches the phone in seconds. Both
  * are guarded by a shared secret and switched off entirely when it is unset.

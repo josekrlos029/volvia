@@ -50,9 +50,9 @@ Quién drena depende de dónde corre. En producción no hay ningún proceso ence
 tiempo, porque la API escala a cero y un worker fijo sería el único coste constante del
 producto. En su lugar, el drenaje y los trabajos programados son dos endpoints de la API
 (`/internal/jobs/outbox` y `/internal/jobs/cron`) protegidos por un secreto: Cloud
-Scheduler llama al segundo cada minuto, y la API llama al primero sobre sí misma justo
-después de cada petición que escribe, para que un sello llegue al teléfono en segundos y
-no al minuto siguiente. En local, `worker.ts` llama a los mismos dos ticks con un
+Scheduler llama al segundo cada cinco minutos, y la API llama al primero sobre sí misma
+justo después de cada petición que escribe, para que un sello llegue al teléfono en
+segundos y no en el siguiente tick. En local, `worker.ts` llama a los mismos dos ticks con un
 temporizador.
 
 Los trabajos programados corren detrás de un lock distribuido en Redis, porque dos ticks

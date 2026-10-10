@@ -43,7 +43,7 @@ const DAILY_EVERY_SECONDS = 15 * 60
  * Everything the background worker used to do, as two callable ticks.
  *
  * There is no always-on process in production: the API scales to zero and a scheduler
- * calls `cron` once a minute, while a request that enqueues work calls `outbox` on its
+ * calls `cron` every few minutes, while a request that enqueues work calls `outbox` on its
  * own instance right after answering. Both are idempotent and safe to overlap, because
  * the outbox is claimed with `for update skip locked` and the cron jobs run behind
  * Redis locks. The local worker (`worker.ts`) calls the same two functions on a timer.
