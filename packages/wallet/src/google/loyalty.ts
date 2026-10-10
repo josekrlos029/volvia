@@ -92,7 +92,9 @@ export function buildLoyaltyObject(
     linksModuleData: {
       uris: [{ uri: content.cardUrl, description: 'Volvia', id: 'card' }],
     },
-    locations: content.places.map((place) => ({
+    // Google sends its own "pass nearby" notification around these points. The older
+    // `locations` key still validates but no longer triggers anything.
+    merchantLocations: content.places.map((place) => ({
       latitude: place.latitude,
       longitude: place.longitude,
     })),
@@ -127,17 +129,21 @@ export async function buildSaveUrl(
   return `${SAVE_URL}/${token}`
 }
 
+async function walletClient(config: GoogleWalletConfig) {
+  const auth = new GoogleAuth({
+    credentials: { client_email: config.serviceAccountEmail, private_key: config.privateKey },
+    scopes: ['https://www.googleapis.com/auth/wallet_object.issuer'],
+  })
+  return auth.getClient()
+}
+
 /** Pushes the new stamp count to Google so an already-saved pass updates itself. */
 export async function patchLoyaltyObject(
   config: GoogleWalletConfig,
   serial: string,
   patch: Record<string, unknown>,
 ): Promise<void> {
-  const auth = new GoogleAuth({
-    credentials: { client_email: config.serviceAccountEmail, private_key: config.privateKey },
-    scopes: ['https://www.googleapis.com/auth/wallet_object.issuer'],
-  })
-  const client = await auth.getClient()
+  const client = await walletClient(config)
 
   await client.request({
     url: `${API_BASE}/loyaltyObject/${objectId(config, serial)}`,
@@ -146,15 +152,39 @@ export async function patchLoyaltyObject(
   })
 }
 
+/**
+ * Attaches a message to the saved pass and asks Google to notify the phone.
+ *
+ * This is the only way a Google Wallet pass produces a notification: patching the
+ * object updates it quietly. Google caps how many of these an object gets per day, so
+ * a rejection here is expected now and then and should be recorded, not retried.
+ */
+export async function addLoyaltyObjectMessage(
+  config: GoogleWalletConfig,
+  serial: string,
+  message: { id: string; header: string; body: string },
+): Promise<void> {
+  const client = await walletClient(config)
+
+  await client.request({
+    url: `${API_BASE}/loyaltyObject/${objectId(config, serial)}/addMessage`,
+    method: 'POST',
+    data: {
+      message: {
+        id: message.id,
+        header: message.header,
+        body: message.body,
+        messageType: 'TEXT_AND_NOTIFY',
+      },
+    },
+  })
+}
+
 export async function upsertLoyaltyClass(
   config: GoogleWalletConfig,
   loyaltyClass: Record<string, unknown>,
 ): Promise<void> {
-  const auth = new GoogleAuth({
-    credentials: { client_email: config.serviceAccountEmail, private_key: config.privateKey },
-    scopes: ['https://www.googleapis.com/auth/wallet_object.issuer'],
-  })
-  const client = await auth.getClient()
+  const client = await walletClient(config)
   const id = loyaltyClass.id as string
 
   try {

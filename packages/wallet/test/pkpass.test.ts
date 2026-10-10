@@ -34,8 +34,9 @@ const content: PassContent = {
   foregroundColor: '#FFFFFF',
   labelColor: '#F5B841',
   cardUrl: 'http://localhost:3002/c/abc123def456ghi789',
-  places: [{ latitude: 10.46, longitude: -73.25, relevantText: 'Estás cerca de Burger Train' }],
+  places: [{ latitude: 10.46, longitude: -73.25 }],
   offerMessage: null,
+  latestMessage: null,
   locale: 'es',
   updatedAt: new Date('2026-09-02T15:00:00Z'),
 }
@@ -69,10 +70,12 @@ interface StoreCardPass {
     headerFields: Array<{ value: string }>
     primaryFields: Array<{ value: number }>
     secondaryFields: Array<{ value: string }>
-    auxiliaryFields: Array<{ value: string }>
+    auxiliaryFields: Array<{ key: string; value: string; changeMessage?: string }>
+    backFields: Array<{ key: string; label: string; value: string; changeMessage?: string }>
   }
   barcodes: Array<{ format: string; message: string }>
-  locations: unknown[]
+  locations: Array<{ latitude: number; longitude: number; relevantText: string }>
+  maxDistance?: number
 }
 
 describe('pass.json', () => {
@@ -110,12 +113,76 @@ describe('pass.json', () => {
     expect(fresh.storeCard.secondaryFields[0]!.value).toBe('Hamburguesa gratis')
   })
 
-  it('surfaces an active campaign offer', () => {
+  it('surfaces an active campaign offer, and announces it', () => {
     const json = buildPassJson(
       { ...content, offerMessage: 'Hoy sellos dobles' },
       options,
     ) as unknown as StoreCardPass
     expect(json.storeCard.auxiliaryFields[0]!.value).toBe('Hoy sellos dobles')
+    expect(json.storeCard.auxiliaryFields[0]!.changeMessage).toContain('%@')
+  })
+
+  it('always carries a message field, so the first message can be a change', () => {
+    const fresh = buildPassJson(content, options) as unknown as StoreCardPass
+    const field = fresh.storeCard.backFields.find((entry) => entry.key === 'message')
+    expect(field).toBeDefined()
+    expect(field!.changeMessage).toContain('%@')
+
+    const sent = buildPassJson(
+      {
+        ...content,
+        latestMessage: {
+          headline: 'Te extrañamos',
+          body: 'Pásate esta semana',
+          sentAt: new Date('2026-10-01T10:00:00Z'),
+        },
+      },
+      options,
+    ) as unknown as StoreCardPass
+    const updated = sent.storeCard.backFields.find((entry) => entry.key === 'message')!
+    expect(updated.label).toBe('Te extrañamos')
+    expect(updated.value).toBe('Pásate esta semana')
+  })
+
+  describe('nearby relevance', () => {
+    it('pins every branch and tells the customer, in their language, where they stand', () => {
+      const json = buildPassJson(content, options) as unknown as StoreCardPass
+      expect(json.locations).toEqual([
+        {
+          latitude: 10.46,
+          longitude: -73.25,
+          relevantText: 'Estás cerca de Burger Train. Llevas 4/8 sellos.',
+        },
+      ])
+
+      const english = buildPassJson(
+        { ...content, locale: 'en' },
+        options,
+      ) as unknown as StoreCardPass
+      expect(english.locations[0]!.relevantText).toBe(
+        'Burger Train is nearby. You have 4/8 stamps.',
+      )
+    })
+
+    it('leads with the reward when one is waiting: that is the moment to walk in', () => {
+      const json = buildPassJson(
+        { ...content, stampsCount: 0, pendingRewardCount: 1 },
+        options,
+      ) as unknown as StoreCardPass
+      expect(json.locations[0]!.relevantText).toBe(
+        'Estás cerca de Burger Train. ¡Tienes una recompensa lista!',
+      )
+    })
+
+    it('leaves the radius to iOS: maxDistance could only make it smaller', () => {
+      const json = buildPassJson(content, options) as unknown as StoreCardPass
+      expect(json.maxDistance).toBeUndefined()
+    })
+
+    it('emits no locations for a business that has not pinned any branch', () => {
+      const json = buildPassJson({ ...content, places: [] }, options) as unknown as StoreCardPass
+      expect(json.locations).toEqual([])
+    })
   })
 })
 

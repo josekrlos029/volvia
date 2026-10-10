@@ -1,8 +1,8 @@
 import { BusinessSettings } from '@/components/BusinessSettings'
 import { DangerZone } from '@/components/DangerZone'
 import { LegalSettings } from '@/components/LegalSettings'
+import { LocationsSettings } from '@/components/LocationsSettings'
 import { PublicPageSettings } from '@/components/PublicPageSettings'
-import { Panel } from '@/components/ui'
 import { apiFetch } from '@/lib/session'
 import type { OrgSettings } from '@volvia/shared'
 import Link from 'next/link'
@@ -27,9 +27,16 @@ interface Org {
 export default async function SettingsPage() {
   const [org, locations] = await Promise.all([
     apiFetch<Org>('/v1/org'),
-    apiFetch<Array<{ id: string; name: string; address: string | null; city: string | null }>>(
-      '/v1/org/locations',
-    ),
+    apiFetch<
+      Array<{
+        id: string
+        name: string
+        address: string | null
+        city: string | null
+        latitude: number | null
+        longitude: number | null
+      }>
+    >('/v1/org/locations'),
   ])
 
   return (
@@ -58,18 +65,7 @@ export default async function SettingsPage() {
         publicUrl={org.publicUrl}
       />
 
-      <Panel title="Sedes">
-        <ul className="flex flex-col divide-y divide-[var(--color-line)]">
-          {locations.map((location) => (
-            <li key={location.id} className="py-2.5 first:pt-0">
-              <p className="text-[14px] font-medium">{location.name}</p>
-              <p className="text-[13px] text-[var(--color-ink-muted)]">
-                {[location.address, location.city].filter(Boolean).join(', ') || 'Sin dirección'}
-              </p>
-            </li>
-          ))}
-        </ul>
-      </Panel>
+      <LocationsSettings locations={locations} />
 
       <LegalSettings settings={org.settings} slug={org.slug} />
 

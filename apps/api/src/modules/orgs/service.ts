@@ -17,9 +17,11 @@ import {
   type LocationInput,
   type ProfileQuestionInput,
   type Role,
+  type UpdateLocationInput,
   type UpdateOrgInput,
 } from '@volvia/shared'
 import { AppError } from '../../lib/errors'
+import { enqueueWalletUpdatesForOrg } from '../../lib/outbox'
 import { hashPassword } from '../../lib/passwords'
 import { hashToken, randomToken, slugify } from '../../lib/tokens'
 import { assertWithinLimit } from '../../plugins/auth'
@@ -96,37 +98,80 @@ export async function createLocation(
 
   assertWithinLimit(input.entitlements, 'locations', existing?.value ?? 0)
 
-  const [created] = await db
-    .insert(locations)
-    .values({
-      orgId: input.orgId,
-      name: input.data.name,
-      address: input.data.address,
-      city: input.data.city,
-      phone: input.data.phone,
-      // Falls back to the organisation's timezone so daily rollups stay consistent.
-      timezone: input.data.timezone ?? input.timezone,
-      googlePlaceId: input.data.googlePlaceId,
-      hours: input.data.hours,
-      isActive: input.data.isActive,
-    })
-    .returning()
-  return created!
+  return db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(locations)
+      .values({
+        orgId: input.orgId,
+        name: input.data.name,
+        address: input.data.address,
+        city: input.data.city,
+        phone: input.data.phone,
+        // Falls back to the organisation's timezone so daily rollups stay consistent.
+        timezone: input.data.timezone ?? input.timezone,
+        googlePlaceId: input.data.googlePlaceId,
+        latitude: input.data.latitude,
+        longitude: input.data.longitude,
+        hours: input.data.hours,
+        isActive: input.data.isActive,
+      })
+      .returning()
+
+    // A new pin changes every pass of the business, so each installed one is refreshed.
+    if (isPassRelevant(created!)) {
+      await enqueueWalletUpdatesForOrg(tx, input.orgId, { reason: 'location' })
+    }
+    return created!
+  })
+}
+
+/** Whether a location contributes a point to the wallet passes of the business. */
+function isPassRelevant(location: {
+  latitude: number | null
+  longitude: number | null
+  isActive: boolean
+  deletedAt: Date | null
+}): boolean {
+  return (
+    location.isActive &&
+    location.deletedAt === null &&
+    location.latitude !== null &&
+    location.longitude !== null
+  )
 }
 
 export async function updateLocation(
   db: Database,
   orgId: string,
   locationId: string,
-  data: Partial<LocationInput>,
+  data: UpdateLocationInput,
 ) {
-  const [updated] = await db
-    .update(locations)
-    .set({ ...data, updatedAt: new Date() })
-    .where(and(eq(locations.id, locationId), eq(locations.orgId, orgId)))
-    .returning()
-  if (!updated) throw new AppError('NOT_FOUND', { message: 'location not found' })
-  return updated
+  return db.transaction(async (tx) => {
+    const [before] = await tx
+      .select()
+      .from(locations)
+      .where(and(eq(locations.id, locationId), eq(locations.orgId, orgId)))
+      .for('update')
+      .limit(1)
+    if (!before) throw new AppError('NOT_FOUND', { message: 'location not found' })
+
+    const [updated] = await tx
+      .update(locations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(locations.id, locationId))
+      .returning()
+
+    // Renaming a branch or changing its hours is invisible to the pass; only the pin
+    // (or the branch going on or off the map) is worth waking every phone for.
+    const pinChanged =
+      before.latitude !== updated!.latitude ||
+      before.longitude !== updated!.longitude ||
+      isPassRelevant(before) !== isPassRelevant(updated!)
+    if (pinChanged && (isPassRelevant(before) || isPassRelevant(updated!))) {
+      await enqueueWalletUpdatesForOrg(tx, orgId, { reason: 'location' })
+    }
+    return updated!
+  })
 }
 
 /** Soft delete: stamp history references the location, so the row must survive. */
@@ -140,11 +185,21 @@ export async function deleteLocation(db: Database, orgId: string, locationId: st
     throw new AppError('CONFLICT', { message: 'a business needs at least one location' })
   }
 
-  await db
-    .update(locations)
-    .set({ isActive: false, deletedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(locations.id, locationId), eq(locations.orgId, orgId)))
-  return { deleted: true }
+  return db.transaction(async (tx) => {
+    const [deleted] = await tx
+      .update(locations)
+      .set({ isActive: false, deletedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(eq(locations.id, locationId), eq(locations.orgId, orgId), isNull(locations.deletedAt)),
+      )
+      .returning()
+
+    // The branch had a pin: the passes still point at it until they are rebuilt.
+    if (deleted && deleted.latitude !== null && deleted.longitude !== null) {
+      await enqueueWalletUpdatesForOrg(tx, orgId, { reason: 'location' })
+    }
+    return { deleted: true }
+  })
 }
 
 // ── Team ─────────────────────────────────────────────────────────────────────

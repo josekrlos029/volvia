@@ -76,3 +76,11 @@ describe('entitlements', () => {
     expect(minimumPlanFor('multi_location')).toBe('multi')
   })
 })
+
+describe('custom segments', () => {
+  it('are a business feature, while the suggested ones need no plan at all', () => {
+    expect(minimumPlanFor('custom_segments')).toBe('business')
+    expect(PLANS.pro.features).not.toContain('custom_segments')
+    expect(PLANS.business.features).toContain('custom_segments')
+  })
+})

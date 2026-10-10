@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { MAX_PROFILE_QUESTIONS, MAX_SELECTED_CUSTOMERS } from '../constants'
-import { COMMUNITY_SEGMENTS } from '../segments'
+import { COMMUNITY_SEGMENTS, SUGGESTED_SEGMENT_KEYS } from '../segments'
 import {
   birthdaySchema,
   emailSchema,
@@ -33,11 +33,14 @@ export const updateCustomerSchema = z.object({
 
 /**
  * Segments the dashboard and campaign audiences share: the five community buckets,
- * plus the two that answer a question rather than describe a state.
+ * the two composites that read them together, plus the two that answer a question
+ * rather than describe a state.
  */
 export const CUSTOMER_SEGMENTS = [
   'all',
   ...COMMUNITY_SEGMENTS,
+  'cold',
+  'recurring',
   'birthday_month',
   'never_visited',
 ] as const
@@ -48,6 +51,9 @@ const dateFilter = z.coerce.date().optional()
 export const customerListQuerySchema = paginationSchema.extend({
   cardId: z.string().uuid().optional(),
   segment: z.enum(CUSTOMER_SEGMENTS).default('all'),
+  /** A saved segment or a suggested one; either replaces `segment` as the base. */
+  segmentId: z.string().uuid().optional(),
+  suggested: z.enum(SUGGESTED_SEGMENT_KEYS).optional(),
   search: z.string().trim().max(120).optional(),
   sortBy: z
     .enum(['joinedAt', 'lastStampAt', 'stamps', 'rewards', 'firstName'])

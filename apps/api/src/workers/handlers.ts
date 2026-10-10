@@ -5,9 +5,9 @@ import {
   customerCards,
   customers,
   eq,
-  inArray,
+  messageDeliveries,
+  messages,
   organizations,
-  outbox,
   reviewRequests,
   rewardGrants,
   rewards,
@@ -22,12 +22,13 @@ import {
   rewardReadyTemplate,
   welcomeCustomerTemplate,
 } from '../lib/email'
-import { OUTBOX_KINDS } from '../lib/outbox'
+import { fanOutWalletUpdates } from '../lib/outbox'
 import { visitFrequencyOf } from '../lib/segments'
-import { audienceConditions } from '../modules/engagement/audience'
+import { audienceConditions, resolveAudienceDefinition } from '../modules/engagement/audience'
+import { settleDelivery } from '../modules/messages/service'
 import { walletPushCounter } from '../plugins/observability'
 import type { OutboxHandler, OutboxHandlerContext } from './outbox'
-import { patchGooglePass, pushAppleUpdate } from './wallet-push'
+import { patchGooglePass, pushAppleUpdate, pushGoogleMessage } from './wallet-push'
 
 /**
  * Outbox handlers.
@@ -39,13 +40,26 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
   return {
     'wallet.update': async (payload, context) => {
       const customerCardId = String(payload.customerCardId)
+      const reason = typeof payload.reason === 'string' ? payload.reason : null
+      const messageId = reason === 'message' ? String(payload.messageId) : null
 
       const passes = await context.db
         .select()
         .from(walletPasses)
         .where(eq(walletPasses.customerCardId, customerCardId))
 
-      if (passes.length === 0) return
+      if (passes.length === 0) {
+        // A message to someone without the pass has nowhere to land; say so rather than
+        // leaving the delivery queued forever.
+        if (messageId) {
+          await settleDelivery(context.db, { messageId, customerCardId, status: 'skipped_no_pass' })
+        }
+        return
+      }
+
+      // What Google Wallet shows as a notification: the message, or a campaign that asked
+      // for a push. Apple needs nothing here — the rebuilt pass carries the text.
+      const notice = await loadNotice(context, payload)
 
       // Bump `updatedAt` before pushing: the device reacts to the push by asking which
       // serials changed since its last tag, and a pass not yet bumped answers "nothing".
@@ -55,16 +69,22 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
         .set({ updatedAt: new Date() })
         .where(eq(walletPasses.customerCardId, customerCardId))
 
+      let delivered = 0
+      let lastError: string | null = null
       for (const pass of passes) {
         try {
           if (pass.platform === 'apple') {
             await pushAppleUpdate(context.db, pass.id, context.logger)
+          } else if (notice) {
+            await pushGoogleMessage(context.db, pass.serial, notice, context.logger)
           } else {
             await patchGooglePass(context.db, pass.serial, context.logger)
           }
           walletPushCounter.labels(pass.platform, 'ok').inc()
+          delivered += 1
         } catch (error) {
           walletPushCounter.labels(pass.platform, 'failed').inc()
+          lastError = error instanceof Error ? error.message : String(error)
           context.logger.warn({ err: error, platform: pass.platform }, 'wallet push failed')
         }
       }
@@ -73,6 +93,15 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
         .update(walletPasses)
         .set({ lastPushedAt: new Date() })
         .where(eq(walletPasses.customerCardId, customerCardId))
+
+      if (messageId) {
+        await settleDelivery(context.db, {
+          messageId,
+          customerCardId,
+          status: delivered > 0 ? 'delivered' : 'failed',
+          error: delivered > 0 ? null : lastError,
+        })
+      }
     },
 
     'email.send': async (payload, context) => {
@@ -203,18 +232,80 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
         .where(eq(campaigns.id, campaignId))
 
       // One wallet update per affected card, so the offer appears on the pass itself.
-      // Chunked: a busy café can have thousands of cardholders, and a single insert
-      // of that size would hold a lock far longer than the drain loop expects.
+      await fanOutWalletUpdates(context.db, campaign.orgId, targets, {
+        reason: 'campaign',
+        campaignId,
+      })
+    },
+
+    'message.send': async (payload, context) => {
+      const messageId = String(payload.messageId)
+      const [message] = await context.db
+        .select()
+        .from(messages)
+        .where(eq(messages.id, messageId))
+        .limit(1)
+      // Cancelled (back to draft), already sent, or gone: nothing to do.
+      if (!message || (message.status !== 'scheduled' && message.status !== 'sending')) return
+
+      const audience = { ...audienceSchema.parse(message.audience), consentOnly: true }
+      let targets: string[]
+      try {
+        targets = await resolveAudience(context, message.orgId, audience, { allowDeleted: true })
+      } catch (error) {
+        // The segment it was aimed at no longer exists at all.
+        await context.db
+          .update(messages)
+          .set({
+            status: 'failed',
+            error: error instanceof Error ? error.message.slice(0, 500) : 'audience_unresolved',
+            updatedAt: new Date(),
+          })
+          .where(eq(messages.id, messageId))
+        return
+      }
+
+      await context.db
+        .update(messages)
+        .set({ status: 'sending', targetedCount: targets.length, updatedAt: new Date() })
+        .where(eq(messages.id, messageId))
+
+      if (targets.length === 0) {
+        await context.db
+          .update(messages)
+          .set({ status: 'sent', sentAt: new Date(), updatedAt: new Date() })
+          .where(eq(messages.id, messageId))
+        return
+      }
+
+      // Each chunk inserts its deliveries and fans out their pushes in one transaction.
+      // The unique index makes a retry insert nothing new, so a card already fanned out
+      // by an earlier, committed chunk is never pushed twice.
       const CHUNK = 500
       for (let index = 0; index < targets.length; index += CHUNK) {
         const chunk = targets.slice(index, index + CHUNK)
-        await context.db.insert(outbox).values(
-          chunk.map((customerCardId) => ({
-            orgId: campaign.orgId,
-            kind: OUTBOX_KINDS.walletUpdate,
-            payload: { customerCardId, reason: 'campaign', campaignId },
-          })),
-        )
+        await context.db.transaction(async (tx) => {
+          const inserted = await tx
+            .insert(messageDeliveries)
+            .values(
+              chunk.map((customerCardId) => ({
+                orgId: message.orgId,
+                messageId,
+                customerCardId,
+              })),
+            )
+            .onConflictDoNothing({
+              target: [messageDeliveries.messageId, messageDeliveries.customerCardId],
+            })
+            .returning({ customerCardId: messageDeliveries.customerCardId })
+
+          await fanOutWalletUpdates(
+            tx,
+            message.orgId,
+            inserted.map((row) => row.customerCardId),
+            { reason: 'message', messageId },
+          )
+        })
       }
     },
 
@@ -259,6 +350,7 @@ async function resolveAudience(
   context: OutboxHandlerContext,
   orgId: string,
   audience: Audience,
+  options: { allowDeleted?: boolean } = {},
 ): Promise<string[]> {
   const [org] = await context.db
     .select({ settings: organizations.settings })
@@ -266,13 +358,47 @@ async function resolveAudience(
     .where(eq(organizations.id, orgId))
     .limit(1)
 
+  const definition = await resolveAudienceDefinition(context.db, orgId, audience, options)
+
   const rows = await context.db
     .select({ id: customerCards.id })
     .from(customerCards)
     .innerJoin(customers, eq(customers.id, customerCards.customerId))
-    .where(audienceConditions(orgId, audience, visitFrequencyOf(org?.settings)))
+    .where(audienceConditions(orgId, audience, definition, visitFrequencyOf(org?.settings)))
 
   return rows.map((row) => row.id)
+}
+
+/**
+ * The text a Google Wallet pass should announce for this update, if any. Apple reads
+ * it off the rebuilt pass instead, so this is only for Google.
+ */
+async function loadNotice(
+  context: OutboxHandlerContext,
+  payload: Record<string, unknown>,
+): Promise<{ id: string; headline: string; body: string } | null> {
+  if (payload.reason === 'message' && payload.messageId) {
+    const [message] = await context.db
+      .select({ id: messages.id, headline: messages.headline, body: messages.body })
+      .from(messages)
+      .where(eq(messages.id, String(payload.messageId)))
+      .limit(1)
+    return message ?? null
+  }
+  if (payload.reason === 'campaign' && payload.campaignId) {
+    const [campaign] = await context.db
+      .select({
+        id: campaigns.id,
+        headline: campaigns.headline,
+        body: campaigns.body,
+        sendPush: campaigns.sendPush,
+      })
+      .from(campaigns)
+      .where(eq(campaigns.id, String(payload.campaignId)))
+      .limit(1)
+    return campaign?.sendPush ? campaign : null
+  }
+  return null
 }
 
 export { resolveAudience }

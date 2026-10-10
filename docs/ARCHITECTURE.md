@@ -73,6 +73,32 @@ El token que Apple exige dentro del pase se deriva por HMAC del serial en vez de
 Así es estable entre descargas (un dispositivo con una copia vieja sigue autenticando) y no
 hay un secreto más que pueda filtrarse desde la base.
 
+Las coordenadas de las sedes forman parte del contenido del pase: con ellas, el propio
+sistema operativo muestra la tarjeta cuando el cliente se acerca al local. Por eso mover
+una sede encola, por el outbox, una actualización para cada pase del negocio, igual que
+un sello.
+
+### Mensajes push
+
+El cliente no tiene app: el único canal para avisarle algo es el pase. Un mensaje a un
+segmento se resuelve con las mismas condiciones SQL que la vista previa del panel, se
+anota una entrega por tarjeta y se encola una actualización de pase por cada una.
+
+En Apple, el aviso en pantalla de bloqueo lo produce el propio pase: el campo `message`
+lleva `changeMessage`, y el teléfono muestra el texto nuevo cuando lo descarga tras el
+push vacío de APNs. El campo existe desde la instalación, con un texto neutro, porque Apple
+solo avisa de campos que ya conocía. Dos mensajes seguidos con el mismo cuerpo no avisan
+dos veces; es una limitación de la plataforma y no vale la pena rodearla. El campo de
+oferta de las campañas también lleva `changeMessage`, así que una campaña avisa igual.
+
+En Google no hay pase que descargar: la notificación es `loyaltyObject.addMessage` con
+`TEXT_AND_NOTIFY`, y el texto se renderiza para cada cliente antes de enviarlo. Google
+limita cuántos mensajes recibe un objeto al día; si rechaza uno, la entrega queda como
+fallida con el motivo y el mensaje termina igual.
+
+En modo `stub` no se envía nada, pero las entregas se marcan como si sí: así el flujo
+completo se prueba en local sin certificados reales.
+
 ## Pagos
 
 `PaymentProviderAdapter` es la costura entre Volvia y quien cobra. Stripe cubre tarjeta

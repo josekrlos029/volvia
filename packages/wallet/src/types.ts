@@ -23,10 +23,18 @@ export interface PassContent {
   labelColor: string
   /** Deep link back to the web card. */
   cardUrl: string
-  /** Locations that trigger a lock-screen suggestion when the customer is nearby. */
-  places: Array<{ latitude: number; longitude: number; relevantText?: string }>
+  /**
+   * Up to ten points where the OS surfaces the pass on its own. The wording shown next
+   * to it is derived from the card state, so it is never stored here.
+   */
+  places: Array<{ latitude: number; longitude: number }>
   /** Free-form message shown when a campaign or birthday offer is active. */
   offerMessage: string | null
+  /**
+   * The last message the business sent to this card. Its change is what makes the
+   * phone show a notification, so the text is already rendered for this customer.
+   */
+  latestMessage: { headline: string; body: string; sentAt: Date } | null
   locale: 'es' | 'en'
   updatedAt: Date
 }

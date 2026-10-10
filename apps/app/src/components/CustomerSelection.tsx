@@ -28,10 +28,12 @@ export function CustomerSelection({
   rows,
   apiUrl,
   canExport,
+  canMessage = false,
 }: {
   rows: CustomerRow[]
   apiUrl: string
   canExport: boolean
+  canMessage?: boolean
 }) {
   const [selected, setSelected] = useState<string[]>([])
 
@@ -59,6 +61,14 @@ export function CustomerSelection({
             >
               Crear campaña
             </Link>
+            {canMessage ? (
+              <Link
+                href={`/messages/new?customers=${ids}`}
+                className="rounded-[9px] border border-white/30 px-3 py-1.5 text-[13px] font-medium"
+              >
+                Enviar mensaje
+              </Link>
+            ) : null}
             {canExport ? (
               <a
                 href={`${apiUrl}/v1/customers/export.csv?ids=${ids}`}
@@ -200,6 +210,7 @@ export function CustomerSelection({
       {selected.length === 0 ? (
         <p className="text-[13px] text-[var(--color-ink-muted)]">
           Marca clientes para crear una campaña solo para ellos
+          {canMessage ? ', enviarles un mensaje' : ''}
           {canExport ? ' o exportarlos' : ''}.
         </p>
       ) : null}

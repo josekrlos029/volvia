@@ -224,3 +224,70 @@ export async function ageCustomer(
     await connection.close()
   }
 }
+
+/**
+ * One aged customer per community bucket, so a segment can be tested against people
+ * who really are regulars, returning, new, missing and lost.
+ */
+export const COMMUNITY_HISTORIES = [
+  { key: 'regulars', joinedDaysAgo: 200, lastStampDaysAgo: 3, totalStamps: 8 },
+  { key: 'returning', joinedDaysAgo: 200, lastStampDaysAgo: 40, totalStamps: 2 },
+  { key: 'new', joinedDaysAgo: 2, lastStampDaysAgo: null, totalStamps: 0 },
+  { key: 'missing', joinedDaysAgo: 200, lastStampDaysAgo: 80, totalStamps: 6 },
+  { key: 'lost', joinedDaysAgo: 400, lastStampDaysAgo: 200, totalStamps: 5 },
+] as const
+
+export async function businessWithACommunity(request: APIRequestContext) {
+  const business = uniqueBusiness()
+  const session = await registerBusiness(request, business)
+  const card = await createAndPublishCard(request, session)
+
+  const emails: Record<string, string> = {}
+  const tokens: Record<string, string> = {}
+  for (const history of COMMUNITY_HISTORIES) {
+    const email = `${history.key}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@volvia.test`
+    const joined = await joinCard(request, card.joinSlug, email)
+    await ageCustomer(session, email, history)
+    emails[history.key] = email
+    tokens[history.key] = joined.token
+  }
+
+  return { business, session, card, emails, tokens }
+}
+
+/**
+ * Puts a wallet pass on a customer's card without building one.
+ *
+ * Written straight to the database, like `ageCustomer`: what these tests check is
+ * who a message reaches, and signing a real `.pkpass` is a different concern with its
+ * own tests and its own certificates.
+ */
+export async function installWalletPass(
+  token: string,
+  platform: 'apple' | 'google' = 'apple',
+): Promise<void> {
+  const { createDatabase, customerCards, eq, walletPasses } = await import('@volvia/db')
+  const connection = createDatabase({ url: process.env.DATABASE_URL ?? '', max: 1 })
+
+  try {
+    const [card] = await connection.db
+      .select({ id: customerCards.id, orgId: customerCards.orgId })
+      .from(customerCards)
+      .where(eq(customerCards.token, token))
+      .limit(1)
+    if (!card) throw new Error(`no customer card for token ${token}`)
+
+    await connection.db
+      .insert(walletPasses)
+      .values({
+        orgId: card.orgId,
+        customerCardId: card.id,
+        platform,
+        serial: token,
+        installedAt: new Date(),
+      })
+      .onConflictDoNothing()
+  } finally {
+    await connection.close()
+  }
+}

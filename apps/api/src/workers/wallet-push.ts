@@ -1,6 +1,8 @@
 import { applePassRegistrations, customerCards, eq, inArray, walletPasses } from '@volvia/db'
 import type { Database } from '@volvia/db'
+import { renderCampaignText } from '@volvia/shared'
 import {
+  addLoyaltyObjectMessage,
   buildLoyaltyObject,
   isDeadPushToken,
   patchLoyaltyObject,
@@ -106,5 +108,47 @@ export async function patchGooglePass(
   await patchLoyaltyObject(config, serial, {
     loyaltyPoints: object.loyaltyPoints,
     textModulesData: object.textModulesData,
+    merchantLocations: object.merchantLocations,
+  })
+}
+
+/**
+ * A message or a campaign, as a Google Wallet notification. The text is rendered for
+ * this customer here, the same way the Apple pass renders it when it is rebuilt.
+ */
+export async function pushGoogleMessage(
+  db: Database,
+  serial: string,
+  notice: { id: string; headline: string; body: string },
+  logger: FastifyBaseLogger,
+): Promise<void> {
+  if (walletConfig.mode !== 'real' || !walletConfig.google.available) {
+    logger.debug({ serial: serial.slice(0, 8) }, 'google wallet message skipped (not configured)')
+    return
+  }
+
+  const [pass] = await db
+    .select({ customerCardId: walletPasses.customerCardId })
+    .from(walletPasses)
+    .where(eq(walletPasses.serial, serial))
+    .limit(1)
+  if (!pass) return
+
+  const [card] = await db
+    .select({ token: customerCards.token })
+    .from(customerCards)
+    .where(eq(customerCards.id, pass.customerCardId))
+    .limit(1)
+  if (!card) return
+
+  // Keep the pass itself current too: the message arrives on top of fresh data.
+  await patchGooglePass(db, serial, logger)
+
+  const { textContext } = await loadPassContent(db, card.token)
+  await addLoyaltyObjectMessage(walletConfig.google.config!, serial, {
+    // Unique per object: the same notice reaching one pass twice is rejected, not shown twice.
+    id: `${notice.id}-${serial.slice(0, 8)}`,
+    header: renderCampaignText(notice.headline, textContext),
+    body: renderCampaignText(notice.body, textContext),
   })
 }

@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test'
 import { COMMUNITY_SEGMENTS, classifyCustomer } from '@volvia/shared'
 import {
+  COMMUNITY_HISTORIES as HISTORIES,
   ageCustomer,
   authHeaders,
+  businessWithACommunity,
   createAndPublishCard,
   joinCard,
   registerBusiness,
@@ -18,30 +20,6 @@ import {
  * count without loading rows. These tests put real aged customers in front of the real
  * query and check the two agree — the only way to catch the two definitions drifting.
  */
-const HISTORIES = [
-  { key: 'regulars', joinedDaysAgo: 200, lastStampDaysAgo: 3, totalStamps: 8 },
-  { key: 'returning', joinedDaysAgo: 200, lastStampDaysAgo: 40, totalStamps: 2 },
-  { key: 'new', joinedDaysAgo: 2, lastStampDaysAgo: null, totalStamps: 0 },
-  { key: 'missing', joinedDaysAgo: 200, lastStampDaysAgo: 80, totalStamps: 6 },
-  { key: 'lost', joinedDaysAgo: 400, lastStampDaysAgo: 200, totalStamps: 5 },
-] as const
-
-async function businessWithACommunity(request: Parameters<typeof registerBusiness>[0]) {
-  const business = uniqueBusiness()
-  const session = await registerBusiness(request, business)
-  const card = await createAndPublishCard(request, session)
-
-  const emails: Record<string, string> = {}
-  for (const history of HISTORIES) {
-    const email = `${history.key}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@volvia.test`
-    await joinCard(request, card.joinSlug, email)
-    await ageCustomer(session, email, history)
-    emails[history.key] = email
-  }
-
-  return { business, session, card, emails }
-}
-
 test.describe('community segments', () => {
   test('each customer lands in the bucket the shared rules predict', async ({ request }) => {
     const { session } = await businessWithACommunity(request)
@@ -130,6 +108,9 @@ test.describe('community segments', () => {
     expect(await preview('all')).toBe(HISTORIES.length)
     expect(await preview('lost')).toBe(1)
     expect(await preview('regulars')).toBe(1)
+    // The composites read two buckets at once.
+    expect(await preview('cold')).toBe(2)
+    expect(await preview('recurring')).toBe(2)
   })
 })
 
@@ -197,6 +178,11 @@ test.describe('the customers screen', () => {
 
     await page.getByRole('link', { name: 'Perdidos' }).first().click()
     await expect(page).toHaveURL(/segment=lost/)
+    await expect(page.getByRole('table').getByText(email)).toBeVisible()
+
+    // A suggested segment is one more chip, with its live count.
+    await page.getByRole('link', { name: /^Fríos/ }).click()
+    await expect(page).toHaveURL(/suggested=cold/)
     await expect(page.getByRole('table').getByText(email)).toBeVisible()
   })
 })

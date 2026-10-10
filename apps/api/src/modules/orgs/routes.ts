@@ -9,6 +9,7 @@ import {
   passwordSchema,
   profileQuestionListSchema,
   roleSchema,
+  updateLocationSchema,
   updateOrgSchema,
 } from '@volvia/shared'
 import type { FastifyInstance } from 'fastify'
@@ -73,6 +74,7 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
                 'customer_contact_details',
                 'birthday_automation',
                 'customer_messages',
+                'custom_segments',
                 'campaigns',
                 'surveys',
                 'google_review_requests',
@@ -90,6 +92,7 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
             activeCards: entitlements.limit('activeCards'),
             staffSeats: entitlements.limit('staffSeats'),
             campaignsPerMonth: entitlements.limit('campaignsPerMonth'),
+            messagesPerMonth: entitlements.limit('messagesPerMonth'),
           },
         },
         publicUrl: `${env.PASS_URL}/b/${org.slug}`,
@@ -192,7 +195,7 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
       preHandler: [app.requireOrg('admin')],
       schema: {
         params: z.object({ locationId: z.string().uuid() }),
-        body: locationSchema.partial(),
+        body: updateLocationSchema,
         tags: ['org'],
       },
     },

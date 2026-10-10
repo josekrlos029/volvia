@@ -28,6 +28,7 @@ const FEATURE_LABELS: Record<FeatureKey, { es: string; en: string }> = {
   customer_contact_details: { es: 'Correos de tus clientes', en: 'Customer emails' },
   birthday_automation: { es: 'Cumpleaños automáticos', en: 'Birthday automation' },
   customer_messages: { es: 'Mensajes a clientes', en: 'Customer messages' },
+  custom_segments: { es: 'Segmentos propios', en: 'Custom segments' },
   campaigns: { es: 'Campañas', en: 'Campaigns' },
   surveys: { es: 'Encuestas', en: 'Surveys' },
   google_review_requests: { es: 'Reseñas en Google', en: 'Google review requests' },

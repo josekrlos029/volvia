@@ -6,6 +6,7 @@ import { createRedis } from './lib/redis'
 import {
   expireInactiveCards,
   expireRewards,
+  finishStaleMessages,
   runBirthdayAutomations,
   runCampaignScheduler,
   runLocked,
@@ -66,6 +67,7 @@ safeInterval('campaigns', SCHEDULER_INTERVAL_MS, async () => {
   await runLocked(context, 'campaigns', 55, async () => {
     const result = await runCampaignScheduler(context)
     if (result.started || result.finished) logger.info(result, 'campaign scheduler')
+    await finishStaleMessages(context)
   })
 })
 

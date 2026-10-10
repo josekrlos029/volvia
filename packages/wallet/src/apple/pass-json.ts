@@ -23,6 +23,11 @@ const STRINGS = {
     ready: '¡Listo para reclamar!',
     of: 'de',
     terms: 'Términos',
+    news: 'Novedades',
+    noNews: 'Aquí verás lo que te cuente el negocio.',
+    nearby: (org: string, count: number, required: number) =>
+      `Estás cerca de ${org}. Llevas ${count}/${required} sellos.`,
+    nearbyReward: (org: string) => `Estás cerca de ${org}. ¡Tienes una recompensa lista!`,
   },
   en: {
     progress: 'Progress',
@@ -30,8 +35,25 @@ const STRINGS = {
     ready: 'Ready to claim!',
     of: 'of',
     terms: 'Terms',
+    news: 'News',
+    noNews: 'Messages from the business will show up here.',
+    nearby: (org: string, count: number, required: number) =>
+      `${org} is nearby. You have ${count}/${required} stamps.`,
+    nearbyReward: (org: string) => `${org} is nearby. You have a reward ready!`,
   },
 } as const
+
+/**
+ * What the lock screen says next to the pass when the customer is near the shop. Built
+ * from the card state rather than stored, so every rebuild (each stamp triggers one)
+ * keeps it true.
+ */
+export function nearbyText(content: PassContent): string {
+  const strings = STRINGS[content.locale]
+  return content.pendingRewardCount > 0
+    ? strings.nearbyReward(content.organizationName)
+    : strings.nearby(content.organizationName, content.stampsCount, content.stampsRequired)
+}
 
 export function buildPassJson(
   content: PassContent,
@@ -39,6 +61,7 @@ export function buildPassJson(
 ): Record<string, unknown> {
   const strings = STRINGS[content.locale]
   const hasReward = content.pendingRewardCount > 0
+  const relevantText = nearbyText(content)
 
   return {
     formatVersion: 1,
@@ -82,11 +105,19 @@ export function buildPassJson(
         },
       ],
       auxiliaryFields: content.offerMessage
-        ? [{ key: 'offer', label: '★', value: content.offerMessage }]
+        ? [{ key: 'offer', label: '★', value: content.offerMessage, changeMessage: '%@' }]
         : [],
       backFields: [
         { key: 'about', label: content.cardName, value: content.rewardDescription },
         { key: 'link', label: 'Volvia', value: content.cardUrl },
+        // Always present, even before the first message: the phone only alerts when a
+        // field it already knew changes value, so the key has to exist from install.
+        {
+          key: 'message',
+          label: content.latestMessage?.headline ?? strings.news,
+          value: content.latestMessage?.body ?? strings.noNews,
+          changeMessage: '%@',
+        },
         ...(content.terms ? [{ key: 'terms', label: strings.terms, value: content.terms }] : []),
       ],
     },
@@ -101,14 +132,15 @@ export function buildPassJson(
       },
     ],
 
-    // Surfaces the pass on the lock screen when the customer is near a location.
+    // Surfaces the pass on the lock screen when the customer is near a branch. iOS
+    // picks the radius itself (about a hundred metres for a store card); `maxDistance`
+    // could only shrink it, so it is left out.
     locations: content.places.map((place) => ({
       latitude: place.latitude,
       longitude: place.longitude,
-      relevantText: place.relevantText ?? `${content.organizationName}`,
+      relevantText,
     })),
 
-    maxDistance: 150,
     sharingProhibited: true,
     voided: false,
   }

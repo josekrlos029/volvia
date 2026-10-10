@@ -1,6 +1,7 @@
 import { relations, sql } from 'drizzle-orm'
 import {
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -68,6 +69,12 @@ export const locations = pgTable(
     phone: text(),
     timezone: text().notNull().default('America/Bogota'),
     googlePlaceId: text(),
+    /**
+     * WGS84 decimal degrees, both set or both null. This is all a wallet pass needs to
+     * surface itself when the customer walks up to the shop.
+     */
+    latitude: doublePrecision(),
+    longitude: doublePrecision(),
     hours: jsonb()
       .$type<Array<{ day: number; opens: string; closes: string }>>()
       .notNull()

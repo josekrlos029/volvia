@@ -19,6 +19,11 @@ cuánto espera el negocio que vuelva un buen cliente, sus datos legales, el text
 de su página y si las peticiones de reseña están en pausa. Añadir una preferencia no
 necesita migración, y `orgSettingsSchema` le pone forma al leerlo.
 
+`locations.latitude` y `locations.longitude` van juntas o ninguna: media coordenada
+pondría la sede en el ecuador. Son lo único que necesita el pase de wallet para aparecer
+cuando el cliente se acerca; el texto que lo acompaña se genera desde el estado de la
+tarjeta y no se guarda.
+
 Cerrar un negocio es un borrado suave (`deleted_at`). Desde ese momento sus tarjetas dejan
 de admitir gente y las de sus clientes dejan de abrirse, aunque sus propias filas sigan
 marcadas como activas: la comprobación está en la organización, no en la tarjeta.
@@ -61,6 +66,22 @@ guardan: se calculan desde `joined_at`, `last_stamp_at` y `total_stamps` contra 
 frecuencia que el negocio configuró. `classifyCustomer` es la definición y el SQL de
 `lib/segments.ts` es la misma regla para contar miles de filas sin traerlas. Cada cliente
 cae en exactamente uno, así que los cinco suman el total.
+
+`customer_segments` guarda los segmentos que el negocio define: un punto de partida (uno de
+los cinco, los compuestos `cold`/`recurring`, o todos) y los filtros encima, como `jsonb`.
+No guarda a quién contiene: la regla se evalúa cada vez, así que un segmento no envejece.
+Los segmentos sugeridos por Volvia no están en la base: viven en código, y solo se vuelven
+una fila cuando el negocio guarda una copia para afinarla. El borrado es suave porque un
+mensaje programado puede seguir apuntando a un segmento que su dueño acaba de quitar.
+
+## Mensajes
+
+`messages` es un aviso puntual al pase de wallet. `message_deliveries` tiene una fila por
+tarjeta de cliente, única por mensaje: es lo que hace idempotente el envío, porque un
+reintento del worker no inserta nada nuevo y nadie recibe dos veces el mismo push. Cada
+fila pasa de `queued` a `delivered`, `failed` o `skipped_no_pass` (el cliente no tiene el
+pase en el móvil), y `delivered_count` se deriva de ahí en vez de adivinarse. El mensaje
+pasa a `sent` cuando no queda ninguna fila en cola.
 
 ## Analítica
 

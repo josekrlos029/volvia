@@ -5,8 +5,22 @@ import { EmptyState, Panel, buttonClass } from '@/components/ui'
 import { formatNumber } from '@/lib/format'
 import { COMMUNITY_LABELS, EXTRA_SEGMENT_LABELS, segmentLabel } from '@/lib/segments'
 import { apiFetch } from '@/lib/session'
-import { COMMUNITY_SEGMENTS, type VisitFrequency } from '@volvia/shared'
+import { COMMUNITY_SEGMENTS, SUGGESTED_SEGMENT_LIST, type VisitFrequency } from '@volvia/shared'
 import Link from 'next/link'
+
+interface SegmentList {
+  segments: Array<{ id: string; name: string; count: number }>
+  suggested: Array<{ key: string; name: string; label?: string; count: number }>
+}
+
+function chipClass(current: boolean): string {
+  return [
+    'shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors',
+    current
+      ? 'bg-[var(--color-ink)] text-white'
+      : 'border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]',
+  ].join(' ')
+}
 
 interface CustomerPage {
   items: CustomerRow[]
@@ -54,6 +68,11 @@ export default async function CustomersPage({
   }
 
   const segment = values.segment ?? 'all'
+  // A saved or suggested segment replaces the bucket as the base of the list.
+  const segmentId = values.segmentId
+  const suggested = SUGGESTED_SEGMENT_LIST.some((item) => item.key === values.suggested)
+    ? values.suggested
+    : undefined
   const page = Math.max(1, Number(values.page ?? 1) || 1)
 
   // The filter query, without the parts that are navigation rather than filtering.
@@ -63,19 +82,32 @@ export default async function CustomersPage({
   }
   const activeCount = [...filters.keys()].filter((key) => key !== 'sortBy').length
 
-  const listQuery = new URLSearchParams(filters)
+  const scope = new URLSearchParams(filters)
+  if (segmentId) scope.set('segmentId', segmentId)
+  if (suggested) scope.set('suggested', suggested)
+
+  const listQuery = new URLSearchParams(scope)
   listQuery.set('segment', segment)
   listQuery.set('page', String(page))
   listQuery.set('pageSize', '25')
 
-  const [customers, counts, org, cards] = await Promise.all([
+  const [customers, counts, org, cards, segmentList] = await Promise.all([
     apiFetch<CustomerPage>(`/v1/customers?${listQuery}`),
-    apiFetch<SegmentCounts>(`/v1/customers/segments?${filters}`),
+    apiFetch<SegmentCounts>(`/v1/customers/segments?${scope}`),
     apiFetch<{ entitlements: { features: Record<string, boolean> } }>('/v1/org'),
     apiFetch<Array<{ id: string; name: string }>>('/v1/cards'),
+    apiFetch<SegmentList>('/v1/segments'),
   ])
 
   const canExport = org.entitlements.features.csv_export ?? false
+  const canMessage = org.entitlements.features.customer_messages ?? false
+  const activeSaved = segmentId
+    ? segmentList.segments.find((item) => item.id === segmentId)
+    : undefined
+  const activeSuggested = suggested
+    ? segmentList.suggested.find((item) => item.key === suggested)
+    : undefined
+  const scopeLabel = activeSaved?.name ?? activeSuggested?.name ?? segmentLabel(segment)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
   const pageLink = (target: number) => {
@@ -98,9 +130,9 @@ export default async function CustomersPage({
           <h1 className="text-[22px] font-semibold tracking-[-0.01em]">Clientes</h1>
           <p className="tabular mt-1 text-[14px] text-[var(--color-ink-muted)]">
             {formatNumber(customers.total)}{' '}
-            {segment === 'all' && activeCount === 0
+            {segment === 'all' && activeCount === 0 && !activeSaved && !activeSuggested
               ? 'en total'
-              : `en ${segmentLabel(segment).toLowerCase()}`}
+              : `en ${scopeLabel.toLowerCase()}`}
           </p>
         </div>
         {canExport ? (
@@ -118,24 +150,20 @@ export default async function CustomersPage({
         total={counts.total}
         frequency={counts.frequency}
         active={segment}
-        query={filters}
+        query={scope}
       />
 
       <nav aria-label="Segmentos" className="-mx-1 flex gap-1 overflow-x-auto pb-1">
         {chips.map((item) => {
           const href = new URLSearchParams(filters)
           href.set('segment', item.id)
+          const current = !activeSaved && !activeSuggested && segment === item.id
           return (
             <Link
               key={item.id}
               href={`/customers?${href}`}
-              aria-current={segment === item.id ? 'page' : undefined}
-              className={[
-                'shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors',
-                segment === item.id
-                  ? 'bg-[var(--color-ink)] text-white'
-                  : 'border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]',
-              ].join(' ')}
+              aria-current={current ? 'page' : undefined}
+              className={chipClass(current)}
             >
               {item.label}
             </Link>
@@ -143,7 +171,56 @@ export default async function CustomersPage({
         })}
       </nav>
 
-      <CustomerFilters values={{ ...values, segment }} cards={cards} activeCount={activeCount} />
+      {segmentList.suggested.length > 0 || segmentList.segments.length > 0 ? (
+        <nav aria-label="Segmentos guardados" className="-mx-1 flex gap-1 overflow-x-auto pb-1">
+          {segmentList.suggested.map((item) => {
+            const href = new URLSearchParams(filters)
+            href.set('suggested', item.key)
+            const current = suggested === item.key
+            return (
+              <Link
+                key={item.key}
+                href={`/customers?${href}`}
+                aria-current={current ? 'page' : undefined}
+                className={chipClass(current)}
+              >
+                {item.label ?? item.name}
+                <span className="tabular ml-1.5 opacity-70">{formatNumber(item.count)}</span>
+              </Link>
+            )
+          })}
+          {segmentList.segments.map((item) => {
+            const href = new URLSearchParams(filters)
+            href.set('segmentId', item.id)
+            const current = segmentId === item.id
+            return (
+              <Link
+                key={item.id}
+                href={`/customers?${href}`}
+                aria-current={current ? 'page' : undefined}
+                className={chipClass(current)}
+              >
+                {item.name}
+                <span className="tabular ml-1.5 opacity-70">{formatNumber(item.count)}</span>
+              </Link>
+            )
+          })}
+          <Link href="/segments" className={chipClass(false)}>
+            Gestionar segmentos
+          </Link>
+        </nav>
+      ) : null}
+
+      <CustomerFilters
+        values={{
+          ...values,
+          segment,
+          ...(segmentId ? { segmentId } : {}),
+          ...(suggested ? { suggested } : {}),
+        }}
+        cards={cards}
+        activeCount={activeCount}
+      />
 
       {customers.masked ? (
         <p className="rounded-[9px] bg-[var(--color-accent-soft)] px-3.5 py-2.5 text-[13px] text-[var(--color-warning)]">
@@ -159,7 +236,10 @@ export default async function CustomersPage({
             body="Prueba con otro segmento o quita algún filtro. Si aún no tienes clientes, comparte el QR de tu tarjeta para que empiecen a unirse."
             action={
               activeCount > 0 ? (
-                <Link href={`/customers?segment=${segment}`} className={buttonClass('secondary')}>
+                <Link
+                  href={`/customers?${new URLSearchParams({ segment, ...(segmentId ? { segmentId } : {}), ...(suggested ? { suggested } : {}) })}`}
+                  className={buttonClass('secondary')}
+                >
                   Quitar filtros
                 </Link>
               ) : undefined
@@ -168,7 +248,12 @@ export default async function CustomersPage({
         </Panel>
       ) : (
         <>
-          <CustomerSelection rows={customers.items} apiUrl={apiUrl} canExport={canExport} />
+          <CustomerSelection
+            rows={customers.items}
+            apiUrl={apiUrl}
+            canExport={canExport}
+            canMessage={canMessage}
+          />
 
           {customers.total > customers.pageSize ? (
             <nav className="flex items-center justify-between gap-4" aria-label="Paginación">

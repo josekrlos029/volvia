@@ -4,10 +4,16 @@ import {
   campaigns,
   customerCards,
   customers,
+  desc,
   eq,
   gte,
+  inArray,
+  isNotNull,
+  isNull,
   locations,
   lte,
+  messageDeliveries,
+  messages,
   organizations,
   rewardGrants,
   rewards,
@@ -15,7 +21,7 @@ import {
   stampCards,
   walletPasses,
 } from '@volvia/db'
-import type { CardDesign } from '@volvia/shared'
+import { type CampaignTextContext, type CardDesign, renderCampaignText } from '@volvia/shared'
 import {
   type PassContent,
   buildLoyaltyClass,
@@ -27,15 +33,25 @@ import {
 } from '@volvia/wallet'
 import { env } from '../../env'
 import { AppError } from '../../lib/errors'
-import { isWithinActiveHours } from '../../lib/time'
+import { isWithinActiveHours, orgHour } from '../../lib/time'
 import { derivePassAuthToken } from '../../lib/tokens'
 import { walletConfig } from './config'
 
-/** Assembles everything a pass shows, from the customer's current card state. */
+/**
+ * Assembles everything a pass shows, from the customer's current card state.
+ *
+ * `textContext` is what the campaign placeholders resolve against for this customer;
+ * it is returned so Google Wallet messages can be rendered the same way the pass is.
+ */
 export async function loadPassContent(
   db: Database,
   token: string,
-): Promise<{ content: PassContent; orgId: string; customerCardId: string }> {
+): Promise<{
+  content: PassContent
+  orgId: string
+  customerCardId: string
+  textContext: CampaignTextContext
+}> {
   const [row] = await db
     .select({
       customerCard: customerCards,
@@ -52,7 +68,7 @@ export async function loadPassContent(
 
   if (!row) throw new AppError('CUSTOMER_CARD_NOT_FOUND', { message: 'card not found' })
 
-  const [cardRewards, pending, activeCampaigns] = await Promise.all([
+  const [cardRewards, pending, activeCampaigns, places, [latestDelivery]] = await Promise.all([
     db.select().from(rewards).where(eq(rewards.cardId, row.card.id)).orderBy(rewards.atStamp),
     db
       .select({ value: sql<number>`count(*)::int` })
@@ -74,6 +90,25 @@ export async function loadPassContent(
           gte(campaigns.endsAt, new Date()),
         ),
       ),
+    loadPassPlaces(db, row.org.id),
+    // Queued counts too: the iPhone fetches the rebuilt pass the moment the push lands,
+    // before the worker has had the chance to mark the delivery as done.
+    db
+      .select({
+        headline: messages.headline,
+        body: messages.body,
+        sentAt: sql<Date>`coalesce(${messages.scheduledAt}, ${messages.createdAt})`,
+      })
+      .from(messageDeliveries)
+      .innerJoin(messages, eq(messages.id, messageDeliveries.messageId))
+      .where(
+        and(
+          eq(messageDeliveries.customerCardId, row.customerCard.id),
+          inArray(messageDeliveries.status, ['queued', 'delivered']),
+        ),
+      )
+      .orderBy(desc(sql`coalesce(${messages.scheduledAt}, ${messages.createdAt})`))
+      .limit(1),
   ])
 
   const design = row.card.design as CardDesign
@@ -90,9 +125,18 @@ export async function loadPassContent(
     ),
   )
 
+  const textContext: CampaignTextContext = {
+    name: row.customer.firstName,
+    business: row.org.name,
+    stamps: row.customerCard.stampsCount,
+    remaining: Math.max(0, row.card.stampsRequired - row.customerCard.stampsCount),
+    hour: orgHour(new Date(), row.org.timezone),
+  }
+
   return {
     orgId: row.org.id,
     customerCardId: row.customerCard.id,
+    textContext,
     content: {
       serial: row.customerCard.token,
       organizationName: row.org.name,
@@ -109,9 +153,15 @@ export async function loadPassContent(
       foregroundColor: design.foregroundColor,
       labelColor: design.accentColor,
       cardUrl: `${env.PASS_URL}/c/${row.customerCard.token}`,
-      // Locations are attached below only when the business has geocoded them.
-      places: [],
-      offerMessage: liveCampaign ? liveCampaign.headline : null,
+      places,
+      offerMessage: liveCampaign ? renderCampaignText(liveCampaign.headline, textContext) : null,
+      latestMessage: latestDelivery
+        ? {
+            headline: renderCampaignText(latestDelivery.headline, textContext),
+            body: renderCampaignText(latestDelivery.body, textContext),
+            sentAt: new Date(latestDelivery.sentAt),
+          }
+        : null,
       locale: row.customer.locale,
       updatedAt: row.customerCard.updatedAt,
     },
@@ -210,10 +260,33 @@ export async function issueGoogleSaveUrl(db: Database, token: string): Promise<s
   return buildSaveUrl(config, { loyaltyObjects: [loyaltyObject], loyaltyClasses: [loyaltyClass] })
 }
 
-/** Attaches a business's geocoded locations so the pass can surface near the shop. */
-export async function loadPassPlaces(db: Database, orgId: string) {
-  return db
-    .select({ name: locations.name, address: locations.address })
+/**
+ * The pins that make the pass surface when the customer walks up to the shop. Both
+ * wallets cap relevance points at ten, so a business with more branches keeps its
+ * oldest ten: those are the ones its customers already know.
+ */
+export async function loadPassPlaces(
+  db: Database,
+  orgId: string,
+): Promise<Array<{ latitude: number; longitude: number }>> {
+  const rows = await db
+    .select({ latitude: locations.latitude, longitude: locations.longitude })
     .from(locations)
-    .where(and(eq(locations.orgId, orgId), eq(locations.isActive, true)))
+    .where(
+      and(
+        eq(locations.orgId, orgId),
+        eq(locations.isActive, true),
+        isNull(locations.deletedAt),
+        isNotNull(locations.latitude),
+        isNotNull(locations.longitude),
+      ),
+    )
+    .orderBy(locations.createdAt)
+    .limit(10)
+
+  return rows.flatMap((row) =>
+    row.latitude !== null && row.longitude !== null
+      ? [{ latitude: row.latitude, longitude: row.longitude }]
+      : [],
+  )
 }

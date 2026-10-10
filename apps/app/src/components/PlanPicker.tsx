@@ -22,6 +22,7 @@ const FEATURE_LABELS: Record<string, string> = {
   customer_contact_details: 'Correos de tus clientes',
   birthday_automation: 'Cumpleaños automáticos',
   customer_messages: 'Mensajes a clientes',
+  custom_segments: 'Segmentos propios',
   campaigns: 'Campañas',
   surveys: 'Encuestas',
   google_review_requests: 'Pedir reseñas en Google',

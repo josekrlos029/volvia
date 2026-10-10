@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
+import type { SegmentDefinition } from '../types'
 import { rewards, stampCards } from './cards'
 import { customerCardStatusEnum, localeEnum, rewardGrantStatusEnum, stampSourceEnum } from './enums'
 import { users } from './identity'
@@ -164,6 +165,34 @@ export const customerAnswers = pgTable(
     answeredAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex('customer_answers_key').on(table.customerId, table.questionId)],
+)
+
+/**
+ * A segment the business saved: a community bucket plus the filters layered on top.
+ * The suggested segments are not here — they live in code, so they can change without
+ * a migration — and a suggested one becomes a row only when the business saves a copy.
+ */
+export const customerSegments = pgTable(
+  'customer_segments',
+  {
+    id: uuid().primaryKey().default(sql`gen_random_uuid()`),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    description: text(),
+    definition: jsonb().$type<SegmentDefinition>().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** Soft: a scheduled message may still point at a segment its owner removed. */
+    deletedAt: timestamp({ withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('customer_segments_org_name_key')
+      .on(table.orgId, sql`lower(${table.name})`)
+      .where(sql`${table.deletedAt} is null`),
+    index('customer_segments_org_idx').on(table.orgId, table.deletedAt),
+  ],
 )
 
 export const customersRelations = relations(customers, ({ one, many }) => ({

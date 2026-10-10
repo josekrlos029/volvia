@@ -43,11 +43,15 @@ export default async function CampaignsPage({
     )
   }
 
-  const [list, cards] = await Promise.all([
+  const [list, cards, segmentList] = await Promise.all([
     apiFetch<{ campaigns: Campaign[]; thisMonth: { used: number; limit: number | null } }>(
       '/v1/campaigns',
     ),
     apiFetch<Array<{ id: string; name: string; status: string }>>('/v1/cards'),
+    apiFetch<{
+      segments: Array<{ id: string; name: string; count: number }>
+      suggested: Array<{ key: string; name: string; count: number }>
+    }>('/v1/segments'),
   ])
   const campaigns = list.campaigns
   const { used, limit } = list.thisMonth
@@ -82,6 +86,12 @@ export default async function CampaignsPage({
         cards={cards.filter((card) => card.status === 'active')}
         selectedCustomerIds={selection}
         remainingThisMonth={limit === null ? null : Math.max(0, limit - used)}
+        suggested={segmentList.suggested.map((item) => ({
+          id: item.key,
+          name: item.name,
+          count: item.count,
+        }))}
+        segments={segmentList.segments}
       />
 
       {campaigns.length === 0 ? (

@@ -10,7 +10,7 @@ vive cada pieza y cómo se publica un cambio.
 | Sitio de marketing | Vercel, proyecto `volvia-web` (`apps/web`) | `somosvolvia.com`; `www` redirige al dominio raíz |
 | Panel | Vercel, proyecto `volvia-app` (`apps/app`) | `app.somosvolvia.com` |
 | Tarjeta del cliente | Vercel, proyecto `volvia-pass` (`apps/pass`) | `tarjeta.somosvolvia.com` |
-| API | Cloud Run, servicio `volvia-api` | `api.somosvolvia.com`, mínimo una instancia |
+| API | Cloud Run, servicio `volvia-api` | `api.somosvolvia.com`, escala a cero; el primer request tras inactividad paga el arranque en frío |
 | Worker | Cloud Run, worker pool `volvia-worker` | Una instancia fija; no escucha en ningún puerto |
 | Base de datos | Neon, AWS us-east-1 | URL *pooled* para la API, directa para migraciones |
 | Redis | Redis Cloud, AWS us-east-1 | Sesiones, idempotencia, nonces, límites y colas |

@@ -34,6 +34,34 @@ export function isVisitFrequency(value: unknown): value is VisitFrequency {
 export const COMMUNITY_SEGMENTS = ['regulars', 'returning', 'new', 'missing', 'lost'] as const
 export type CommunitySegment = (typeof COMMUNITY_SEGMENTS)[number]
 
+/**
+ * Two buckets read together. "Cold" is everyone drifting or gone; "recurring" is
+ * everyone still coming back. They are not community segments — those five stay a
+ * partition — but they are what a business means when it says "the ones we're losing".
+ */
+export const COMPOSITE_SEGMENTS = {
+  cold: ['missing', 'lost'],
+  recurring: ['regulars', 'returning'],
+} as const satisfies Record<string, readonly CommunitySegment[]>
+export type CompositeSegment = keyof typeof COMPOSITE_SEGMENTS
+
+/**
+ * The segments Volvia proposes on its own. Keys only: the definitions and the copy
+ * live in `suggested-segments.ts`, which depends on the schemas and so cannot be
+ * imported from here.
+ */
+export const SUGGESTED_SEGMENT_KEYS = [
+  'cold',
+  'recurring',
+  'vip',
+  'one_stamp_away',
+  'never_redeemed',
+  'birthday_this_month',
+  'new_no_second_visit',
+  'dormant_with_reward',
+] as const
+export type SuggestedSegmentKey = (typeof SUGGESTED_SEGMENT_KEYS)[number]
+
 /** Visits that make someone a regular rather than a repeat visitor. */
 export const REGULAR_MIN_VISITS = 3
 

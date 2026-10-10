@@ -1,5 +1,5 @@
 /** Shapes stored inside jsonb columns. Kept structural so Drizzle stays decoupled from zod. */
-import type { CardDesign, CardMessages, StampRules } from '@volvia/shared'
+import type { CardDesign, CardMessages, SegmentDefinition, StampRules } from '@volvia/shared'
 
 export type SocialLink = { platform: string; url: string; label?: string }
 export type { CardDesign, CardMessages, StampRules }
@@ -15,7 +15,12 @@ export type CampaignAudience = {
   cardIds: string[]
   customerIds: string[]
   consentOnly: boolean
+  /** Optional: rows written before saved segments existed do not carry them. */
+  segmentId?: string | null
+  suggested?: string | null
 }
+
+export type { SegmentDefinition }
 
 export type SurveyQuestion =
   | { type: 'rating'; prompt: string; scale: 5 }

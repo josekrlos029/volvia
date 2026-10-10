@@ -1,6 +1,7 @@
 'use client'
 
 import { api } from '@/lib/api-client'
+import { VARIABLE_HELP } from '@/lib/segments'
 import { CAMPAIGN_VARIABLES, renderCampaignText } from '@volvia/shared'
 import { ApiError } from '@volvia/shared/client'
 import { useRouter } from 'next/navigation'
@@ -101,27 +102,31 @@ const TEMPLATES = [
   },
 ]
 
-/** A short, honest explanation of each placeholder, shown where they are written. */
-const VARIABLE_HELP: Record<string, string> = {
-  name: 'el nombre del cliente',
-  business: 'el nombre de tu negocio',
-  stamps: 'los sellos que lleva',
-  remaining: 'los que le faltan',
-  hour: 'la hora, donde está tu negocio',
+export interface SegmentOption {
+  id: string
+  name: string
+  count: number
 }
 
 export function CampaignComposer({
   cards,
   selectedCustomerIds,
   remainingThisMonth,
+  suggested = [],
+  segments = [],
 }: {
   cards: Array<{ id: string; name: string }>
   /** A selection carried over from the customer list, if the business came from there. */
   selectedCustomerIds?: string[]
   remainingThisMonth: number | null
+  /** Segments the business can aim the campaign at instead of the template's own. */
+  suggested?: SegmentOption[]
+  segments?: SegmentOption[]
 }) {
   const router = useRouter()
   const [selected, setSelected] = useState<string | null>(null)
+  /** `suggested:<key>` or `custom:<id>`; empty means the template decides. */
+  const [target, setTarget] = useState('')
   const [audienceSize, setAudienceSize] = useState<number | null>(null)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -158,15 +163,17 @@ export function CampaignComposer({
     )
   }, [template])
 
-  const audience = useMemo(
-    () => ({
+  const audience = useMemo(() => {
+    const [kind, value] = target.split(':')
+    return {
       segment: picked.length > 0 ? ('all' as const) : (template?.segment ?? 'all'),
+      suggested: picked.length === 0 && kind === 'suggested' ? (value ?? null) : null,
+      segmentId: picked.length === 0 && kind === 'custom' ? (value ?? null) : null,
       cardIds: cards.map((card) => card.id),
       customerIds: picked,
       consentOnly: true,
-    }),
-    [cards, template, picked],
-  )
+    }
+  }, [cards, template, picked, target])
 
   // Show the reach before sending: "this goes to 214 people" is the number that
   // decides whether a campaign is worth launching.
@@ -279,6 +286,37 @@ export function CampaignComposer({
               Cada cliente verá lo suyo:{' '}
               {usedVariables.map((name) => VARIABLE_HELP[name] ?? name).join(', ')}.
             </p>
+          ) : null}
+
+          {picked.length === 0 && (suggested.length > 0 || segments.length > 0) ? (
+            <label className="mt-3 flex flex-col gap-1.5 text-[13px] font-medium">
+              ¿A quién?
+              <select
+                value={target}
+                onChange={(event) => setTarget(event.target.value)}
+                className="w-full rounded-[9px] border border-[var(--color-line)] bg-white px-3 py-2 text-[14px] font-normal focus:border-[var(--color-primary)] focus:outline-none"
+              >
+                <option value="">A quien propone la plantilla</option>
+                {suggested.length > 0 ? (
+                  <optgroup label="Sugeridos por Volvia">
+                    {suggested.map((item) => (
+                      <option key={item.id} value={`suggested:${item.id}`}>
+                        {item.name} ({item.count})
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+                {segments.length > 0 ? (
+                  <optgroup label="Tus segmentos">
+                    {segments.map((item) => (
+                      <option key={item.id} value={`custom:${item.id}`}>
+                        {item.name} ({item.count})
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+              </select>
+            </label>
           ) : null}
 
           <p className="mt-3 text-[14px] text-[var(--color-ink-muted)]">

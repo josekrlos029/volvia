@@ -106,3 +106,36 @@ describe('community segments', () => {
     }
   })
 })
+
+describe('composite and suggested segments', () => {
+  it('reads cold and recurring as disjoint halves of the community, leaving only the new', async () => {
+    const { COMPOSITE_SEGMENTS } = await import('../src/segments')
+    const cold = new Set<string>(COMPOSITE_SEGMENTS.cold)
+    const recurring = new Set<string>(COMPOSITE_SEGMENTS.recurring)
+    for (const segment of cold) expect(recurring.has(segment)).toBe(false)
+    const covered = new Set([...cold, ...recurring, 'new'])
+    expect([...covered].sort()).toEqual([...COMMUNITY_SEGMENTS].sort())
+  })
+
+  it('ships every suggested segment with a valid definition and sendable templates', async () => {
+    const { SUGGESTED_SEGMENTS, SUGGESTED_SEGMENT_KEYS } = await import('../src/index')
+    const { messageSchema, segmentDefinitionSchema } = await import('../src/index')
+    const text = messageSchema.pick({ headline: true, body: true })
+
+    for (const key of SUGGESTED_SEGMENT_KEYS) {
+      const suggested = SUGGESTED_SEGMENTS[key]
+      expect(suggested.key).toBe(key)
+      expect(() => segmentDefinitionSchema.parse(suggested.definition), key).not.toThrow()
+      expect(suggested.messageTemplates.length, key).toBeGreaterThan(0)
+      for (const template of suggested.messageTemplates) {
+        expect(() => text.parse(template), `${key}: ${template.headline}`).not.toThrow()
+      }
+    }
+  })
+
+  it('refuses a filter it does not know, so a typo cannot silently match everyone', async () => {
+    const { segmentDefinitionSchema } = await import('../src/index')
+    expect(() => segmentDefinitionSchema.parse({ base: 'all', filters: { minStamp: 3 } })).toThrow()
+    expect(segmentDefinitionSchema.parse({})).toEqual({ base: 'all', filters: {} })
+  })
+})

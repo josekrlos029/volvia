@@ -274,6 +274,38 @@ Android con una de las cuentas de prueba del paso 2.5.
 
 ---
 
+## Avisos por cercanía
+
+Las dos wallets saben mostrar el pase solas cuando el cliente se acerca al negocio. No hay
+que rastrear a nadie ni mandar pushes propios: basta con que el pase lleve las coordenadas
+de las sedes. El dueño las fija en Ajustes → Sedes, con el botón "Usar mi ubicación actual"
+(el GPS del navegador, pensado para hacerlo desde la puerta del local) o pegando un enlace
+de Google Maps. No hace falta ninguna API de mapas.
+
+| | iPhone | Android |
+|---|---|---|
+| Qué ve el cliente | Una sugerencia silenciosa en la pantalla de bloqueo, con el texto que generamos: "Estás cerca de X. Llevas 4/8 sellos." (o "¡Tienes una recompensa lista!"), en su idioma | Una notificación de Google Wallet con texto genérico; el texto y el radio los decide Google |
+| Radio | Unos 100 m, lo fija iOS para tarjetas de tienda. `maxDistance` solo podría reducirlo, por eso no se manda | Unos 150 m, lo fija Google |
+| Qué necesita el cliente | Tener el pase instalado | Pase guardado, notificaciones activas y ubicación precisa "siempre" para la app de Wallet |
+| Campo del pase | `locations[]` en `pass.json` | `merchantLocations[]` en el LoyaltyObject (el campo `locations[]` existe pero está deprecado y ya no dispara avisos) |
+
+Límites: 10 puntos por pase. Si un negocio tiene más sedes con coordenadas, van las 10
+más antiguas.
+
+Cuando cambian las coordenadas de una sede (o la sede se desactiva o se borra), la API
+encola un `wallet.update` por cada tarjeta con pase instalado. El iPhone re-descarga el
+pase con las nuevas `locations`; para Google el worker parchea `merchantLocations` en el
+objeto. Como el resto de actualizaciones, el parche de Google solo sale con
+`WALLET_MODE=real`.
+
+Para probarlo en un iPhone real: pon la sede a menos de 100 m de donde estés, instala el
+pase y bloquea el teléfono. La sugerencia aparece sin sonido y puede tardar unos minutos.
+En Android, comprueba en la consola de Wallet que el objeto lleva `merchantLocations`.
+Google no documenta si los avisos funcionan mientras la cuenta sigue en modo demo
+(paso 2.5): si no llegan, es lo primero que descartar.
+
+---
+
 ## Parte 3 — Tiendas de aplicaciones (más adelante)
 
 Nada de esto hace falta para las tarjetas. Es solo para empaquetar el escáner del

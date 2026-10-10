@@ -1,4 +1,4 @@
-import { outbox } from '@volvia/db'
+import { eq, outbox, walletPasses } from '@volvia/db'
 import type { Database } from '@volvia/db'
 
 /** Job kinds the outbox worker knows how to drain. */
@@ -40,4 +40,52 @@ export async function enqueue(
     orgId: options.orgId ?? null,
     runAt: options.runAt ?? new Date(),
   })
+}
+
+/**
+ * One `wallet.update` per card of the business that has a pass installed, for changes
+ * that alter every pass at once (a shop moving, for instance). Returns how many were
+ * queued.
+ */
+export async function enqueueWalletUpdatesForOrg(
+  tx: Tx,
+  orgId: string,
+  payload: Record<string, unknown>,
+): Promise<number> {
+  const holders = await tx
+    .selectDistinct({ customerCardId: walletPasses.customerCardId })
+    .from(walletPasses)
+    .where(eq(walletPasses.orgId, orgId))
+
+  await fanOutWalletUpdates(
+    tx,
+    orgId,
+    holders.map((holder) => holder.customerCardId),
+    payload,
+  )
+  return holders.length
+}
+
+/**
+ * One wallet update per customer card, in chunks: a busy café can have thousands of
+ * cardholders, and a single insert of that size would hold a lock far longer than the
+ * drain loop expects.
+ */
+export async function fanOutWalletUpdates(
+  tx: Tx,
+  orgId: string,
+  customerCardIds: readonly string[],
+  payload: Record<string, unknown>,
+  chunkSize = 500,
+): Promise<void> {
+  for (let index = 0; index < customerCardIds.length; index += chunkSize) {
+    const chunk = customerCardIds.slice(index, index + chunkSize)
+    await tx.insert(outbox).values(
+      chunk.map((customerCardId) => ({
+        orgId,
+        kind: OUTBOX_KINDS.walletUpdate,
+        payload: { ...payload, customerCardId },
+      })),
+    )
+  }
 }

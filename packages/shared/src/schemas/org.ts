@@ -94,13 +94,16 @@ export const updateOrgSchema = z.object({
 })
 export type UpdateOrgInput = z.infer<typeof updateOrgSchema>
 
-export const locationSchema = z.object({
+const locationFieldsSchema = z.object({
   name: z.string().trim().min(2).max(80),
   address: z.string().trim().max(200).nullable().default(null),
   city: z.string().trim().max(80).nullable().default(null),
   timezone: timezoneSchema.optional(),
   phone: z.string().trim().max(30).nullable().default(null),
   googlePlaceId: z.string().trim().max(120).nullable().default(null),
+  /** WGS84 decimal degrees. Feeds the wallet "you are near the shop" relevance. */
+  latitude: z.number().min(-90).max(90).nullable().default(null),
+  longitude: z.number().min(-180).max(180).nullable().default(null),
   /** Weekly opening hours as `[{ day: 0-6, opens: 'HH:mm', closes: 'HH:mm' }]`. */
   hours: z
     .array(
@@ -114,7 +117,34 @@ export const locationSchema = z.object({
     .default([]),
   isActive: z.boolean().default(true),
 })
+
+/**
+ * Half a coordinate is worse than none: the pass would point at the equator. On a
+ * partial update both keys must travel together too, otherwise `{ latitude: null }`
+ * alone would leave a stale longitude behind.
+ */
+const coordinatesTravelTogether = (value: {
+  latitude?: number | null
+  longitude?: number | null
+}): boolean =>
+  'latitude' in value === 'longitude' in value &&
+  (value.latitude == null) === (value.longitude == null)
+
+const COORDINATES_MESSAGE = {
+  message: 'latitude and longitude must be set together',
+  path: ['longitude'],
+}
+
+export const locationSchema = locationFieldsSchema.refine(
+  coordinatesTravelTogether,
+  COORDINATES_MESSAGE,
+)
 export type LocationInput = z.infer<typeof locationSchema>
+
+export const updateLocationSchema = locationFieldsSchema
+  .partial()
+  .refine(coordinatesTravelTogether, COORDINATES_MESSAGE)
+export type UpdateLocationInput = z.infer<typeof updateLocationSchema>
 
 export const inviteMemberSchema = z.object({
   email: emailSchema,

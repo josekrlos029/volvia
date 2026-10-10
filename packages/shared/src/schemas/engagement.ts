@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { MAX_SURVEY_QUESTIONS } from '../constants'
+import { SUGGESTED_SEGMENT_KEYS } from '../segments'
 import { CUSTOMER_SEGMENTS } from './customer'
 
 /**
@@ -58,6 +59,12 @@ export const CAMPAIGN_STATUSES = ['draft', 'scheduled', 'running', 'finished', '
 
 export const audienceSchema = z.object({
   segment: z.enum(CUSTOMER_SEGMENTS).default('all'),
+  /**
+   * A saved or a suggested segment takes the place of `segment`. Both default to null
+   * so audiences stored before they existed still parse.
+   */
+  segmentId: z.string().uuid().nullable().default(null),
+  suggested: z.enum(SUGGESTED_SEGMENT_KEYS).nullable().default(null),
   cardIds: z.array(z.string().uuid()).max(20).default([]),
   customerIds: z.array(z.string().uuid()).max(2000).default([]),
   /** Only customers who opted in to marketing; forced true for promotional sends. */
@@ -102,6 +109,15 @@ export const messageSchema = z.object({
   audience: audienceSchema,
   scheduledAt: z.coerce.date().nullable().default(null),
 })
+export type MessageInput = z.infer<typeof messageSchema>
+
+/** Send now (null) or at a moment the business picked. */
+export const sendMessageSchema = z.object({
+  scheduledAt: z.coerce.date().nullable().default(null),
+})
+
+export const MESSAGE_STATUSES = ['draft', 'scheduled', 'sending', 'sent', 'failed'] as const
+export type MessageStatus = (typeof MESSAGE_STATUSES)[number]
 
 export const SURVEY_TRIGGERS = ['after_reward', 'after_join', 'after_nth_stamp', 'manual'] as const
 

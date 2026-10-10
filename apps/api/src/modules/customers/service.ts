@@ -20,9 +20,14 @@ import {
   stampCards,
   stampEvents,
 } from '@volvia/db'
-import { COMMUNITY_SEGMENTS, type CustomerListQuery, type VisitFrequency } from '@volvia/shared'
+import {
+  COMMUNITY_SEGMENTS,
+  type CustomerListQuery,
+  type SegmentDefinition,
+  type VisitFrequency,
+} from '@volvia/shared'
 import { AppError } from '../../lib/errors'
-import { filterConditions, segmentCondition, visitFrequencyOf } from '../../lib/segments'
+import { filterConditions, segmentCondition, segmentDefinitionConditions } from '../../lib/segments'
 
 function sortColumn(sortBy: CustomerListQuery['sortBy']) {
   switch (sortBy) {
@@ -41,12 +46,24 @@ function sortColumn(sortBy: CustomerListQuery['sortBy']) {
  * Everything that narrows a customer list, in one place: ownership, the segment, the
  * card, the free-text search and the filters. Shared by the list, the counts and the
  * CSV export so the three can never disagree about who is in scope.
+ *
+ * A saved or suggested segment, when given, takes the place of the plain bucket; the
+ * URL filters still apply on top of it.
  */
-export function customerScope(orgId: string, query: CustomerListQuery, frequency: VisitFrequency) {
+export function customerScope(
+  orgId: string,
+  query: CustomerListQuery,
+  frequency: VisitFrequency,
+  definition?: SegmentDefinition,
+) {
   const conditions = [eq(customers.orgId, orgId), isNull(customers.deletedAt)]
 
-  const segment = segmentCondition(query.segment, frequency)
-  if (segment) conditions.push(segment)
+  if (definition) {
+    conditions.push(...segmentDefinitionConditions(definition, frequency))
+  } else {
+    const segment = segmentCondition(query.segment, frequency)
+    if (segment) conditions.push(segment)
+  }
 
   if (query.search) {
     const pattern = `%${query.search}%`
@@ -71,8 +88,9 @@ export async function listCustomers(
   orgId: string,
   query: CustomerListQuery,
   frequency: VisitFrequency,
+  definition?: SegmentDefinition,
 ) {
-  const where = customerScope(orgId, query, frequency)
+  const where = customerScope(orgId, query, frequency, definition)
   const column = sortColumn(query.sortBy)
 
   /**
@@ -126,19 +144,23 @@ export async function communityCounts(
   orgId: string,
   query: CustomerListQuery,
   frequency: VisitFrequency,
+  definition?: SegmentDefinition,
 ): Promise<{ total: number; segments: Record<string, number> }> {
   const base = { ...query, segment: 'all' as const }
+  // Inside a saved segment the tiles describe the community of that segment: its
+  // filters stay, its base bucket gives way to each of the five.
+  const scoped = (segment: CustomerListQuery['segment']) =>
+    definition
+      ? customerScope(orgId, base, frequency, { base: segment, filters: definition.filters })
+      : customerScope(orgId, { ...base, segment }, frequency)
 
   const [[total], ...buckets] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(customers)
-      .where(customerScope(orgId, base, frequency)),
+    db.select({ value: count() }).from(customers).where(scoped('all')),
     ...COMMUNITY_SEGMENTS.map((segment) =>
       db
         .select({ value: count() })
         .from(customers)
-        .where(customerScope(orgId, { ...base, segment }, frequency))
+        .where(scoped(segment))
         .then(([row]) => [segment, row?.value ?? 0] as const),
     ),
   ])
@@ -274,8 +296,15 @@ export async function exportCustomersCsv(
   orgId: string,
   query: CustomerListQuery,
   frequency: VisitFrequency,
+  definition?: SegmentDefinition,
 ): Promise<string> {
-  const all = await listCustomers(db, orgId, { ...query, page: 1, pageSize: 10_000 }, frequency)
+  const all = await listCustomers(
+    db,
+    orgId,
+    { ...query, page: 1, pageSize: 10_000 },
+    frequency,
+    definition,
+  )
 
   const header = [
     'nombre',

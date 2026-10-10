@@ -48,6 +48,9 @@ test.describe('plans and entitlements', () => {
     expect(pro.features).toContain('wallet_passes')
     expect(pro.features).not.toContain('kiosk_mode')
     expect(business.features).toContain('kiosk_mode')
+    // Saving your own segments is a business feature; the suggested ones are open.
+    expect(pro.features).not.toContain('custom_segments')
+    expect(business.features).toContain('custom_segments')
     // Colombian businesses are billed in pesos through the local provider.
     expect(body.currency).toBe('cop')
   })

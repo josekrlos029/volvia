@@ -10,6 +10,7 @@ export { isDeadPushToken, sendPassUpdatePushes } from './apple/apns'
 export type { PassPushInput, PassPushResult } from './apple/apns'
 export type { BuildPassInput, PassImages } from './apple/builder'
 export {
+  addLoyaltyObjectMessage,
   buildLoyaltyClass,
   buildLoyaltyObject,
   buildSaveUrl,

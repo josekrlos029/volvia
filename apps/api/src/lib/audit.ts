@@ -55,6 +55,9 @@ export const AUDIT_ACTIONS = {
   kioskOpened: 'kiosk.opened',
   kioskRevoked: 'kiosk.revoked',
   campaignLaunched: 'campaign.launched',
+  messageSent: 'message.sent',
+  segmentCreated: 'segment.created',
+  segmentDeleted: 'segment.deleted',
   planChanged: 'plan.changed',
   orgDeleted: 'org.deleted',
 } as const

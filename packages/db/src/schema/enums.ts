@@ -81,3 +81,9 @@ export const messageStatusEnum = pgEnum('message_status', [
   'sent',
   'failed',
 ])
+export const messageDeliveryStatusEnum = pgEnum('message_delivery_status', [
+  'queued',
+  'delivered',
+  'failed',
+  'skipped_no_pass',
+])

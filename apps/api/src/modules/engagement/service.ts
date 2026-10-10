@@ -28,7 +28,7 @@ import type {
 import { AppError } from '../../lib/errors'
 import { OUTBOX_KINDS } from '../../lib/outbox'
 import { assertWithinLimit } from '../../plugins/auth'
-import { resolveAudienceSize } from './audience'
+import { resolveAudienceReach } from './audience'
 
 // ── Campaigns ────────────────────────────────────────────────────────────────
 
@@ -133,7 +133,7 @@ export async function previewAudience(
   audience: CampaignInput['audience'],
   frequency: VisitFrequency,
 ) {
-  return { size: await resolveAudienceSize(db, orgId, audience, frequency) }
+  return resolveAudienceReach(db, orgId, audience, frequency)
 }
 
 // ── Surveys ──────────────────────────────────────────────────────────────────

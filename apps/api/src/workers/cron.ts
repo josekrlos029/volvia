@@ -10,6 +10,8 @@ import {
   inArray,
   isNotNull,
   lte,
+  messageDeliveries,
+  messages,
   organizations,
   outbox,
   rewardGrants,
@@ -190,6 +192,40 @@ export async function runCampaignScheduler(
   }
 
   return { started: toStart.length, finished: toFinish.length }
+}
+
+/**
+ * Closes messages whose fan-out never finished — a worker that died between chunks,
+ * a wallet update that failed every retry. An hour after it was due, whatever is
+ * still queued is marked failed and the message is declared sent, so the panel never
+ * shows "Enviando" forever.
+ */
+export async function finishStaleMessages(context: CronContext): Promise<number> {
+  const cutoff = new Date(Date.now() - 60 * 60 * 1000)
+  const stale = await context.db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.status, 'sending'),
+        // A raw fragment loses the column type the driver needs to encode a Date.
+        sql`coalesce(${messages.scheduledAt}, ${messages.createdAt}) < ${cutoff.toISOString()}::timestamptz`,
+      ),
+    )
+  if (stale.length === 0) return 0
+
+  const ids = stale.map((row) => row.id)
+  await context.db
+    .update(messageDeliveries)
+    .set({ status: 'failed', error: 'timed_out' })
+    .where(and(inArray(messageDeliveries.messageId, ids), eq(messageDeliveries.status, 'queued')))
+  await context.db
+    .update(messages)
+    .set({ status: 'sent', sentAt: new Date(), updatedAt: new Date() })
+    .where(and(inArray(messages.id, ids), eq(messages.status, 'sending')))
+
+  context.logger.warn({ count: ids.length }, 'closed stale messages')
+  return ids.length
 }
 
 /** Expires reward grants nobody claimed, so the card stops promising them. */

@@ -22,6 +22,7 @@ import {
   automationTypeEnum,
   campaignStatusEnum,
   campaignTemplateEnum,
+  messageDeliveryStatusEnum,
   messageStatusEnum,
   surveyTriggerEnum,
 } from './enums'
@@ -74,9 +75,41 @@ export const messages = pgTable(
     sentAt: timestamp({ withTimezone: true }),
     targetedCount: integer().notNull().default(0),
     deliveredCount: integer().notNull().default(0),
+    error: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('messages_org_idx').on(table.orgId, table.status)],
+)
+
+/**
+ * One row per (message, customer card). The unique index is what makes the send
+ * idempotent: a retried fan-out inserts nothing new, so nobody is pushed twice. The
+ * delivered count on the message is derived from these rows, never guessed.
+ */
+export const messageDeliveries = pgTable(
+  'message_deliveries',
+  {
+    id: uuid().primaryKey().default(sql`gen_random_uuid()`),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    messageId: uuid()
+      .notNull()
+      .references(() => messages.id, { onDelete: 'cascade' }),
+    customerCardId: uuid()
+      .notNull()
+      .references(() => customerCards.id, { onDelete: 'cascade' }),
+    status: messageDeliveryStatusEnum().notNull().default('queued'),
+    deliveredAt: timestamp({ withTimezone: true }),
+    error: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('message_deliveries_message_card_key').on(table.messageId, table.customerCardId),
+    index('message_deliveries_message_status_idx').on(table.messageId, table.status),
+    index('message_deliveries_card_idx').on(table.customerCardId, table.createdAt),
+  ],
 )
 
 export const surveys = pgTable(

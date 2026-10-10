@@ -1,10 +1,17 @@
 import { and, customers, eq } from '@volvia/db'
-import { VISIT_FREQUENCIES, customerListQuerySchema, updateCustomerSchema } from '@volvia/shared'
+import {
+  type CustomerListQuery,
+  type SegmentDefinition,
+  VISIT_FREQUENCIES,
+  customerListQuerySchema,
+  updateCustomerSchema,
+} from '@volvia/shared'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { AUDIT_ACTIONS, audit } from '../../lib/audit'
 import { AppError } from '../../lib/errors'
 import { typed } from '../../types'
+import { resolveSegmentDefinition } from '../segments/service'
 import {
   communityCounts,
   deleteCustomer,
@@ -14,6 +21,16 @@ import {
 } from './service'
 
 const customerParams = z.object({ customerId: z.string().uuid() })
+
+/** A saved or suggested segment in the query replaces the plain bucket as the base. */
+async function definitionFor(
+  db: Parameters<typeof resolveSegmentDefinition>[0],
+  orgId: string,
+  query: CustomerListQuery,
+): Promise<SegmentDefinition | undefined> {
+  if (!query.segmentId && !query.suggested) return undefined
+  return resolveSegmentDefinition(db, orgId, query)
+}
 
 export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
   const app = typed(fastify)
@@ -30,6 +47,7 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
         request.org!.orgId,
         request.query,
         request.org!.visitFrequency,
+        await definitionFor(app.db, request.org!.orgId, request.query),
       )
 
       // Contact details are a paid feature: mask them rather than hiding the customer,
@@ -125,6 +143,7 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
         request.org!.orgId,
         request.query,
         request.org!.visitFrequency,
+        await definitionFor(app.db, request.org!.orgId, request.query),
       )),
       frequency: request.org!.visitFrequency,
     }),
@@ -142,6 +161,7 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
         request.org!.orgId,
         request.query,
         request.org!.visitFrequency,
+        await definitionFor(app.db, request.org!.orgId, request.query),
       )
       await audit(app.db, {
         orgId: request.org!.orgId,

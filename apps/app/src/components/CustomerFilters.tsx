@@ -56,6 +56,12 @@ export function CustomerFilters({
 
       <form action="/customers" className="border-t border-[var(--color-line)] p-4">
         <input type="hidden" name="segment" value={values.segment ?? 'all'} />
+        {values.segmentId ? (
+          <input type="hidden" name="segmentId" value={values.segmentId} />
+        ) : null}
+        {values.suggested ? (
+          <input type="hidden" name="suggested" value={values.suggested} />
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <label className="flex flex-col gap-1.5 text-[13px] font-medium">
@@ -198,7 +204,15 @@ export function CustomerFilters({
           </button>
           {activeCount > 0 ? (
             <Link
-              href={`/customers?segment=${values.segment ?? 'all'}`}
+              href={`/customers?${new URLSearchParams(
+                Object.fromEntries(
+                  Object.entries({
+                    segment: values.segment ?? 'all',
+                    segmentId: values.segmentId ?? '',
+                    suggested: values.suggested ?? '',
+                  }).filter(([, value]) => value),
+                ),
+              )}`}
               className={buttonClass('ghost', 'sm')}
             >
               Quitar filtros

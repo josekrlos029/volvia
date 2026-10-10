@@ -7,8 +7,10 @@ import { cardRoutes } from '../modules/cards/routes'
 import { customerRoutes } from '../modules/customers/routes'
 import { engagementRoutes, publicSurveyRoutes } from '../modules/engagement/routes'
 import { loyaltyRoutes } from '../modules/loyalty/routes'
+import { messageRoutes } from '../modules/messages/routes'
 import { orgRoutes, publicInviteRoutes } from '../modules/orgs/routes'
 import { publicRoutes } from '../modules/public/routes'
+import { segmentRoutes } from '../modules/segments/routes'
 import { walletRoutes } from '../modules/wallet/routes'
 import { healthRoutes } from './health'
 
@@ -27,6 +29,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(publicInviteRoutes, { prefix: '/p' })
   await app.register(orgRoutes, { prefix: '/v1/org' })
   await app.register(customerRoutes, { prefix: '/v1/customers' })
+  await app.register(segmentRoutes, { prefix: '/v1/segments' })
+  await app.register(messageRoutes, { prefix: '/v1/messages' })
   await app.register(analyticsRoutes, { prefix: '/v1/analytics' })
   await app.register(billingRoutes, { prefix: '/v1/billing' })
   await app.register(adminRoutes, { prefix: '/v1/admin' })
