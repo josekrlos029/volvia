@@ -1,0 +1,1 @@
+La app del personal de los negocios que usan Volvia: escanea la tarjeta digital del cliente y súmale un sello, con o sin internet.

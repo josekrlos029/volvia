@@ -1,0 +1,21 @@
+Volvia Biz is the staff app for businesses that use Volvia, the digital loyalty card platform. It is not a consumer app: the person behind the counter uses it to add stamps to their customers' cards.
+
+HOW IT WORKS
+• Sign in with the same email and password as the Volvia dashboard.
+• Point the camera at the code on the customer's card (Apple Wallet, Google Wallet or their card link).
+• The app adds the stamp and shows the customer's name, how many stamps they have and how many are left.
+• When the card is complete, the app flags the reward so you can hand it over on the spot.
+
+BUILT FOR THE COUNTER
+• Works offline: the stamp is saved on the phone and sent as soon as the connection is back. The customer never waits.
+• A stamp is never counted twice, even if the network drops halfway.
+• Working at several businesses or locations? Switch between them without signing out.
+• No ads, no in-app sign-up, no tracking.
+
+PRIVACY
+The camera is used only to read the card code. No photos are taken and no images are stored. The app keeps only your session and the stamps waiting to be sent.
+
+YOU NEED AN ACCOUNT
+Accounts are created by the business from its dashboard at somosvolvia.com. The app interface is currently in Spanish.
+
+Support: hola@somosvolvia.com

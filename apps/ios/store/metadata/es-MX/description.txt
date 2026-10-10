@@ -1,0 +1,21 @@
+Volvia Biz es la app del personal de los negocios que usan Volvia, la plataforma de tarjetas de fidelidad digitales. No es una app para el público: la usa quien atiende el mostrador para sumar sellos a las tarjetas de sus clientes.
+
+CÓMO FUNCIONA
+• Entra con el mismo correo y contraseña del panel de Volvia.
+• Apunta la cámara al código de la tarjeta que el cliente tiene en su teléfono (Apple Wallet, Google Wallet o el enlace de su tarjeta).
+• La app suma el sello y te muestra el nombre del cliente, cuántos sellos lleva y cuántos le faltan.
+• Cuando completa la tarjeta, te avisa de la recompensa y la entregas ahí mismo con un toque.
+
+PENSADA PARA EL MOSTRADOR
+• Funciona sin internet: el sello se guarda en el teléfono y se envía solo cuando vuelve la conexión. El cliente nunca espera.
+• Un sello nunca se cuenta dos veces, aunque la red falle a mitad de camino.
+• Si trabajas en varios negocios o sedes, cambias de uno a otro sin cerrar sesión.
+• Sin anuncios, sin registro dentro de la app, sin seguimiento.
+
+PRIVACIDAD
+La cámara se usa solo para leer el código de la tarjeta. No se toman fotos ni se guardan imágenes. La app guarda únicamente tu sesión y los sellos pendientes de enviar.
+
+NECESITAS UNA CUENTA
+Las cuentas las crea el negocio desde su panel en somosvolvia.com. Si tu negocio aún no usa Volvia, puedes conocer el servicio en https://somosvolvia.com.
+
+Soporte: hola@somosvolvia.com

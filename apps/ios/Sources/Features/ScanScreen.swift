@@ -28,6 +28,9 @@ struct ScanScreen: View {
         .animation(.snappy(duration: 0.22), value: model.outcome)
         .sheet(isPresented: $showsAccount) { AccountSheet() }
         .task { await model.flush() }
+        #if targetEnvironment(simulator)
+        .onAppear { if SimulatorFixtures.state == .account { showsAccount = true } }
+        #endif
     }
 
     private var header: some View {

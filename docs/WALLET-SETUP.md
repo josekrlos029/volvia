@@ -378,19 +378,13 @@ sin barra de navegador.
    teléfono, política de privacidad publicada, y el formulario de **Seguridad de
    los datos** declarando que recoges correo y nombre.
 
-### 3.2 App Store — la ruta larga
+### 3.2 App Store
 
-Apple **no acepta** envoltorios de web sin funcionalidad nativa propia (guía
-4.2 de la App Review). Una TWA equivalente sería rechazada.
-
-Para iOS hay que compilar de verdad: Expo o React Native reutilizando la lógica
-de escaneo. Está fuera de esta iteración; la decisión que tomamos fue PWA
-primero. Cuando toque:
-
-1. Ya tendrás el Apple Developer Program de la parte 1, que cubre las dos cosas.
-2. App Store Connect → **Mis apps** → **+** → nuevo bundle id
-   `co.volvia.staff` (distinto del pass type id).
-3. Subir con Xcode o `eas submit`, y pasar App Review.
+Apple **no acepta** envoltorios de web sin funcionalidad nativa propia (guía 4.2 de la
+App Review). Una TWA equivalente sería rechazada, así que la app de iOS es nativa:
+`apps/ios`, Swift y SwiftUI, bundle id `co.volvia.biz`, con el mismo Apple Developer
+Program de la parte 1. El paso a paso de publicación (prueba local, TestFlight, ficha,
+revisión) está en [APP-STORE.md](APP-STORE.md).
 
 ---
 

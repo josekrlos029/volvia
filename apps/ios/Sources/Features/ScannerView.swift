@@ -5,7 +5,60 @@ import SwiftUI
 ///
 /// A staff member holds the phone in one hand with a queue in front of them. Everything
 /// that is not the viewfinder — counters, menus, settings — belongs on another screen.
-struct ScannerView: UIViewControllerRepresentable {
+struct ScannerView: View {
+    let onCode: (String) -> Void
+
+    var body: some View {
+        #if targetEnvironment(simulator)
+        // The simulator has no camera. A photo and a button stand in for it so the whole
+        // flow can be exercised and screenshotted; none of this compiles for a device.
+        SimulatedScannerView(onCode: onCode)
+        #else
+        CameraScannerView(onCode: onCode)
+        #endif
+    }
+}
+
+#if targetEnvironment(simulator)
+struct SimulatedScannerView: View {
+    let onCode: (String) -> Void
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                Color.black
+                if let path = Bundle.main.path(forResource: "SimulatedCamera", ofType: "jpg"),
+                   let image = UIImage(contentsOfFile: path) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                }
+                // Hidden while capturing store screenshots: the state is fixed then.
+                if SimulatorFixtures.state == nil {
+                    // Copy a card link (https://tarjeta.somosvolvia.com/c/…) on the Mac and
+                    // pick "Pegar del portapapeles": the simulator shares the clipboard.
+                    Menu("Simular lectura") {
+                        ForEach(SimulatorFixtures.scanCodes, id: \.code) { entry in
+                            Button(entry.label) { onCode(entry.code) }
+                        }
+                        Button("Pegar del portapapeles") {
+                            onCode(UIPasteboard.general.string ?? "")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.white)
+                    .padding(.bottom, 28)
+                }
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+#endif
+
+struct CameraScannerView: UIViewControllerRepresentable {
     let onCode: (String) -> Void
 
     func makeUIViewController(context: Context) -> ScannerViewController {
@@ -57,6 +110,14 @@ final class ScannerViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         preview?.frame = view.bounds
+
+        // iPad may be held upside down (the only other orientation the app allows).
+        // Without this the preview comes out inverted there.
+        let upsideDown = view.window?.windowScene?.effectiveGeometry.interfaceOrientation == .portraitUpsideDown
+        let angle: CGFloat = upsideDown ? 270 : 90
+        if let connection = preview?.connection, connection.isVideoRotationAngleSupported(angle) {
+            connection.videoRotationAngle = angle
+        }
     }
 
     private func configure() {

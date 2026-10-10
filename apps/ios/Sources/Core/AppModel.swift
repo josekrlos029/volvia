@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 
@@ -24,9 +25,21 @@ final class AppModel: ObservableObject {
     let queue = StampQueue()
 
     private var client: APIClient!
+    private var forwarders: Set<AnyCancellable> = []
 
     init(baseURL: URL = AppModel.defaultBaseURL) {
+        // Views observe this object, but the session and the queue are objects of their own:
+        // without this, signing in or queueing a stamp would not redraw until the next launch.
+        for publisher in [session.objectWillChange, queue.objectWillChange] {
+            publisher
+                .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
+                .store(in: &forwarders)
+        }
+
         session.restore()
+        #if targetEnvironment(simulator)
+        SimulatorFixtures.apply(to: self)
+        #endif
 
         let store = session
         client = APIClient(
@@ -45,7 +58,16 @@ final class AppModel: ObservableObject {
         )
     }
 
+    /// Release builds get `https://api.somosvolvia.com` through `VOLVIA_API_URL` in
+    /// project.yml; Debug builds get localhost and can be pointed elsewhere (the isolated
+    /// stack on :8081, say) with the `VOLVIA_API_URL` environment variable of the scheme.
     static var defaultBaseURL: URL {
+        #if DEBUG
+        if let override = ProcessInfo.processInfo.environment["VOLVIA_API_URL"],
+           let url = URL(string: override), url.scheme != nil {
+            return url
+        }
+        #endif
         let configured = Bundle.main.object(forInfoDictionaryKey: "VolviaAPIURL") as? String
         return URL(string: configured ?? "http://localhost:8080")!
     }
@@ -107,6 +129,10 @@ final class AppModel: ObservableObject {
     /// to the foreground — the three moments where connection is likely to be back.
     func flush() async {
         guard session.isSignedIn else { return }
+        #if targetEnvironment(simulator)
+        // A fixed screenshot state must not drain its fake queue against a real server.
+        if SimulatorFixtures.state != nil { return }
+        #endif
         await queue.flush { [client] stamp in
             do {
                 return .success(try await client!.stamp(stamp))
@@ -120,10 +146,13 @@ final class AppModel: ObservableObject {
 
     private func message(for error: APIError) -> String {
         switch error.code {
-        case "CUSTOMER_CARD_NOT_FOUND": return "Esa tarjeta ya no existe."
+        case "CUSTOMER_CARD_NOT_FOUND", "CARD_NOT_FOUND": return "Esa tarjeta ya no existe."
         case "CARD_NOT_ACTIVE": return "Esa tarjeta no está activa."
-        case "STAMP_TOO_SOON": return "Ya tiene un sello muy reciente."
-        case "DAILY_CAP_REACHED": return "Llegó al tope de sellos de hoy."
+        case "CUSTOMER_CARD_BLOCKED": return "Esa tarjeta está bloqueada."
+        // The API's codes (apps/api/src/modules/loyalty/service.ts); the older names stay
+        // in case a build meets a server that still emits them.
+        case "STAMP_COOLDOWN_ACTIVE", "STAMP_TOO_SOON": return "Ya tiene un sello muy reciente."
+        case "STAMP_DAILY_CAP_REACHED", "DAILY_CAP_REACHED": return "Llegó al tope de sellos de hoy."
         case "FORBIDDEN", "NOT_A_MEMBER": return "Esa tarjeta no es de este negocio."
         default: return error.message
         }

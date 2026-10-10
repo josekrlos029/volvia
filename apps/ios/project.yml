@@ -10,9 +10,20 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     CODE_SIGN_STYLE: Automatic
-    # Nothing here is signed for distribution: the Team ID is set when the Apple
-    # Developer account exists. Until then the app builds and runs on a simulator.
-    DEVELOPMENT_TEAM: ""
+    # The Apple Developer team. Xcode creates the distribution certificate and the
+    # provisioning profile on the first archive; nothing is checked in.
+    DEVELOPMENT_TEAM: V69VG5K7D8
+    # Bump these per release. CURRENT_PROJECT_VERSION must grow with every upload.
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+  configs:
+    Debug:
+      # The simulator reaches the Mac as localhost. Override per run with the
+      # VOLVIA_API_URL environment variable (scheme or `simctl launch`), e.g. to
+      # point at the isolated stack on :8081 instead of the prod-pointing dev stack.
+      VOLVIA_API_URL: http://localhost:8080
+    Release:
+      VOLVIA_API_URL: https://api.somosvolvia.com
 
 targets:
   VolviaBiz:
@@ -20,15 +31,32 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: Resources
+        excludes:
+          - Simulator
+      # The fake camera backdrop. Compiled out of device builds, so the App Store
+      # binary never carries it (see ScannerView.swift).
+      - path: Resources/Simulator
+        buildPhase: resources
     info:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: Volvia Biz
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "1"
-        UILaunchScreen: {}
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        VolviaAPIURL: $(VOLVIA_API_URL)
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+          UIImageName: LaunchLogo
+          UIImageRespectsSafeAreaInsets: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # iPad: both portrait orientations and no multitasking. Without
+        # UIRequiresFullScreen, App Store Connect demands all four orientations.
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+        UIRequiresFullScreen: true
         # The scanner is the whole app; the reason has to say so plainly.
         NSCameraUsageDescription: >-
           Volvia Biz usa la cámara para leer el código de la tarjeta de tus
@@ -38,6 +66,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: co.volvia.biz
         GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        "EXCLUDED_SOURCE_FILE_NAMES[sdk=iphoneos*]": SimulatedCamera.jpg
 
   VolviaBizTests:
     type: bundle.unit-test
@@ -58,7 +90,23 @@ schemes:
         VolviaBiz: all
     run:
       config: Debug
+      # Where ⌘R sends the simulator. Production by default (real account, real stamps);
+      # tick the :8081 entry instead for the isolated stack of docs/APP-STORE.md §2.
+      # Never leave both enabled: Xcode keeps the last one.
+      environmentVariables:
+        - variable: VOLVIA_API_URL
+          value: https://api.somosvolvia.com
+          isEnabled: true
+        - variable: VOLVIA_API_URL
+          value: http://localhost:8081
+          isEnabled: false
+        # Local test cards for the isolated stack; "Pegar del portapapeles" covers prod.
+        - variable: VOLVIA_SIM_SCAN
+          value: Juan (9 de 10)=https://tarjeta.somosvolvia.com/c/1ennusiWG_EAX3MMkMOiCXSYTFQ0z6-O|Sebastián (0 de 10)=https://tarjeta.somosvolvia.com/c/skK9ascBZhkJRf1zkeuB5RtCuVQpp02w|Otro negocio=https://tarjeta.somosvolvia.com/c/Od0M75Wbvn4-YSM7-5S8x5B9zo5-HT5b|Código inválido=WIFI:S:cafe;P:1234;;
+          isEnabled: false
     test:
       config: Debug
       targets:
         - VolviaBizTests
+    archive:
+      config: Release

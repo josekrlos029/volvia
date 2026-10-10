@@ -1,0 +1,19 @@
+{
+  "order": ["aim", "stamped", "reward", "queued", "account", "login"],
+  "es-MX": {
+    "aim": { "title": "Escanea y sella\nen un segundo", "subtitle": "Apunta al código de la tarjeta del cliente. Listo." },
+    "stamped": { "title": "El cliente ve\nsu progreso al instante", "subtitle": "Nombre, sellos acumulados y cuántos le faltan." },
+    "reward": { "title": "Entrega la recompensa\nahí mismo", "subtitle": "Cuando completa la tarjeta, la app te avisa." },
+    "queued": { "title": "Funciona\nsin internet", "subtitle": "El sello se guarda y se envía solo cuando vuelve la red." },
+    "account": { "title": "Varios negocios,\nuna sola app", "subtitle": "Cambia de local sin cerrar sesión." },
+    "login": { "title": "Entra con tu cuenta\ndel panel de Volvia", "subtitle": "Solo para el personal de negocios que usan Volvia." }
+  },
+  "en-US": {
+    "aim": { "title": "Scan and stamp\nin a second", "subtitle": "Point at the customer's card code. Done." },
+    "stamped": { "title": "Customers see\ntheir progress instantly", "subtitle": "Name, stamps so far and how many are left." },
+    "reward": { "title": "Hand over the reward\non the spot", "subtitle": "When the card is complete, the app tells you." },
+    "queued": { "title": "Works\nwithout internet", "subtitle": "Stamps are saved and sent when the network is back." },
+    "account": { "title": "Several businesses,\none app", "subtitle": "Switch locations without signing out." },
+    "login": { "title": "Sign in with your\nVolvia dashboard account", "subtitle": "For the staff of businesses that use Volvia." }
+  }
+}

@@ -4,8 +4,14 @@ import SwiftUI
 struct LoginView: View {
     @EnvironmentObject private var model: AppModel
 
+    #if targetEnvironment(simulator)
+    // A filled-in form reads better in the store screenshot than two empty fields.
+    @State private var email = SimulatorFixtures.state == .login ? "ana@cafe-raices.test" : ""
+    @State private var password = SimulatorFixtures.state == .login ? "volvia-local-2026" : ""
+    #else
     @State private var email = ""
     @State private var password = ""
+    #endif
     @State private var isWorking = false
     @State private var error: String?
 

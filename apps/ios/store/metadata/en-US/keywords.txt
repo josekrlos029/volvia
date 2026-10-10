@@ -1,0 +1,1 @@
+loyalty,stamps,rewards,customers,qr,business,cafe,punch card,points,scanner,card

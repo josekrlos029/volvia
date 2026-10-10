@@ -97,6 +97,14 @@ final class StampQueue: ObservableObject {
         rejected.removeAll()
     }
 
+    /// Drops everything, sent or not. Only the simulator fixtures call this: on a real
+    /// phone a pending stamp belongs to a customer and is never discarded wholesale.
+    func removeAll() {
+        pending.removeAll()
+        rejected.removeAll()
+        persist()
+    }
+
     private func reject(_ stamp: PendingStamp, reason: String) {
         rejected.append((stamp, reason))
     }

@@ -1,0 +1,1 @@
+Primera versión: inicio de sesión, escáner de tarjetas, entrega de recompensas y cola de sellos sin conexión.
