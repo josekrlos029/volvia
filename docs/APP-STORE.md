@@ -151,16 +151,17 @@ Resultado en `store/out/`:
 |---|---|---|
 | `icon/AppIcon-1024-navy.png`, `-violet.png` | Dos variantes del icono, opacas, sin esquinas | La navy ya está instalada en el catálogo; `ICON_VARIANT=violet node icon.mjs` cambia |
 | `icon/AppIcon-dark-1024.png`, `-tinted-1024.png` | Variantes iOS 18 | Catálogo (automático) |
-| `screenshots/es-MX/iphone-6.9/01-aim.png … 06-login.png` | 1320×2868 | App Store Connect → Español (México) → iPhone 6.9" |
+| `screenshots/es-MX/iphone-6.3/01-aim.png … 06-login.png` | 1206×2622 | App Store Connect → Español (México) → iPhone 6.3" |
 | `screenshots/es-MX/ipad-13/…` | 2064×2752 | → iPad 13" |
 | `screenshots/en-US/…` | Igual, titulares en inglés | → English (U.S.) |
 | `review/demo-card-sheet.png` | QR de la tarjeta demo (paso 5) | Adjunto en App Review Information |
 | `banners/header-universal-<idioma>.png` (5244×2950) | Banner opcional de la página del producto y de los resultados de búsqueda (`node banners.mjs`) | App Store Connect → Header and Search Results, por idioma |
 
-Los tamaños son exactamente los que App Store Connect acepta: la captura cruda del iPhone
-17 Pro Max ya es 1320×2868 y la del iPad Pro 13" es 2064×2752, y `frame.mjs` falla si
-algo no mide eso. Apple escala el 6.9" a las pantallas menores; no hace falta subir más
-tamaños. Los textos de cada pantalla están en `store/copy.json`; la app está en español en
+Los tamaños son exactamente los que App Store Connect acepta hoy: la pestaña "iPhone
+with Dynamic Island" pide 1206×2622 (6.3") y la de iPad 13" pide 2064×2752. La captura
+cruda del iPhone 17 Pro Max sale a 1320×2868 y `frame.mjs` la reescala (misma
+proporción); el script falla si algún PNG final no mide lo exigido. Apple escala a las
+demás pantallas; no hace falta subir más tamaños. Los textos de cada pantalla están en `store/copy.json`; la app está en español en
 ambas fichas (no tiene localización inglesa todavía), y la descripción en inglés lo dice.
 
 El glifo de la "V" existe solo como PNG de 157 px incrustado en `assets/Icono * sin
@@ -270,8 +271,8 @@ Las builds de TestFlight caducan a los 90 días.
 
 En App Store Connect → tu app → iOS App → 1.0 Prepare for Submission:
 
-1. **Capturas**: arrastra `out/screenshots/es-MX/iphone-6.9/*.png` al hueco de iPhone
-   6.9" (hasta 10; van las 6 en orden) y `ipad-13/*.png` al de iPad 13". Cambia el idioma
+1. **Capturas**: arrastra `out/screenshots/es-MX/iphone-6.3/*.png` a la pestaña "iPhone with
+   Dynamic Island" (hasta 10; van las 6 en orden) y `ipad-13/*.png` al de iPad 13". Cambia el idioma
    arriba a English (U.S.) y repite con `en-US`.
 2. **Promotional Text, Description, Keywords, Support URL, Marketing URL**: de
    `metadata/<idioma>/`.

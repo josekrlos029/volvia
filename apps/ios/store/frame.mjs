@@ -1,5 +1,5 @@
 // Marketing screenshots: a headline on a brand background with the raw simulator capture
-// framed below, at exactly the pixel sizes App Store Connect accepts.
+// framed below, at exactly the pixel sizes App Store Connect accepts (iPhone 1206×2622, iPad 2064×2752).
 //
 //   node frame.mjs            all locales and devices from raw/
 //   LOCALES=es-MX DEVICES=iphone node frame.mjs
@@ -11,7 +11,9 @@ import { OUT, RAW, STORE, assertSize, brand, ensureDir } from './lib.mjs'
 
 const copy = JSON.parse(await fs.readFile(path.join(STORE, 'copy.json'), 'utf8'))
 const DEVICES = {
-  iphone: { width: 1320, height: 2868, folder: 'iphone-6.9', title: 104, subtitle: 46, top: 190, radius: 120, scale: 0.78 },
+  // App Store Connect's "iPhone with Dynamic Island" slot takes 6.3" (1206×2622) or 6.1";
+  // the raw 1320×2868 capture has the same proportions and is simply scaled down.
+  iphone: { width: 1206, height: 2622, folder: 'iphone-6.3', title: 95, subtitle: 42, top: 174, radius: 110, scale: 0.78 },
   ipad: { width: 2064, height: 2752, folder: 'ipad-13', title: 128, subtitle: 56, top: 220, radius: 72, scale: 0.72 },
 }
 const FONT_FILES = ['/System/Library/Fonts/HelveticaNeue.ttc', '/System/Library/Fonts/Supplemental/Arial Bold.ttf']

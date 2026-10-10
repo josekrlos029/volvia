@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Raw store screenshots from the simulators, one per app state, at the exact sizes App
-# Store Connect accepts: iPhone 17 Pro Max → 1320×2868 (6.9"), iPad Pro 13" → 2064×2752.
+# Store Connect accepts for iPad (2064×2752). The iPhone 17 Pro Max capture (1320×2868) is
+# scaled to 1206×2622 by frame.mjs, which is what the iPhone slot takes now.
 #
 #   bash capture.sh            build, install, capture both devices
 #   SKIP_BUILD=1 bash capture.sh
