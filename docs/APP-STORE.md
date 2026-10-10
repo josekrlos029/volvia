@@ -155,6 +155,7 @@ Resultado en `store/out/`:
 | `screenshots/es-MX/ipad-13/…` | 2064×2752 | → iPad 13" |
 | `screenshots/en-US/…` | Igual, titulares en inglés | → English (U.S.) |
 | `review/demo-card-sheet.png` | QR de la tarjeta demo (paso 5) | Adjunto en App Review Information |
+| `banners/header-universal-<idioma>.png` (5244×2950) | Banner opcional de la página del producto y de los resultados de búsqueda (`node banners.mjs`) | App Store Connect → Header and Search Results, por idioma |
 
 Los tamaños son exactamente los que App Store Connect acepta: la captura cruda del iPhone
 17 Pro Max ya es 1320×2868 y la del iPad Pro 13" es 2064×2752, y `frame.mjs` falla si
