@@ -13,6 +13,7 @@ import {
 } from '@volvia/db'
 import type { Entitlements, MessageInput, VisitFrequency } from '@volvia/shared'
 import { AppError } from '../../lib/errors'
+import { deferToNotificationHours } from '../../lib/notification-hours'
 import { OUTBOX_KINDS } from '../../lib/outbox'
 import { assertWithinLimit } from '../../plugins/auth'
 import { resolveAudienceDefinition, resolveAudienceReach } from '../engagement/audience'
@@ -124,7 +125,9 @@ export async function sendMessage(
     assertWithinLimit(input.entitlements, 'messagesPerMonth', used)
   }
 
-  const runAt = input.scheduledAt ?? new Date()
+  // "Now" at 11pm means tomorrow morning: the time is shifted here, before it is
+  // stored, so the panel shows when the message will really leave.
+  const runAt = await deferToNotificationHours(db, input.orgId, input.scheduledAt ?? new Date())
 
   return db.transaction(async (tx) => {
     const [updated] = await tx

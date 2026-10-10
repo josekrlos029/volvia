@@ -51,11 +51,28 @@ export const socialLinkSchema = z.object({
   label: z.string().trim().max(40).optional(),
 })
 
+const clockSchema = z.string().regex(/^\d{2}:\d{2}$/)
+
+/** When a business may reach its customers' phones, unless it says otherwise: never past midnight. */
+export const DEFAULT_NOTIFICATION_HOURS = { from: '08:00', to: '23:59' }
+
+export const notificationHoursSchema = z
+  .object({ from: clockSchema, to: clockSchema })
+  .nullable()
+  .default(DEFAULT_NOTIFICATION_HOURS)
+export type NotificationHours = z.infer<typeof notificationHoursSchema>
+
 /**
  * Everything that is a preference rather than an identity, kept in one jsonb column so
  * adding a setting never needs a migration.
  */
 export const orgSettingsSchema = z.object({
+  /**
+   * The window, in the business's own timezone, inside which messages and campaign
+   * pushes may reach a phone. Anything due outside it waits for the next opening.
+   * Null means any time, which a bar may genuinely want.
+   */
+  notificationHours: notificationHoursSchema,
   /** How often a good customer is expected back. Drives the community segments. */
   visitFrequency: z.enum(VISIT_FREQUENCIES).default(DEFAULT_VISIT_FREQUENCY),
   /** Legal entity shown on the public page and in the privacy notice. */

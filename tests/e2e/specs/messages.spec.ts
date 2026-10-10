@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import {
   COMMUNITY_HISTORIES,
+  allowNotificationsAnytime,
   authHeaders,
   businessWithACommunity,
   installWalletPass,
@@ -141,6 +142,7 @@ test.describe('messages', () => {
   test('goes out once, to the segment, and reports who it reached', async ({ request }) => {
     const { session, tokens } = await businessWithACommunity(request)
     const headers = authHeaders(session)
+    await allowNotificationsAnytime(request, session)
     await installWalletPass(tokens.lost!)
 
     const created = await request.post(`${urls.api}/v1/messages`, {
@@ -201,6 +203,65 @@ test.describe('messages', () => {
     expect((await list.json()).thisMonth.used).toBe(1)
   })
 
+  test('sent outside the notification hours, it waits for the next opening', async ({
+    request,
+  }) => {
+    const { session } = await businessWithACommunity(request)
+    const headers = authHeaders(session)
+
+    // A window that starts two hours from now in the business's timezone (Bogotá), so
+    // "now" is always outside it, whatever time the suite runs.
+    const bogotaHour = Number(
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'America/Bogota',
+        hour: '2-digit',
+        hour12: false,
+      }).format(new Date()),
+    )
+    const opensAt = (bogotaHour + 2) % 24
+    const closesAt = (bogotaHour + 3) % 24
+    const clock = (hour: number) => `${String(hour).padStart(2, '0')}:00`
+    const updated = await request.patch(`${urls.api}/v1/org`, {
+      headers,
+      data: { settings: { notificationHours: { from: clock(opensAt), to: clock(closesAt) } } },
+    })
+    expect(updated.ok(), await updated.text()).toBeTruthy()
+
+    const created = await request.post(`${urls.api}/v1/messages`, {
+      headers,
+      data: {
+        headline: 'Buenas noches',
+        body: 'Esto no debería sonar a las once.',
+        audience: { segment: 'all', cardIds: [], customerIds: [], consentOnly: true },
+      },
+    })
+    const message = (await created.json()) as { id: string }
+
+    const sent = await request.post(`${urls.api}/v1/messages/${message.id}/send`, {
+      headers,
+      data: { scheduledAt: null },
+    })
+    expect(sent.ok(), await sent.text()).toBeTruthy()
+    const body = (await sent.json()) as { status: string; scheduledAt: string }
+    expect(body.status).toBe('scheduled')
+
+    const leavesAt = new Date(body.scheduledAt)
+    expect(leavesAt.getTime()).toBeGreaterThan(Date.now() + 60 * 60 * 1000)
+    const leavesAtHour = Number(
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'America/Bogota',
+        hour: '2-digit',
+        hour12: false,
+      }).format(leavesAt),
+    )
+    expect(leavesAtHour % 24).toBe(opensAt)
+
+    // Nothing drains it early: a few seconds later it is still waiting.
+    await new Promise((resolve) => setTimeout(resolve, 4_000))
+    const detail = await request.get(`${urls.api}/v1/messages/${message.id}`, { headers })
+    expect((await detail.json()).status).toBe('scheduled')
+  })
+
   test('a scheduled message can be pulled back before it leaves', async ({ request }) => {
     const { session } = await businessWithACommunity(request)
     const headers = authHeaders(session)
@@ -238,7 +299,8 @@ test.describe('messages', () => {
     page,
     request,
   }) => {
-    const { business } = await businessWithACommunity(request)
+    const { business, session } = await businessWithACommunity(request)
+    await allowNotificationsAnytime(request, session)
 
     await signIn(page, business.email, business.password)
     await page.goto(`${urls.app}/messages/new?suggested=cold`)

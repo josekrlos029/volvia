@@ -22,7 +22,8 @@ import {
   rewardReadyTemplate,
   welcomeCustomerTemplate,
 } from '../lib/email'
-import { fanOutWalletUpdates } from '../lib/outbox'
+import { deferToNotificationHours } from '../lib/notification-hours'
+import { OUTBOX_KINDS, enqueue, fanOutWalletUpdates } from '../lib/outbox'
 import { visitFrequencyOf } from '../lib/segments'
 import { audienceConditions, resolveAudienceDefinition } from '../modules/engagement/audience'
 import { settleDelivery } from '../modules/messages/service'
@@ -219,19 +220,40 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
         .limit(1)
       if (!campaign || campaign.status === 'cancelled') return
 
+      // The offer lands on the phone as a notification, so it waits for the business's
+      // notification hours like a message does. The campaign stays scheduled meanwhile.
+      const now = new Date()
+      const allowedAt = await deferToNotificationHours(context.db, campaign.orgId, now)
+      if (allowedAt > now) {
+        await enqueue(
+          context.db,
+          OUTBOX_KINDS.campaignStart,
+          { campaignId },
+          {
+            orgId: campaign.orgId,
+            runAt: allowedAt,
+          },
+        )
+        return
+      }
+
       // The audience was written as jsonb, possibly by an older version of the app, so
       // it is validated on the way back out rather than trusted.
       const audience = audienceSchema.parse(campaign.audience)
       const targets = await resolveAudience(context, campaign.orgId, audience)
 
-      await context.db
+      // Only a scheduled campaign starts: the scheduler and a deferred start can both
+      // leave a row for the same campaign, and the second must not fan out again.
+      const started = await context.db
         .update(campaigns)
         .set({
           status: 'running',
           startedAt: new Date(),
           stats: { ...campaign.stats, targeted: targets.length },
         })
-        .where(eq(campaigns.id, campaignId))
+        .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, 'scheduled')))
+        .returning({ id: campaigns.id })
+      if (started.length === 0) return
 
       // One wallet update per affected card, so the offer appears on the pass itself.
       await fanOutWalletUpdates(context.db, campaign.orgId, targets, {
@@ -249,6 +271,31 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
         .limit(1)
       // Cancelled (back to draft), already sent, or gone: nothing to do.
       if (!message || (message.status !== 'scheduled' && message.status !== 'sending')) return
+
+      // Due outside the business's notification hours (the hours changed, or a retry
+      // slipped past closing): push it to the next opening and leave it scheduled.
+      if (message.status === 'scheduled') {
+        const now = new Date()
+        const allowedAt = await deferToNotificationHours(context.db, message.orgId, now)
+        if (allowedAt > now) {
+          await context.db.transaction(async (tx) => {
+            await tx
+              .update(messages)
+              .set({ scheduledAt: allowedAt, updatedAt: now })
+              .where(eq(messages.id, messageId))
+            await enqueue(
+              tx,
+              OUTBOX_KINDS.messageSend,
+              { messageId },
+              {
+                orgId: message.orgId,
+                runAt: allowedAt,
+              },
+            )
+          })
+          return
+        }
+      }
 
       const audience = { ...audienceSchema.parse(message.audience), consentOnly: true }
       let targets: string[]

@@ -2,7 +2,12 @@
 
 import { api } from '@/lib/api-client'
 import { FREQUENCY_LABELS } from '@/lib/segments'
-import { BUSINESS_CATEGORIES, type OrgSettings, VISIT_FREQUENCIES } from '@volvia/shared'
+import {
+  BUSINESS_CATEGORIES,
+  DEFAULT_NOTIFICATION_HOURS,
+  type OrgSettings,
+  VISIT_FREQUENCIES,
+} from '@volvia/shared'
 import { ApiError } from '@volvia/shared/client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -149,6 +154,76 @@ export function BusinessSettings({ org }: { org: Org }) {
               </option>
             ))}
           </select>
+        </Labelled>
+
+        <Labelled
+          label="Horario para avisos en el teléfono"
+          htmlFor="org-notify-from"
+          help="Los mensajes y las ofertas de campañas solo llegan dentro de este horario, en la hora de tu negocio. Lo que caiga fuera espera a la siguiente apertura."
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              id="org-notify-from"
+              type="time"
+              aria-label="Desde"
+              value={value.settings.notificationHours?.from ?? DEFAULT_NOTIFICATION_HOURS.from}
+              disabled={value.settings.notificationHours === null}
+              onChange={(event) =>
+                setValue({
+                  ...value,
+                  settings: {
+                    ...value.settings,
+                    notificationHours: {
+                      from: event.target.value,
+                      to: value.settings.notificationHours?.to ?? DEFAULT_NOTIFICATION_HOURS.to,
+                    },
+                  },
+                })
+              }
+              className={`${field} max-w-[130px]`}
+            />
+            <span className="text-[14px] text-[var(--color-ink-muted)]">a</span>
+            <input
+              id="org-notify-to"
+              type="time"
+              aria-label="Hasta"
+              value={value.settings.notificationHours?.to ?? DEFAULT_NOTIFICATION_HOURS.to}
+              disabled={value.settings.notificationHours === null}
+              onChange={(event) =>
+                setValue({
+                  ...value,
+                  settings: {
+                    ...value.settings,
+                    notificationHours: {
+                      from:
+                        value.settings.notificationHours?.from ?? DEFAULT_NOTIFICATION_HOURS.from,
+                      to: event.target.value,
+                    },
+                  },
+                })
+              }
+              className={`${field} max-w-[130px]`}
+            />
+            <label className="flex items-center gap-2 text-[14px]">
+              <input
+                type="checkbox"
+                checked={value.settings.notificationHours === null}
+                onChange={(event) =>
+                  setValue({
+                    ...value,
+                    settings: {
+                      ...value.settings,
+                      notificationHours: event.target.checked
+                        ? null
+                        : { ...DEFAULT_NOTIFICATION_HOURS },
+                    },
+                  })
+                }
+                className="accent-[var(--color-primary)]"
+              />
+              A cualquier hora
+            </label>
+          </div>
         </Labelled>
 
         <Labelled label="Frase corta" htmlFor="org-tagline">

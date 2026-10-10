@@ -57,6 +57,8 @@ export function MessageComposer({
   initialSegmentId,
   selectedCustomerIds,
   remainingThisMonth,
+  timezone,
+  notificationHours,
 }: {
   suggested: Array<{ key: string; name: string; count: number }>
   segments: Array<{ id: string; name: string; count: number }>
@@ -64,6 +66,9 @@ export function MessageComposer({
   initialSegmentId?: string
   selectedCustomerIds?: string[]
   remainingThisMonth: number | null
+  /** The business's timezone and notification window, to warn before a send waits. */
+  timezone: string
+  notificationHours: { from: string; to: string } | null
 }) {
   const router = useRouter()
   const picked = selectedCustomerIds ?? []
@@ -145,6 +150,14 @@ export function MessageComposer({
       new RegExp(`\\{\\{\\s*${name}\\s*\\}\\}`, 'i').test(text),
     )
   }, [headline, body])
+
+  // The server shifts a send that falls outside the window; this just says so first.
+  const waitsForOpening = useMemo(() => {
+    if (!notificationHours) return false
+    const target = when === 'later' && scheduledAt ? new Date(scheduledAt) : new Date()
+    if (Number.isNaN(target.getTime())) return false
+    return !withinHours(target, timezone, notificationHours)
+  }, [when, scheduledAt, timezone, notificationHours])
 
   const canSend =
     headline.trim().length >= 2 &&
@@ -405,6 +418,13 @@ export function MessageComposer({
             />
           ) : null}
         </div>
+        {waitsForOpening && notificationHours ? (
+          <p className="mt-3 rounded-[9px] bg-[var(--color-accent-soft)] px-3.5 py-2.5 text-[13px] text-[var(--color-warning)]">
+            Está fuera del horario de avisos de tu negocio ({notificationHours.from} a{' '}
+            {notificationHours.to}). Saldrá a las {notificationHours.from}. Puedes cambiar el
+            horario en Ajustes.
+          </p>
+        ) : null}
       </Panel>
 
       {error ? (
@@ -428,4 +448,25 @@ export function MessageComposer({
       </div>
     </div>
   )
+}
+
+/** Minutes since midnight in the given timezone, with what the browser knows. */
+function localMinutes(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date)
+  const read = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0)
+  return (read('hour') % 24) * 60 + read('minute')
+}
+
+function withinHours(date: Date, timeZone: string, hours: { from: string; to: string }): boolean {
+  const minutes = localMinutes(date, timeZone)
+  const [fromH = 0, fromM = 0] = hours.from.split(':').map(Number)
+  const [toH = 0, toM = 0] = hours.to.split(':').map(Number)
+  const from = fromH * 60 + fromM
+  const to = toH * 60 + toM
+  return from <= to ? minutes >= from && minutes <= to : minutes >= from || minutes <= to
 }

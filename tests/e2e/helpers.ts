@@ -291,3 +291,19 @@ export async function installWalletPass(
     await connection.close()
   }
 }
+
+/**
+ * Lets a test business notify at any hour. The default window (08:00 to midnight in the
+ * business's timezone) would otherwise park a "send now" until the morning whenever
+ * the suite runs at night.
+ */
+export async function allowNotificationsAnytime(
+  request: APIRequestContext,
+  session: Session,
+): Promise<void> {
+  const response = await request.patch(`${urls.api}/v1/org`, {
+    headers: authHeaders(session),
+    data: { settings: { notificationHours: null } },
+  })
+  expect(response.ok(), await response.text()).toBeTruthy()
+}

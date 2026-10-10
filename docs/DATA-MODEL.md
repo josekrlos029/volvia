@@ -15,8 +15,9 @@ prueba premium y se lee en casi toda petición autenticada. Contar en vivo serí
 `COUNT(*)` por request.
 
 `organizations.settings` es un `jsonb` con lo que es preferencia y no identidad: cada
-cuánto espera el negocio que vuelva un buen cliente, sus datos legales, el texto del botón
-de su página y si las peticiones de reseña están en pausa. Añadir una preferencia no
+cuánto espera el negocio que vuelva un buen cliente, a qué horas pueden sonar sus avisos
+en el teléfono, sus datos legales, el texto del botón de su página y si las peticiones de
+reseña están en pausa. Añadir una preferencia no
 necesita migración, y `orgSettingsSchema` le pone forma al leerlo.
 
 `locations.latitude` y `locations.longitude` van juntas o ninguna: media coordenada

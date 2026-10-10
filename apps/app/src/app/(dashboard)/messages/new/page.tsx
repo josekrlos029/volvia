@@ -13,7 +13,11 @@ export default async function NewMessagePage({
 }: {
   searchParams: Promise<{ suggested?: string; segmentId?: string; customers?: string }>
 }) {
-  const org = await apiFetch<{ entitlements: { features: Record<string, boolean> } }>('/v1/org')
+  const org = await apiFetch<{
+    timezone: string
+    settings: { notificationHours: { from: string; to: string } | null }
+    entitlements: { features: Record<string, boolean> }
+  }>('/v1/org')
   if (!org.entitlements.features.customer_messages) {
     return (
       <Panel>
@@ -57,6 +61,8 @@ export default async function NewMessagePage({
         initialSegmentId={query.segmentId}
         selectedCustomerIds={picked}
         remainingThisMonth={limit === null ? null : Math.max(0, limit - used)}
+        timezone={org.timezone}
+        notificationHours={org.settings.notificationHours}
       />
     </div>
   )

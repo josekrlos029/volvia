@@ -111,6 +111,12 @@ En Google no hay pase que descargar: la notificación es `loyaltyObject.addMessa
 limita cuántos mensajes recibe un objeto al día; si rechaza uno, la entrega queda como
 fallida con el motivo y el mensaje termina igual.
 
+Ningún aviso sale fuera del horario de avisos del negocio (`notificationHours` en sus
+ajustes, por defecto de 08:00 a medianoche en su zona horaria). Un "enviar ahora" a la
+una de la madrugada se guarda programado para las ocho de la mañana, y el arranque de una campaña
+espera igual. La comprobación está en el envío y en el worker, así que da lo mismo quién
+dispare el trabajo.
+
 En modo `stub` no se envía nada, pero las entregas se marcan como si sí: así el flujo
 completo se prueba en local sin certificados reales.
 
