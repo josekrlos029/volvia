@@ -28,27 +28,44 @@ export function objectId(config: GoogleWalletConfig, serial: string): string {
   return `${config.issuerId}.${serial.replace(/[^A-Za-z0-9_-]/g, '')}`
 }
 
+/** Images Google fetches by URL. Each URL must change when the picture does. */
+export interface LoyaltyClassImages {
+  /** The Volvia · business lockup, 1032×336. Replaces the round logo in the header. */
+  wideProgramLogoUrl: string | null
+  /** The business alone, square; Google crops it round. Shown where the wide one is not. */
+  programLogoUrl: string | null
+}
+
 export function buildLoyaltyClass(
   config: GoogleWalletConfig,
   input: {
     orgId: string
     organizationName: string
-    programLogoUrl: string | null
     backgroundColor: string
+    images?: Partial<LoyaltyClassImages>
+    /** @deprecated use `images.programLogoUrl` */
+    programLogoUrl?: string | null
   },
 ): Record<string, unknown> {
+  const description = { defaultValue: { language: 'es', value: input.organizationName } }
+  const programLogoUrl = input.images?.programLogoUrl ?? input.programLogoUrl ?? null
+  const wideProgramLogoUrl = input.images?.wideProgramLogoUrl ?? null
+
   return {
     id: classId(config, input.orgId),
     issuerName: input.organizationName,
     programName: input.organizationName,
     reviewStatus: 'UNDER_REVIEW',
     hexBackgroundColor: input.backgroundColor,
-    ...(input.programLogoUrl
+    ...(programLogoUrl
+      ? { programLogo: { sourceUri: { uri: programLogoUrl }, contentDescription: description } }
+      : {}),
+    ...(wideProgramLogoUrl
       ? {
-          programLogo: {
-            sourceUri: { uri: input.programLogoUrl },
+          wideProgramLogo: {
+            sourceUri: { uri: wideProgramLogoUrl },
             contentDescription: {
-              defaultValue: { language: 'es', value: input.organizationName },
+              defaultValue: { language: 'es', value: `Volvia · ${input.organizationName}` },
             },
           },
         }
@@ -60,11 +77,34 @@ export function buildLoyaltyObject(
   config: GoogleWalletConfig,
   content: PassContent,
   orgId: string,
+  images: { heroImageUrl?: string | null } = {},
 ): Record<string, unknown> {
   const labels =
     content.locale === 'es'
-      ? { points: 'Sellos', reward: 'Recompensa', ready: '¡Listo para reclamar!' }
-      : { points: 'Stamps', reward: 'Reward', ready: 'Ready to claim!' }
+      ? {
+          points: 'Sellos',
+          nextReward: 'Próxima recompensa',
+          rewardReady: 'Recompensa lista',
+          reward: 'Tu recompensa',
+          ready: '¡Listo para reclamar!',
+          remaining: 'Te faltan',
+          stamps: (count: number) => (count === 1 ? '1 sello' : `${count} sellos`),
+          cycle: 'Vuelta',
+        }
+      : {
+          points: 'Stamps',
+          nextReward: 'Next reward',
+          rewardReady: 'Reward ready',
+          reward: 'Your reward',
+          ready: 'Ready to claim!',
+          remaining: 'You need',
+          stamps: (count: number) => (count === 1 ? '1 more stamp' : `${count} more stamps`),
+          cycle: 'Round',
+        }
+  const hasReward = content.pendingRewardCount > 0
+  const target = content.nextRewardAt ?? content.stampsRequired
+  const remaining = Math.max(0, target - content.stampsCount)
+  const lap = content.cycleIndex > 0 ? ` · ${labels.cycle} ${content.cycleIndex + 1}` : ''
 
   return {
     id: objectId(config, content.serial),
@@ -74,7 +114,12 @@ export function buildLoyaltyObject(
     accountId: content.serial,
     loyaltyPoints: {
       label: labels.points,
-      balance: { string: `${content.stampsCount}/${content.stampsRequired}` },
+      balance: { string: `${content.stampsCount} / ${content.stampsRequired}` },
+    },
+    // The second balance slot is the reward: the thing the stamps are for.
+    secondaryLoyaltyPoints: {
+      label: hasReward ? labels.rewardReady : labels.nextReward,
+      balance: { string: hasReward ? labels.ready : content.rewardTitle },
     },
     barcode: {
       type: 'QR_CODE',
@@ -82,11 +127,13 @@ export function buildLoyaltyObject(
       alternateText: content.serial.slice(0, 8).toUpperCase(),
     },
     textModulesData: [
-      {
-        id: 'reward',
-        header: labels.reward,
-        body: content.pendingRewardCount > 0 ? labels.ready : content.rewardTitle,
-      },
+      hasReward
+        ? { id: 'reward', header: labels.reward, body: content.rewardTitle }
+        : {
+            id: 'reward',
+            header: labels.remaining,
+            body: `${labels.stamps(remaining)} · ${content.rewardTitle}${lap}`,
+          },
       ...(content.offerMessage ? [{ id: 'offer', header: '★', body: content.offerMessage }] : []),
     ],
     linksModuleData: {
@@ -99,6 +146,21 @@ export function buildLoyaltyObject(
       longitude: place.longitude,
     })),
     hexBackgroundColor: content.backgroundColor,
+    // The stamp grid, the same picture Apple gets as strip.png. Set on the object, not
+    // the class, because it is this customer's progress.
+    ...(images.heroImageUrl
+      ? {
+          heroImage: {
+            sourceUri: { uri: images.heroImageUrl },
+            contentDescription: {
+              defaultValue: {
+                language: content.locale,
+                value: `${content.stampsCount} / ${content.stampsRequired}`,
+              },
+            },
+          },
+        }
+      : {}),
   }
 }
 

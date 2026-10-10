@@ -23,14 +23,20 @@ import {
 } from '@volvia/db'
 import { type CampaignTextContext, type CardDesign, renderCampaignText } from '@volvia/shared'
 import {
+  type GoogleImageKind,
+  type GoogleWalletConfig,
   type PassContent,
+  buildAppleImages,
   buildLoyaltyClass,
   buildLoyaltyObject,
   buildPkpass,
   buildSaveUrl,
-  generateIcon,
-  generateStrip,
+  imageVersion,
+  loadPassArtwork,
+  renderGoogleImage,
+  upsertLoyaltyClass,
 } from '@volvia/wallet'
+import type { FastifyBaseLogger } from 'fastify'
 import { env } from '../../env'
 import { AppError } from '../../lib/errors'
 import { isWithinActiveHours, orgHour } from '../../lib/time'
@@ -112,9 +118,8 @@ export async function loadPassContent(
   ])
 
   const design = row.card.design as CardDesign
-  const nextReward =
-    cardRewards.find((reward) => reward.atStamp > row.customerCard.stampsCount) ??
-    cardRewards[cardRewards.length - 1]
+  const upcoming = cardRewards.find((reward) => reward.atStamp > row.customerCard.stampsCount)
+  const nextReward = upcoming ?? cardRewards[cardRewards.length - 1]
 
   const liveCampaign = activeCampaigns.find((campaign) =>
     isWithinActiveHours(
@@ -144,6 +149,11 @@ export async function loadPassContent(
       stampsCount: row.customerCard.stampsCount,
       stampsRequired: row.card.stampsRequired,
       pendingRewardCount: pending[0]?.value ?? 0,
+      rewardPositions: cardRewards.map((reward) => reward.atStamp),
+      nextRewardAt: upcoming?.atStamp ?? null,
+      cycleIndex: row.customerCard.cycleIndex,
+      lastStampAt: row.customerCard.lastStampAt,
+      headline: design.headline,
       rewardTitle: nextReward?.title ?? '',
       rewardDescription: nextReward?.description ?? '',
       terms: row.card.terms,
@@ -152,6 +162,9 @@ export async function loadPassContent(
       backgroundColor: design.backgroundColor,
       foregroundColor: design.foregroundColor,
       labelColor: design.accentColor,
+      emptyStampColor: design.emptyStampColor,
+      stampIcon: design.stampIcon,
+      stampStyle: design.stampStyle,
       cardUrl: `${env.PASS_URL}/c/${row.customerCard.token}`,
       places,
       offerMessage: liveCampaign ? renderCampaignText(liveCampaign.headline, textContext) : null,
@@ -202,6 +215,10 @@ export async function issueApplePass(
     })
     .onConflictDoNothing()
 
+  // The strip carries this customer's stamps, so the images are drawn per pass and
+  // travel inside it: the iPhone re-downloads the whole archive after each push.
+  const artwork = await loadPassArtwork(content)
+
   const buffer = await buildPkpass({
     content,
     options: {
@@ -213,21 +230,90 @@ export async function issueApplePass(
       // not the platform behind it.
       organizationName: content.organizationName,
     },
-    images: {
-      'icon.png': generateIcon(29, content.backgroundColor, content.labelColor),
-      'icon@2x.png': generateIcon(58, content.backgroundColor, content.labelColor),
-      'logo.png': generateIcon(50, content.backgroundColor, content.labelColor),
-      'logo@2x.png': generateIcon(100, content.backgroundColor, content.labelColor),
-      'strip.png': generateStrip(375, 123, content.backgroundColor),
-      'strip@2x.png': generateStrip(750, 246, content.backgroundColor),
-    },
+    images: buildAppleImages(content, artwork),
     signing: walletConfig.apple.signing!,
   })
 
   return { buffer, serial: content.serial }
 }
 
-export async function issueGoogleSaveUrl(db: Database, token: string): Promise<string> {
+/**
+ * Where Google fetches the pass pictures from. Google caches by URL, so the version
+ * fingerprint is part of it: a new stamp or a new palette is a new URL.
+ */
+export function googleImageUrl(content: PassContent, kind: GoogleImageKind): string {
+  return `${env.API_URL}/wallet/google/images/${content.serial}/${kind}.png?v=${imageVersion(content)}`
+}
+
+/** The loyalty class for this business, with the pictures it is branded with. */
+export function googleClassFor(
+  config: GoogleWalletConfig,
+  content: PassContent,
+  orgId: string,
+): Record<string, unknown> {
+  return buildLoyaltyClass(config, {
+    orgId,
+    organizationName: content.organizationName,
+    backgroundColor: content.backgroundColor,
+    images: {
+      wideProgramLogoUrl: googleImageUrl(content, 'lockup'),
+      programLogoUrl: googleImageUrl(content, 'logo'),
+    },
+  })
+}
+
+/** The loyalty object for this customer, hero image included. */
+export function googleObjectFor(
+  config: GoogleWalletConfig,
+  content: PassContent,
+  orgId: string,
+): Record<string, unknown> {
+  return buildLoyaltyObject(config, content, orgId, {
+    heroImageUrl: googleImageUrl(content, 'hero'),
+  })
+}
+
+/**
+ * One of the pictures a Google pass links to. Public by necessity (Google's servers
+ * fetch it), and guarded the same way as the card page: the serial is the card token.
+ */
+export async function renderGooglePassImage(
+  db: Database,
+  serial: string,
+  kind: GoogleImageKind,
+): Promise<Buffer> {
+  const { content } = await loadPassContent(db, serial)
+  const artwork = await loadPassArtwork(content)
+  return renderGoogleImage(kind, content, artwork)
+}
+
+/**
+ * Pushes the class to Google. The save link carries the class too, but Google only
+ * reads it when the class does not exist yet; any later branding change (a new logo,
+ * a new accent) has to be written through the API.
+ */
+export async function syncGoogleClass(
+  content: PassContent,
+  orgId: string,
+  logger: FastifyBaseLogger,
+): Promise<void> {
+  if (walletConfig.mode !== 'real' || !walletConfig.google.config) return
+  try {
+    await upsertLoyaltyClass(
+      walletConfig.google.config,
+      googleClassFor(walletConfig.google.config, content, orgId),
+    )
+  } catch (error) {
+    // Not fatal for the customer: the object still saves against the class Google has.
+    logger.warn({ err: error, orgId }, 'google wallet class sync failed')
+  }
+}
+
+export async function issueGoogleSaveUrl(
+  db: Database,
+  token: string,
+  logger: FastifyBaseLogger,
+): Promise<string> {
   if (walletConfig.mode === 'disabled' || !walletConfig.google.available) {
     throw new AppError('SERVICE_UNAVAILABLE', {
       message: 'Google Wallet passes are not configured on this environment',
@@ -237,13 +323,11 @@ export async function issueGoogleSaveUrl(db: Database, token: string): Promise<s
   const { content, orgId, customerCardId } = await loadPassContent(db, token)
   const config = walletConfig.google.config!
 
-  const loyaltyClass = buildLoyaltyClass(config, {
-    orgId,
-    organizationName: content.organizationName,
-    programLogoUrl: content.logoUrl,
-    backgroundColor: content.backgroundColor,
-  })
-  const loyaltyObject = buildLoyaltyObject(config, content, orgId)
+  const loyaltyClass = googleClassFor(config, content, orgId)
+  const loyaltyObject = googleObjectFor(config, content, orgId)
+
+  // Keeps an existing class current with the branding the card has today.
+  await syncGoogleClass(content, orgId, logger)
 
   await db
     .insert(walletPasses)

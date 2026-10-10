@@ -10,6 +10,7 @@ import {
   stampRulesBaseSchema,
 } from '@volvia/shared'
 import { AppError } from '../../lib/errors'
+import { enqueueWalletUpdatesForCard } from '../../lib/outbox'
 import { generateJoinSlug } from '../../lib/tokens'
 import { assertWithinLimit } from '../../plugins/auth'
 
@@ -268,6 +269,15 @@ export async function updateCard(
           expiresInDays: reward.expiresInDays,
         })),
       )
+    }
+
+    // The passes are drawn from the design, so a new look (or a new name) has to reach
+    // every phone that holds one. Queued here, inside the transaction, like a stamp.
+    const looksDifferent =
+      (input.data.design && JSON.stringify(design) !== JSON.stringify(current.design)) ||
+      (input.data.name !== undefined && input.data.name !== current.name)
+    if (looksDifferent) {
+      await enqueueWalletUpdatesForCard(tx, input.orgId, input.cardId, { reason: 'design' })
     }
 
     return card!

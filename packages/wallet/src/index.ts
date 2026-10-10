@@ -1,6 +1,5 @@
 export * from './types'
-export * from './png'
-export { buildPassJson, hexToRgbString } from './apple/pass-json'
+export { buildPassJson, hexToRgbString, nearbyText, stampsRemaining } from './apple/pass-json'
 export type { PassJsonOptions } from './apple/pass-json'
 export { buildManifest } from './apple/manifest'
 export { signManifest, passTypeIdentifierFromCertificate } from './apple/signer'
@@ -19,4 +18,13 @@ export {
   patchLoyaltyObject,
   upsertLoyaltyClass,
 } from './google/loyalty'
-export type { GoogleWalletConfig } from './google/loyalty'
+export type { GoogleWalletConfig, LoyaltyClassImages } from './google/loyalty'
+export {
+  GOOGLE_IMAGE_SIZES,
+  buildAppleImages,
+  imageVersion,
+  loadPassArtwork,
+  renderGoogleImage,
+} from './images'
+export type { GoogleImageKind, PassArtwork, RemoteImage } from './images'
+export { clearRemoteImageCache } from './render/remote-image'

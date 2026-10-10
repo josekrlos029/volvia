@@ -14,7 +14,7 @@ import { AppError } from '../../lib/errors'
 import { passAuthTokenMatches } from '../../lib/tokens'
 import { rateLimits } from '../../plugins/security'
 import { typed } from '../../types'
-import { issueApplePass, issueGoogleSaveUrl } from './service'
+import { issueApplePass, issueGoogleSaveUrl, renderGooglePassImage } from './service'
 
 /**
  * Apple's device-side calls send `Authorization: ApplePass <token>`. The token is
@@ -65,8 +65,38 @@ export async function walletRoutes(fastify: FastifyInstance): Promise<void> {
       schema: { params: z.object({ token: z.string().min(16).max(128) }), tags: ['wallet'] },
     },
     async (request, reply) => {
-      const url = await issueGoogleSaveUrl(app.db, request.params.token)
+      const url = await issueGoogleSaveUrl(app.db, request.params.token, request.log)
       return reply.redirect(url, 302)
+    },
+  )
+
+  /**
+   * The pictures a Google pass shows: Google's servers fetch them from here when the
+   * class or object is written. The `v` query is a fingerprint of what the picture
+   * depends on, so a cached copy is never shown for a newer stamp count.
+   */
+  app.get(
+    '/google/images/:serial/:kind.png',
+    {
+      config: { rateLimit: rateLimits.publicRead },
+      schema: {
+        params: z.object({
+          serial: z.string().min(16).max(128),
+          kind: z.enum(['hero', 'lockup', 'logo']),
+        }),
+        querystring: z.object({ v: z.string().max(40).optional() }),
+        tags: ['wallet'],
+      },
+    },
+    async (request, reply) => {
+      const png = await renderGooglePassImage(app.db, request.params.serial, request.params.kind)
+      return (
+        reply
+          .header('content-type', 'image/png')
+          // Safe to cache for a day: a change in the picture is a change in the URL.
+          .header('cache-control', 'public, max-age=86400')
+          .send(png)
+      )
     },
   )
 

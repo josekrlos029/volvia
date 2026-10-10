@@ -8,9 +8,9 @@ import JSZip from 'jszip'
 import forge from 'node-forge'
 import { describe, expect, it } from 'vitest'
 import { buildPkpass } from '../src/apple/builder'
-import { buildPassJson, hexToRgbString } from '../src/apple/pass-json'
+import { buildPassJson, hexToRgbString, stampsRemaining } from '../src/apple/pass-json'
 import { passTypeIdentifierFromCertificate } from '../src/apple/signer'
-import { generateIcon } from '../src/png'
+import { buildAppleImages } from '../src/images'
 import type { PassContent } from '../src/types'
 
 const certsDir = fileURLToPath(new URL('../../../infra/certs/', import.meta.url))
@@ -27,12 +27,20 @@ const content: PassContent = {
   rewardTitle: 'Hamburguesa gratis',
   rewardDescription: 'La que quieras del menú',
   pendingRewardCount: 0,
+  rewardPositions: [4, 8],
+  nextRewardAt: 8,
+  cycleIndex: 0,
+  lastStampAt: new Date('2026-09-01T18:30:00Z'),
+  headline: 'Club Burger Train',
   terms: 'Una tarjeta por persona.',
   logoUrl: null,
   bannerUrl: null,
   backgroundColor: '#14161B',
   foregroundColor: '#FFFFFF',
   labelColor: '#F5B841',
+  emptyStampColor: '#31363A',
+  stampIcon: { kind: 'preset', value: 'burger' },
+  stampStyle: 'circle',
   cardUrl: 'http://localhost:3002/c/abc123def456ghi789',
   places: [{ latitude: 10.46, longitude: -73.25 }],
   offerMessage: null,
@@ -55,7 +63,7 @@ async function buildAndOpen() {
   const buffer = await buildPkpass({
     content,
     options,
-    images: { 'icon.png': generateIcon(29, content.backgroundColor, content.labelColor) },
+    images: { 'icon.png': buildAppleImages(content)['icon.png'] },
     signing,
   })
   return { buffer, zip: await JSZip.loadAsync(buffer) }
@@ -66,10 +74,11 @@ interface StoreCardPass {
   formatVersion: number
   passTypeIdentifier: string
   serialNumber: string
+  logoText?: string
   storeCard: {
-    headerFields: Array<{ value: string }>
-    primaryFields: Array<{ value: number }>
-    secondaryFields: Array<{ value: string }>
+    headerFields: Array<{ key: string; label: string; value: string; changeMessage?: string }>
+    primaryFields: Array<{ key: string; label: string; value: string; changeMessage?: string }>
+    secondaryFields: Array<{ key: string; label: string; value: string; dateStyle?: string }>
     auxiliaryFields: Array<{ key: string; value: string; changeMessage?: string }>
     backFields: Array<{ key: string; label: string; value: string; changeMessage?: string }>
   }
@@ -84,17 +93,41 @@ describe('pass.json', () => {
     expect(hexToRgbString('#FFF')).toBe('rgb(255, 255, 255)')
   })
 
-  it('describes the card as a store card with the progress up front', () => {
+  it('describes the card as a store card: business and progress in the header, reward up front', () => {
     const json = buildPassJson(content, options) as unknown as StoreCardPass
     expect(json.formatVersion).toBe(1)
     expect(json.passTypeIdentifier).toBe(options.passTypeIdentifier)
     expect(json.serialNumber).toBe(content.serial)
-    expect(json.storeCard.headerFields[0]!.value).toBe('4/8')
-    expect(json.storeCard.primaryFields[0]!.value).toBe(4)
-    expect(json.storeCard.secondaryFields[0]!.value).toBe('Hamburguesa gratis')
+    // The header is all that shows while passes are stacked: the lockup image on the
+    // left names both brands, so the text on the right is the business and the count.
+    expect(json.logoText).toBeUndefined()
+    expect(json.storeCard.headerFields[0]).toMatchObject({ label: 'Burger Train', value: '4/8' })
+    expect(json.storeCard.primaryFields[0]).toMatchObject({
+      label: 'Próxima recompensa',
+      value: 'Hamburguesa gratis',
+    })
+    expect(json.storeCard.secondaryFields[0]).toMatchObject({
+      label: 'Te faltan',
+      value: '4 sellos',
+    })
     expect(json.barcodes[0]!.format).toBe('PKBarcodeFormatQR')
     expect(json.barcodes[0]!.message).toBe(content.cardUrl)
     expect(json.locations).toHaveLength(1)
+  })
+
+  it('counts the stamps left to the next reward, not to the end of the card', () => {
+    // Burger Train rewards at 4 and 8: with 2 stamps the next prize is 2 away.
+    expect(stampsRemaining({ ...content, stampsCount: 2, nextRewardAt: 4 })).toBe(2)
+    expect(stampsRemaining({ ...content, stampsCount: 5, nextRewardAt: 8 })).toBe(3)
+    expect(stampsRemaining({ ...content, stampsCount: 5, nextRewardAt: null })).toBe(3)
+  })
+
+  it('announces each stamp with how far the reward is, from the rebuilt pass', () => {
+    const json = buildPassJson(content, options) as unknown as StoreCardPass
+    expect(json.storeCard.headerFields[0]!.changeMessage).toBe(
+      '¡Sello sumado! Llevas %@. Te faltan 4 para Hamburguesa gratis.',
+    )
+    expect(json.storeCard.primaryFields[0]!.changeMessage).toBeUndefined()
   })
 
   it('announces a claimable reward, which a reset count alone cannot express', () => {
@@ -104,13 +137,34 @@ describe('pass.json', () => {
       { ...content, stampsCount: 0, pendingRewardCount: 1 },
       options,
     ) as unknown as StoreCardPass
-    expect(completed.storeCard.secondaryFields[0]!.value).toBe('¡Listo para reclamar!')
+    expect(completed.storeCard.primaryFields[0]).toMatchObject({
+      label: 'Recompensa lista',
+      value: '¡Listo para reclamar!',
+      changeMessage: 'Burger Train: %@',
+    })
+    expect(completed.storeCard.secondaryFields[0]).toMatchObject({
+      label: 'Tu recompensa',
+      value: 'Hamburguesa gratis',
+    })
+    // One banner per event: the count dropping to zero must not fire a second one.
+    expect(completed.storeCard.headerFields[0]!.changeMessage).toBeUndefined()
 
     const fresh = buildPassJson(
       { ...content, stampsCount: 0, pendingRewardCount: 0 },
       options,
     ) as unknown as StoreCardPass
-    expect(fresh.storeCard.secondaryFields[0]!.value).toBe('Hamburguesa gratis')
+    expect(fresh.storeCard.primaryFields[0]!.value).toBe('Hamburguesa gratis')
+  })
+
+  it('shows the lap from the second one on, and the last visit before that', () => {
+    const first = buildPassJson(content, options) as unknown as StoreCardPass
+    expect(first.storeCard.secondaryFields[1]).toMatchObject({
+      key: 'lastVisit',
+      dateStyle: 'PKDateStyleMedium',
+    })
+
+    const second = buildPassJson({ ...content, cycleIndex: 1 }, options) as unknown as StoreCardPass
+    expect(second.storeCard.secondaryFields[1]).toMatchObject({ label: 'Vuelta', value: '2' })
   })
 
   it('surfaces an active campaign offer, and announces it', () => {
@@ -308,14 +362,29 @@ describe('pkpass archive', () => {
 })
 
 describe('generated images', () => {
-  it('emits a valid PNG with the right dimensions', () => {
-    const png = generateIcon(29, '#14161B', '#F5B841')
+  it('emits valid PNGs', () => {
+    const png = buildAppleImages(content)['icon.png']
     expect(png.subarray(0, 8)).toEqual(
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     )
-    expect(png.readUInt32BE(16)).toBe(29)
-    expect(png.readUInt32BE(20)).toBe(29)
-    // colour type 6 = RGBA, which the transparent rounded corners need.
-    expect(png[25]).toBe(6)
+  })
+
+  it('renders every density PassKit asks for, at the sizes it lays the card out with', () => {
+    const images = buildAppleImages(content)
+    const size = (png: Buffer) => [png.readUInt32BE(16), png.readUInt32BE(20)]
+    expect(size(images['icon.png']!)).toEqual([29, 29])
+    expect(size(images['icon@3x.png']!)).toEqual([87, 87])
+    expect(size(images['strip.png']!)).toEqual([375, 123])
+    expect(size(images['strip@2x.png']!)).toEqual([750, 246])
+    const [logoW, logoH] = size(images['logo.png']!)
+    // Apple caps the logo at 160×50 pt; the lockup is a good deal narrower than that.
+    expect(logoH).toBe(50)
+    expect(logoW).toBeLessThanOrEqual(160)
+    expect(size(images['logo@2x.png']!)).toEqual([(logoW ?? 0) * 2, 100])
+  })
+
+  it('keeps the whole set small enough for a wallet download', () => {
+    const total = Object.values(buildAppleImages(content)).reduce((sum, png) => sum + png.length, 0)
+    expect(total).toBeLessThan(150_000)
   })
 })

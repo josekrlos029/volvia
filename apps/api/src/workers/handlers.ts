@@ -78,7 +78,9 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
           } else if (notice) {
             await pushGoogleMessage(context.db, pass.serial, notice, context.logger)
           } else {
-            await patchGooglePass(context.db, pass.serial, context.logger)
+            await patchGooglePass(context.db, pass.serial, context.logger, {
+              refreshClass: reason === 'design',
+            })
           }
           walletPushCounter.labels(pass.platform, 'ok').inc()
           delivered += 1

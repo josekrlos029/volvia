@@ -78,6 +78,13 @@ sistema operativo muestra la tarjeta cuando el cliente se acerca al local. Por e
 una sede encola, por el outbox, una actualización para cada pase del negocio, igual que
 un sello.
 
+El pase es la tarjeta, no una ficha con un número: el strip con los sellos, el lockup
+Volvia · negocio de la cabecera y el icono se dibujan en el servidor a partir del diseño
+(`packages/wallet/src/render`, SVG rasterizado con resvg, sin texto ni fuentes). Apple los
+lleva dentro del `.pkpass`; Google los pide por URL a la API, con una huella del estado en
+la URL para invalidar su caché. Un cambio de diseño encola una actualización por pase
+instalado, igual que un sello. Detalle en `docs/WALLET-SETUP.md`, "Imágenes del pase".
+
 ### Mensajes push
 
 El cliente no tiene app: el único canal para avisarle algo es el pase. Un mensaje a un

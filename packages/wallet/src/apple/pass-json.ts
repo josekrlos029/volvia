@@ -3,9 +3,11 @@ import type { PassContent } from '../types'
 /**
  * Builds `pass.json` for a PassKit store card.
  *
- * Field choices follow how the card is actually read at a counter: the progress
- * ("4 of 8") is the primary field because that is what staff and customer both look
- * for, and the reward sits in the secondary row so it is legible on the lock screen.
+ * The layout mirrors how the card is read at the counter and in the stacked Wallet
+ * list. The header is the only row visible while passes are collapsed, so it carries
+ * the business (as a label) and the progress; the lockup in `logo.png` sits to its
+ * left. The primary row is the reward the customer is working towards, because that
+ * is the question the card answers; the stamps themselves are drawn in `strip.png`.
  */
 export interface PassJsonOptions {
   passTypeIdentifier: string
@@ -18,25 +20,39 @@ export interface PassJsonOptions {
 
 const STRINGS = {
   es: {
-    progress: 'Progreso',
+    nextReward: 'Próxima recompensa',
+    rewardReady: 'Recompensa lista',
     reward: 'Tu recompensa',
     ready: '¡Listo para reclamar!',
-    of: 'de',
+    remaining: 'Te faltan',
+    stamps: (count: number) => (count === 1 ? '1 sello' : `${count} sellos`),
+    cycle: 'Vuelta',
+    lastVisit: 'Última visita',
     terms: 'Términos',
     news: 'Novedades',
     noNews: 'Aquí verás lo que te cuente el negocio.',
+    stamped: (remaining: number, reward: string) =>
+      `¡Sello sumado! Llevas %@. Te faltan ${remaining} para ${reward}.`,
+    earned: (org: string) => `${org}: %@`,
     nearby: (org: string, count: number, required: number) =>
       `Estás cerca de ${org}. Llevas ${count}/${required} sellos.`,
     nearbyReward: (org: string) => `Estás cerca de ${org}. ¡Tienes una recompensa lista!`,
   },
   en: {
-    progress: 'Progress',
+    nextReward: 'Next reward',
+    rewardReady: 'Reward ready',
     reward: 'Your reward',
     ready: 'Ready to claim!',
-    of: 'of',
+    remaining: 'You need',
+    stamps: (count: number) => (count === 1 ? '1 more stamp' : `${count} more stamps`),
+    cycle: 'Round',
+    lastVisit: 'Last visit',
     terms: 'Terms',
     news: 'News',
     noNews: 'Messages from the business will show up here.',
+    stamped: (remaining: number, reward: string) =>
+      `Stamp added! You have %@. ${remaining} more for ${reward}.`,
+    earned: (org: string) => `${org}: %@`,
     nearby: (org: string, count: number, required: number) =>
       `${org} is nearby. You have ${count}/${required} stamps.`,
     nearbyReward: (org: string) => `${org} is nearby. You have a reward ready!`,
@@ -55,12 +71,19 @@ export function nearbyText(content: PassContent): string {
     : strings.nearby(content.organizationName, content.stampsCount, content.stampsRequired)
 }
 
+/** Stamps still to earn before the next reward (or the end of the card). */
+export function stampsRemaining(content: PassContent): number {
+  const target = content.nextRewardAt ?? content.stampsRequired
+  return Math.max(0, target - content.stampsCount)
+}
+
 export function buildPassJson(
   content: PassContent,
   options: PassJsonOptions,
 ): Record<string, unknown> {
   const strings = STRINGS[content.locale]
   const hasReward = content.pendingRewardCount > 0
+  const remaining = stampsRemaining(content)
   const relevantText = nearbyText(content)
 
   return {
@@ -70,7 +93,8 @@ export function buildPassJson(
     serialNumber: content.serial,
     organizationName: options.organizationName,
     description: `${content.organizationName} — ${content.cardName}`,
-    logoText: content.organizationName,
+    // No `logoText`: the lockup in logo.png already names both brands, and the business
+    // appears again as the header label on the right.
 
     backgroundColor: hexToRgbString(content.backgroundColor),
     foregroundColor: hexToRgbString(content.foregroundColor),
@@ -84,25 +108,39 @@ export function buildPassJson(
       headerFields: [
         {
           key: 'progress',
-          label: strings.progress,
+          label: content.organizationName,
           value: `${content.stampsCount}/${content.stampsRequired}`,
+          // Each stamp changes this value, which is what makes the phone show a banner.
+          // Silenced while a reward is pending: the primary field announces that one,
+          // and the count resetting to zero is not news worth a second alert.
+          ...(hasReward ? {} : { changeMessage: strings.stamped(remaining, content.rewardTitle) }),
         },
       ],
       primaryFields: [
         {
-          key: 'stamps',
-          label: content.cardName,
-          value: content.stampsCount,
-          // Lets the device animate the change rather than silently swapping the number.
-          changeMessage: `${content.organizationName}: %@ ${strings.of} ${content.stampsRequired}`,
+          key: 'reward',
+          label: hasReward ? strings.rewardReady : strings.nextReward,
+          value: hasReward ? strings.ready : content.rewardTitle,
+          ...(hasReward ? { changeMessage: strings.earned(content.organizationName) } : {}),
         },
       ],
       secondaryFields: [
-        {
-          key: 'reward',
-          label: strings.reward,
-          value: hasReward ? strings.ready : content.rewardTitle,
-        },
+        hasReward
+          ? { key: 'remaining', label: strings.reward, value: content.rewardTitle }
+          : { key: 'remaining', label: strings.remaining, value: strings.stamps(remaining) },
+        ...(content.cycleIndex > 0
+          ? [{ key: 'cycle', label: strings.cycle, value: String(content.cycleIndex + 1) }]
+          : content.lastStampAt
+            ? [
+                {
+                  key: 'lastVisit',
+                  label: strings.lastVisit,
+                  value: content.lastStampAt.toISOString(),
+                  dateStyle: 'PKDateStyleMedium',
+                  ignoresTimeZone: false,
+                },
+              ]
+            : []),
       ],
       auxiliaryFields: content.offerMessage
         ? [{ key: 'offer', label: '★', value: content.offerMessage, changeMessage: '%@' }]

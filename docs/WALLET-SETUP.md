@@ -306,6 +306,48 @@ Google no documenta si los avisos funcionan mientras la cuenta sigue en modo dem
 
 ---
 
+## Imágenes del pase
+
+Los dos pases se dibujan a partir del diseño de la tarjeta (colores, icono de sello,
+forma, logo); no hay que subir arte específico para la wallet. Tres imágenes cubren
+ambas plataformas (`packages/wallet/src/render/svg.ts`, rasterizadas con
+`@resvg/resvg-js`, binario precompilado sin dependencias del sistema):
+
+| Imagen | Qué muestra | Apple | Google |
+|---|---|---|---|
+| **Strip** | La cuadrícula de sellos: llenos en el color de acento con el icono del negocio, vacíos en contorno, el premio con un regalo | `strip.png` (375×123 pt, @1x/2x/3x) | `heroImage` del objeto (1032×336) |
+| **Lockup** | Marca Volvia · logo del negocio (o su icono de sello sobre el acento si no subió logo) | `logo.png` (50 pt de alto; es lo que se ve con los pases apilados) | `wideProgramLogo` de la clase (1032×336) |
+| **Tile** | El negocio solo, cuadrado y opaco | `icon.png` (29 pt; notificaciones y pantalla de bloqueo) | `programLogo` de la clase (660×660, Google lo recorta en círculo) |
+
+Ninguna lleva texto, así que no hay que empaquetar fuentes. El icono de sello tipo
+emoji se dibuja como estrella (haría falta una fuente de emoji) y una imagen subida en
+WebP se ignora (el rasterizador no la decodifica): en ambos casos el pase sale bien, con
+el recurso de reserva.
+
+**Apple** lleva las imágenes dentro del `.pkpass`; como el iPhone descarga el archivo
+completo tras cada push, el strip con el sello nuevo llega solo. Las imágenes de un pase
+pesan unos 70 KB en total.
+
+**Google** las obtiene por URL. La API las sirve en
+`GET /wallet/google/images/:serial/{hero|lockup|logo}.png?v=<huella>`, públicas y con
+caché de un día. La huella (`imageVersion`) cambia con cada sello y con cualquier
+cambio de diseño, y como Google cachea por URL, eso es lo que le obliga a volver a
+pedir la imagen. El `PATCH` tras cada sello incluye `heroImage` con la URL nueva. Para
+que Google pueda descargarlas, `API_URL` tiene que ser accesible desde fuera (en local,
+el túnel de 1.11).
+
+La **clase** de Google (una por negocio) lleva el lockup y el logo. El enlace de guardado
+la incluye en el JWT, pero Google solo la lee cuando no existe todavía: por eso, en modo
+`real`, la API la escribe también con `upsertLoyaltyClass` al emitir el enlace y el worker
+la reescribe cuando cambia el diseño (`wallet.update` con `reason: 'design'`, que
+`updateCard` encola para cada pase instalado de esa tarjeta).
+
+Google revisa la marca del pase al pedir acceso de publicación (2.5). Con la clase ya
+definida con el lockup, mándala a revisión tal cual: cambiarla después de aprobada
+implica otra revisión.
+
+---
+
 ## Parte 3 — Tiendas de aplicaciones (más adelante)
 
 Nada de esto hace falta para las tarjetas. Es solo para empaquetar el escáner del

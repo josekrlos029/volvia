@@ -1,3 +1,5 @@
+import type { StampIcon, StampStyle } from '@volvia/shared'
+
 /** Everything a wallet pass needs to render, independent of Apple/Google specifics. */
 export interface PassContent {
   /** Stable, unguessable identifier for this customer's pass. */
@@ -15,12 +17,24 @@ export interface PassContent {
    * empty one look identical from the count alone.
    */
   pendingRewardCount: number
+  /** 1-based slots that unlock a reward, so the strip can mark them. */
+  rewardPositions: number[]
+  /** The slot the customer is working towards; null when nothing is left to earn. */
+  nextRewardAt: number | null
+  /** Completed laps of the card. Shown as "Vuelta N" from the second lap on. */
+  cycleIndex: number
+  lastStampAt: Date | null
+  headline: string
   terms: string
   logoUrl: string | null
   bannerUrl: string | null
   backgroundColor: string
   foregroundColor: string
+  /** The card's accent: labels on Apple, filled stamps everywhere. */
   labelColor: string
+  emptyStampColor: string
+  stampIcon: StampIcon
+  stampStyle: StampStyle
   /** Deep link back to the web card. */
   cardUrl: string
   /**

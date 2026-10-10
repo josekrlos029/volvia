@@ -1,4 +1,4 @@
-import { eq, outbox, walletPasses } from '@volvia/db'
+import { customerCards, eq, outbox, walletPasses } from '@volvia/db'
 import type { Database } from '@volvia/db'
 
 /** Job kinds the outbox worker knows how to drain. */
@@ -56,6 +56,31 @@ export async function enqueueWalletUpdatesForOrg(
     .selectDistinct({ customerCardId: walletPasses.customerCardId })
     .from(walletPasses)
     .where(eq(walletPasses.orgId, orgId))
+
+  await fanOutWalletUpdates(
+    tx,
+    orgId,
+    holders.map((holder) => holder.customerCardId),
+    payload,
+  )
+  return holders.length
+}
+
+/**
+ * One `wallet.update` per installed pass of one card design: what a change to the
+ * card's look has to reach. Other cards of the same business are left alone.
+ */
+export async function enqueueWalletUpdatesForCard(
+  tx: Tx,
+  orgId: string,
+  cardId: string,
+  payload: Record<string, unknown>,
+): Promise<number> {
+  const holders = await tx
+    .selectDistinct({ customerCardId: walletPasses.customerCardId })
+    .from(walletPasses)
+    .innerJoin(customerCards, eq(customerCards.id, walletPasses.customerCardId))
+    .where(eq(customerCards.cardId, cardId))
 
   await fanOutWalletUpdates(
     tx,

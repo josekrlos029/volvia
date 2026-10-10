@@ -5,17 +5,20 @@ import { type PassJsonOptions, buildPassJson } from './pass-json'
 import { type SigningMaterial, signManifest } from './signer'
 
 /**
- * Images a pass needs. PassKit requires at least `icon.png`; the rest improve how the
- * pass looks in the Wallet list and on the lock screen. We generate simple ones from
- * the card design when the business has not uploaded artwork.
+ * Images a pass needs. PassKit requires at least `icon.png`; the rest are what make the
+ * pass look like the card: the lockup as `logo.png`, the stamp grid as `strip.png`.
+ * All are rendered from the card design (see `images.ts`).
  */
 export interface PassImages {
   'icon.png': Buffer
   'icon@2x.png'?: Buffer
+  'icon@3x.png'?: Buffer
   'logo.png'?: Buffer
   'logo@2x.png'?: Buffer
+  'logo@3x.png'?: Buffer
   'strip.png'?: Buffer
   'strip@2x.png'?: Buffer
+  'strip@3x.png'?: Buffer
 }
 
 export interface BuildPassInput {

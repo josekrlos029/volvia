@@ -3,14 +3,13 @@ import type { Database } from '@volvia/db'
 import { renderCampaignText } from '@volvia/shared'
 import {
   addLoyaltyObjectMessage,
-  buildLoyaltyObject,
   isDeadPushToken,
   patchLoyaltyObject,
   sendPassUpdatePushes,
 } from '@volvia/wallet'
 import type { FastifyBaseLogger } from 'fastify'
 import { walletConfig } from '../modules/wallet/config'
-import { loadPassContent } from '../modules/wallet/service'
+import { googleObjectFor, loadPassContent, syncGoogleClass } from '../modules/wallet/service'
 
 /**
  * Tells iPhones holding this pass that it changed.
@@ -76,11 +75,17 @@ export async function pushAppleUpdate(
   }
 }
 
-/** Google passes update by patching the object; there is no separate push. */
+/**
+ * Google passes update by patching the object; there is no separate push.
+ *
+ * `refreshClass` also rewrites the business's class: needed when the design changed,
+ * because the lockup and logo live there, and skipped on an ordinary stamp.
+ */
 export async function patchGooglePass(
   db: Database,
   serial: string,
   logger: FastifyBaseLogger,
+  options: { refreshClass?: boolean } = {},
 ): Promise<void> {
   if (walletConfig.mode !== 'real' || !walletConfig.google.available) {
     logger.debug({ serial: serial.slice(0, 8) }, 'google wallet patch skipped (not configured)')
@@ -103,12 +108,18 @@ export async function patchGooglePass(
 
   const { content } = await loadPassContent(db, card.token)
   const config = walletConfig.google.config!
-  const object = buildLoyaltyObject(config, content, pass.orgId)
+  const object = googleObjectFor(config, content, pass.orgId)
+
+  if (options.refreshClass) await syncGoogleClass(content, pass.orgId, logger)
 
   await patchLoyaltyObject(config, serial, {
     loyaltyPoints: object.loyaltyPoints,
+    secondaryLoyaltyPoints: object.secondaryLoyaltyPoints,
     textModulesData: object.textModulesData,
     merchantLocations: object.merchantLocations,
+    // A new URL each stamp, which is what makes Google fetch the new strip.
+    heroImage: object.heroImage,
+    hexBackgroundColor: object.hexBackgroundColor,
   })
 }
 
