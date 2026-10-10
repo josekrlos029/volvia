@@ -6,6 +6,8 @@ export { buildManifest } from './apple/manifest'
 export { signManifest, passTypeIdentifierFromCertificate } from './apple/signer'
 export type { SigningMaterial } from './apple/signer'
 export { buildPkpass } from './apple/builder'
+export { isDeadPushToken, sendPassUpdatePushes } from './apple/apns'
+export type { PassPushInput, PassPushResult } from './apple/apns'
 export type { BuildPassInput, PassImages } from './apple/builder'
 export {
   buildLoyaltyClass,

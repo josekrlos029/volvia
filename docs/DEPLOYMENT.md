@@ -49,6 +49,13 @@ publica la imagen en otro repositorio.
 **Las migraciones** van antes de desplegar una imagen que las necesite:
 `pnpm db:migrate`, con `DATABASE_URL_UNPOOLED` apuntando a la URL directa de Neon.
 
+**Wallet** necesita las credenciales en la API *y* en el worker: la API firma el
+`.pkpass` y el worker envía los push de APNs y parchea los pases de Google. Los dos montan
+los secretos `APPLE_PASS_CERT`, `APPLE_PASS_KEY`, `APPLE_WWDR_CERT` y
+`GOOGLE_WALLET_SA_KEY` como archivos en `/secrets/...` y leen
+`APPLE_PASS_KEY_PASSPHRASE` como variable. Si el worker no los tiene, los pases se
+emiten bien pero no se actualizan nunca en el teléfono.
+
 ## Cuidado con el `.env` local
 
 Si tu `.env` apunta a Neon y Redis de producción, `pnpm db:seed` y `pnpm db:reset` actúan
@@ -65,9 +72,6 @@ código.
 
 ## Lo que todavía no está encendido
 
-- **Wallet**: `WALLET_MODE=disabled`. Hace falta el Pass Type ID de Apple con su
-  certificado y una cuenta de servicio de Google Wallet; los pasos están en
-  [WALLET-SETUP.md](WALLET-SETUP.md).
 - **Cobros**: `BILLING_ENABLED=false`. Faltan las llaves de producción de Stripe y Wompi,
   sus secretos de webhook y un precio por plan e intervalo.
 - **Google OAuth**: falta el cliente, con `https://api.somosvolvia.com` en las URIs de

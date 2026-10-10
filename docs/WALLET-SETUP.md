@@ -139,9 +139,15 @@ openssl x509 -inform der -in /tmp/wwdr.cer -out infra/certs/wwdr.pem
 ### 1.9 Notificaciones push de actualización de pase
 
 Aquí no hay que crear nada nuevo: **el mismo certificado de Pass Type ID es el
-certificado cliente de APNs** para actualizar pases. Por eso `.env.example`
-apunta `APPLE_PUSH_CERT_PATH` al mismo archivo. La API envía a
-`api.push.apple.com` usando el pass type id como *topic*.
+certificado cliente de APNs** para actualizar pases. El worker reutiliza
+`APPLE_PASS_CERT_PATH` / `APPLE_PASS_KEY_PATH` (no hay una variable aparte) y
+envía por HTTP/2 a `api.push.apple.com` un cuerpo `{}` con el pass type id como
+*topic* (`packages/wallet/src/apple/apns.ts`). Los tokens que APNs rechaza para
+siempre (`410` o `BadDeviceToken`) se borran de `apple_pass_registrations`.
+
+El push solo despierta al iPhone: luego pregunta qué seriales cambiaron y
+descarga el pase. Por eso el worker marca `wallet_passes.updated_at` **antes**
+de enviar el push.
 
 ### 1.10 Variables de entorno
 
@@ -153,7 +159,6 @@ APPLE_PASS_CERT_PATH=infra/certs/pass-cert.pem
 APPLE_PASS_KEY_PATH=infra/certs/pass-key.pem
 APPLE_PASS_KEY_PASSPHRASE=…           # la del paso 1.6
 APPLE_WWDR_CERT_PATH=infra/certs/wwdr.pem
-APPLE_PUSH_CERT_PATH=infra/certs/pass-cert.pem
 ```
 
 ### 1.11 Probar en un iPhone real

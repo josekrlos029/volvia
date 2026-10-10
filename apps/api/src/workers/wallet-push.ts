@@ -1,6 +1,11 @@
-import { applePassRegistrations, customerCards, eq, walletPasses } from '@volvia/db'
+import { applePassRegistrations, customerCards, eq, inArray, walletPasses } from '@volvia/db'
 import type { Database } from '@volvia/db'
-import { buildLoyaltyObject, patchLoyaltyObject } from '@volvia/wallet'
+import {
+  buildLoyaltyObject,
+  isDeadPushToken,
+  patchLoyaltyObject,
+  sendPassUpdatePushes,
+} from '@volvia/wallet'
 import type { FastifyBaseLogger } from 'fastify'
 import { walletConfig } from '../modules/wallet/config'
 import { loadPassContent } from '../modules/wallet/service'
@@ -18,7 +23,7 @@ export async function pushAppleUpdate(
   logger: FastifyBaseLogger,
 ): Promise<void> {
   const registrations = await db
-    .select({ pushToken: applePassRegistrations.pushToken })
+    .select({ id: applePassRegistrations.id, pushToken: applePassRegistrations.pushToken })
     .from(applePassRegistrations)
     .where(eq(applePassRegistrations.passId, passId))
 
@@ -31,8 +36,42 @@ export async function pushAppleUpdate(
     return
   }
 
-  // APNs delivery lands here once a real Pass Type ID certificate is configured.
-  logger.info({ devices: registrations.length }, 'apple push queued')
+  const signing = walletConfig.apple.signing
+  if (!signing) {
+    logger.warn({ devices: registrations.length }, 'apple push skipped (no pass certificate)')
+    return
+  }
+
+  const results = await sendPassUpdatePushes({
+    pushTokens: registrations.map((row) => row.pushToken),
+    topic: walletConfig.apple.passTypeIdentifier,
+    signing,
+  })
+
+  // A removed pass or a wiped phone leaves a token APNs will reject forever.
+  const dead = new Set(results.filter(isDeadPushToken).map((result) => result.token))
+  const deadIds = registrations.filter((row) => dead.has(row.pushToken)).map((row) => row.id)
+  if (deadIds.length > 0) {
+    await db.delete(applePassRegistrations).where(inArray(applePassRegistrations.id, deadIds))
+  }
+
+  const sent = results.filter((result) => result.status === 200).length
+  const failures = results.filter((result) => result.status !== 200 && !dead.has(result.token))
+  logger.info(
+    {
+      devices: registrations.length,
+      sent,
+      removed: deadIds.length,
+      failures: failures.map(({ status, reason }) => ({ status, reason })),
+    },
+    'apple push sent',
+  )
+
+  // Nothing delivered and not because the devices are gone: a certificate or topic
+  // problem, which must surface as a failed push rather than a quiet log line.
+  if (sent === 0 && failures.length > 0) {
+    throw new Error(`apns rejected every push: ${failures[0]!.status} ${failures[0]!.reason}`)
+  }
 }
 
 /** Google passes update by patching the object; there is no separate push. */

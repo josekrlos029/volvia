@@ -47,6 +47,14 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
 
       if (passes.length === 0) return
 
+      // Bump `updatedAt` before pushing: the device reacts to the push by asking which
+      // serials changed since its last tag, and a pass not yet bumped answers "nothing".
+      // It is also what lets a device that missed the push pick the update up on its own.
+      await context.db
+        .update(walletPasses)
+        .set({ updatedAt: new Date() })
+        .where(eq(walletPasses.customerCardId, customerCardId))
+
       for (const pass of passes) {
         try {
           if (pass.platform === 'apple') {
@@ -61,11 +69,9 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
         }
       }
 
-      // Bumping `updatedAt` is what makes the pass appear in Apple's "changed since"
-      // list, so a device that missed the push still picks the update up on its own.
       await context.db
         .update(walletPasses)
-        .set({ updatedAt: new Date(), lastPushedAt: new Date() })
+        .set({ lastPushedAt: new Date() })
         .where(eq(walletPasses.customerCardId, customerCardId))
     },
 
