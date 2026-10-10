@@ -13,6 +13,7 @@ const safe = {
   JWT_ACCESS_SECRET: 'xQ3n7Pk2vR8sTg5wYz1aBc4dEf6hJm9L',
   JWT_REFRESH_SECRET: 'Lm9Jh6fE4dC1cB4aZ1yW5gT8sR2kP7n3',
   TOKEN_PEPPER: 'pP1aS2dF3gH4jK5lZ6xC7vB8nM9qW0eR',
+  JOBS_SECRET: 'jJ4kL7mN2pQ9rS1tV6wX3yZ8aB5cD0eF',
   RATE_LIMIT_ENABLED: true,
   CORS_ORIGINS: ['https://panel.volvia.co', 'https://volvia.co'],
   COOKIE_DOMAIN: 'volvia.co',
@@ -36,6 +37,15 @@ describe('production configuration guard', () => {
     ['TOKEN_PEPPER', 'dev-only-token-pepper-change-me-00000000000000000'],
   ] as const)('refuses the %s shipped in .env.example', (key, value) => {
     expect(broken({ [key]: value })).toContain(`${key} still holds the development placeholder`)
+  })
+
+  it('refuses a jobs secret that is short, missing or the example one', () => {
+    const message = 'JOBS_SECRET must be a real secret of at least 32 characters'
+    expect(broken({ JOBS_SECRET: '' })).toContain(message)
+    expect(broken({ JOBS_SECRET: 'too-short' })).toContain(message)
+    expect(broken({ JOBS_SECRET: 'dev-only-jobs-secret-change-me-000000000000000000' })).toContain(
+      message,
+    )
   })
 
   it('refuses one secret reused for both token types', () => {

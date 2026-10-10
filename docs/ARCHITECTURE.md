@@ -43,12 +43,20 @@ sellar ni contar los datos de otro.
 ## Trabajos en segundo plano
 
 Nada con efecto externo se ejecuta dentro de la petición. Todo pasa por la tabla `outbox`,
-escrita en la misma transacción que el cambio de estado, y drenada por un worker aparte con
-`for update skip locked` (varias instancias toman lotes disjuntos).
+escrita en la misma transacción que el cambio de estado, y drenada aparte con
+`for update skip locked` (varios drenajes a la vez toman lotes disjuntos).
 
-El worker también corre los trabajos programados detrás de un lock distribuido en Redis,
-porque varias instancias sostienen su propio temporizador y el correo de cumpleaños debe
-salir una sola vez.
+Quién drena depende de dónde corre. En producción no hay ningún proceso encendido todo el
+tiempo, porque la API escala a cero y un worker fijo sería el único coste constante del
+producto. En su lugar, el drenaje y los trabajos programados son dos endpoints de la API
+(`/internal/jobs/outbox` y `/internal/jobs/cron`) protegidos por un secreto: Cloud
+Scheduler llama al segundo cada minuto, y la API llama al primero sobre sí misma justo
+después de cada petición que escribe, para que un sello llegue al teléfono en segundos y
+no al minuto siguiente. En local, `worker.ts` llama a los mismos dos ticks con un
+temporizador.
+
+Los trabajos programados corren detrás de un lock distribuido en Redis, porque dos ticks
+pueden solaparse y el correo de cumpleaños debe salir una sola vez.
 
 ## Planes
 

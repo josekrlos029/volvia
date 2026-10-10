@@ -11,7 +11,7 @@ vive cada pieza y cómo se publica un cambio.
 | Panel | Vercel, proyecto `volvia-app` (`apps/app`) | `app.somosvolvia.com` |
 | Tarjeta del cliente | Vercel, proyecto `volvia-pass` (`apps/pass`) | `tarjeta.somosvolvia.com` |
 | API | Cloud Run, servicio `volvia-api` | `api.somosvolvia.com`, escala a cero; el primer request tras inactividad paga el arranque en frío |
-| Worker | Cloud Run, worker pool `volvia-worker` | Una instancia fija; no escucha en ningún puerto |
+| Trabajos en segundo plano | Cloud Scheduler, job `volvia-jobs-cron` | Llama a `POST /internal/jobs/cron` de la API cada minuto; no hay ningún proceso encendido todo el tiempo |
 | Base de datos | Neon, AWS us-east-1 | URL *pooled* para la API, directa para migraciones |
 | Redis | Redis Cloud, AWS us-east-1 | Sesiones, idempotencia, nonces, límites y colas |
 | Archivos | Cloudflare R2, bucket `volvia-uploads` | Lectura pública en `files.somosvolvia.com` |
@@ -24,7 +24,7 @@ Cada escaneo pasa por Redis, así que esa cercanía se nota en el mostrador.
 
 Los secretos viven en Secret Manager y el servicio los lee con la cuenta
 `volvia-runtime`: `DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`,
-`TOKEN_PEPPER`, `SMTP_PASS`, `STORAGE_ACCESS_KEY` y `STORAGE_SECRET_KEY`. El resto de la
+`TOKEN_PEPPER`, `JOBS_SECRET`, `SMTP_PASS`, `STORAGE_ACCESS_KEY` y `STORAGE_SECRET_KEY`. El resto de la
 configuración son variables normales del servicio.
 
 ## Publicar un cambio
@@ -32,7 +32,7 @@ configuración son variables normales del servicio.
 **Las apps web** se publican solas con cada push a `main`. Vercel no reconstruye una app
 si el commit no la toca.
 
-**La API y el worker** comparten imagen. Desde la raíz del repo:
+**La API** se construye y despliega desde la raíz del repo:
 
 ```bash
 export CLOUDSDK_ACTIVE_CONFIG_NAME=volvia
@@ -40,7 +40,6 @@ REPO="us-east4-docker.pkg.dev/somosvolvia-prod/volvia/api"
 TAG="$(git rev-parse --short HEAD)"
 docker buildx build --platform linux/amd64 -f infra/Dockerfile.api -t "${REPO}:${TAG}" --push .
 gcloud run deploy volvia-api --region us-east4 --image "${REPO}:${TAG}"
-gcloud beta run worker-pools deploy volvia-worker --region us-east4 --image "${REPO}:${TAG}"
 ```
 
 Escribe `"${REPO}:${TAG}"` con llaves: en zsh, `$REPO:latest` aplica el modificador `:l` y
@@ -49,14 +48,46 @@ publica la imagen en otro repositorio.
 **Las migraciones** van antes de desplegar una imagen que las necesite:
 `pnpm db:migrate`, con `DATABASE_URL_UNPOOLED` apuntando a la URL directa de Neon.
 
-**Wallet** necesita las credenciales en la API *y* en el worker: la API firma el
-`.pkpass` y el worker envía los push de APNs y parchea los pases de Google. Se usan los
-secretos `APPLE_PASS_CERT`, `APPLE_PASS_KEY`, `APPLE_WWDR_CERT`, `GOOGLE_WALLET_SA_KEY` y
-`APPLE_PASS_KEY_PASSPHRASE`. La API los monta como archivos en `/secrets/...`
-(`*_PATH`). Los worker pools no admiten secretos montados, así que el worker los recibe
-como variables con el contenido: `APPLE_PASS_CERT_PEM`, `APPLE_PASS_KEY_PEM`,
-`APPLE_WWDR_CERT_PEM` y `GOOGLE_WALLET_SA_KEY_JSON`. Si el worker no los tiene, los
-pases se emiten bien pero nunca se actualizan en el teléfono.
+**Wallet** necesita las credenciales en la API, que firma el `.pkpass`, envía los push
+de APNs y parchea los pases de Google. Se usan los secretos `APPLE_PASS_CERT`,
+`APPLE_PASS_KEY`, `APPLE_WWDR_CERT`, `GOOGLE_WALLET_SA_KEY` y
+`APPLE_PASS_KEY_PASSPHRASE`, montados como archivos en `/secrets/...` (`*_PATH`). Las
+variables con el contenido inline (`APPLE_PASS_CERT_PEM`, `APPLE_PASS_KEY_PEM`,
+`APPLE_WWDR_CERT_PEM` y `GOOGLE_WALLET_SA_KEY_JSON`) siguen existiendo para entornos
+que no admiten secretos montados.
+
+## Trabajos en segundo plano sin proceso fijo
+
+No hay worker en producción: una instancia fija costaría lo mismo con cero clientes que
+con mil. En su lugar, la API expone dos endpoints protegidos por `JOBS_SECRET`:
+
+- `POST /internal/jobs/cron`: lo llama Cloud Scheduler cada minuto. Corre el
+  planificador de campañas, cierra mensajes atascados, los cumpleaños y la expiración
+  (estos dos como mucho cada quince minutos), y después drena la bandeja de salida.
+- `POST /internal/jobs/outbox`: lo llama la propia API sobre sí misma justo después de
+  cualquier petición que escribe (un sello, un mensaje, una sede movida), así el pase se
+  actualiza en segundos y no al minuto siguiente. Es una petición HTTP real porque en
+  Cloud Run la CPU solo está garantizada mientras hay una petición en vuelo.
+
+La API escala a cero igual que antes; cada tick es una petición normal y se cobra como
+tal. Para montarlo una sola vez:
+
+```bash
+export CLOUDSDK_ACTIVE_CONFIG_NAME=volvia
+gcloud services enable cloudscheduler.googleapis.com
+openssl rand -base64 48 | tr -d '\n' | gcloud secrets create JOBS_SECRET --data-file=-
+gcloud run services update volvia-api --region us-east4 --update-secrets=JOBS_SECRET=JOBS_SECRET:latest
+gcloud scheduler jobs create http volvia-jobs-cron --location us-east4 \
+  --schedule='* * * * *' --time-zone='Etc/UTC' \
+  --uri='https://api.somosvolvia.com/internal/jobs/cron' --http-method=POST \
+  --headers="authorization=Bearer $(gcloud secrets versions access latest --secret=JOBS_SECRET)" \
+  --attempt-deadline=120s
+```
+
+Si el secreto rota, hay que actualizar el job del scheduler con `gcloud scheduler jobs
+update http volvia-jobs-cron --location us-east4 --update-headers=...`. En local no hace
+falta nada de esto: `pnpm dev` levanta `worker.ts`, que llama a los mismos dos ticks
+con un temporizador.
 
 ## Cuidado con el `.env` local
 

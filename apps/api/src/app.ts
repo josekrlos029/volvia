@@ -11,6 +11,7 @@ import { authPlugin } from './plugins/auth'
 import { contextPlugin } from './plugins/context'
 import { docsPlugin } from './plugins/docs'
 import { errorsPlugin } from './plugins/errors'
+import { jobsPlugin } from './plugins/jobs'
 import { observabilityPlugin } from './plugins/observability'
 import { securityPlugin } from './plugins/security'
 import { registerRoutes } from './routes'
@@ -75,6 +76,7 @@ export async function buildApp(): Promise<App> {
   await app.register(errorsPlugin)
   await app.register(authPlugin)
   await app.register(docsPlugin)
+  await app.register(jobsPlugin)
   await app.register(registerRoutes)
 
   await app.ready()

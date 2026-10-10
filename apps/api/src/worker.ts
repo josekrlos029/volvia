@@ -3,22 +3,14 @@ import pino from 'pino'
 import { env, isProduction } from './env'
 import { createMailer } from './lib/email'
 import { createRedis } from './lib/redis'
-import {
-  expireInactiveCards,
-  expireRewards,
-  finishStaleMessages,
-  runBirthdayAutomations,
-  runCampaignScheduler,
-  runLocked,
-} from './workers/cron'
-import { buildHandlers } from './workers/handlers'
-import { drainOutbox, requeueStale } from './workers/outbox'
+import { createJobRunner } from './workers/jobs'
 
 /**
- * Background worker.
+ * Local background worker.
  *
- * Deployed as its own Cloud Run service so a burst of stamps never competes with the
- * API for CPU, and so the queue keeps draining while the API scales to zero.
+ * Production has no always-on process: Cloud Scheduler calls `/internal/jobs/cron` once
+ * a minute and the API kicks its own outbox after each write. On a laptop there is no
+ * scheduler, so this loop calls the same two ticks on a timer. Same code, two clocks.
  */
 const logger = pino({
   level: env.LOG_LEVEL,
@@ -30,59 +22,35 @@ const logger = pino({
 const database = createDatabase({ url: env.DATABASE_URL, max: 5 })
 const redis = createRedis({ forQueue: true })
 const mailer = createMailer(logger)
-const handlers = buildHandlers({ mailer })
-
-const context = { db: database.db, redis, logger }
+const runner = createJobRunner({ db: database.db, redis, logger, mailer })
 
 const OUTBOX_INTERVAL_MS = 2_000
-const SCHEDULER_INTERVAL_MS = 60_000
-const DAILY_INTERVAL_MS = 15 * 60_000
+const CRON_INTERVAL_MS = 60_000
 
 let running = true
 const timers: NodeJS.Timeout[] = []
 
-/** Wraps a loop body so one failure never kills the interval. */
+/** Wraps a loop body so one failure never kills the interval, and slow runs never overlap. */
 function safeInterval(name: string, intervalMs: number, job: () => Promise<void>): void {
+  let busy = false
   const timer = setInterval(() => {
-    if (!running) return
-    job().catch((error) => logger.error({ err: error, job: name }, 'scheduled job failed'))
+    if (!running || busy) return
+    busy = true
+    job()
+      .catch((error) => logger.error({ err: error, job: name }, 'scheduled job failed'))
+      .finally(() => {
+        busy = false
+      })
   }, intervalMs)
   timers.push(timer)
 }
 
 safeInterval('outbox', OUTBOX_INTERVAL_MS, async () => {
-  const result = await drainOutbox(database.db, handlers, logger)
-  if (result.processed > 0 || result.failed > 0) {
-    logger.debug(result, 'outbox drained')
-  }
+  await runner.outbox({ deadlineMs: 10_000 })
 })
 
-safeInterval('requeue-stale', SCHEDULER_INTERVAL_MS, async () => {
-  await runLocked(context, 'requeue-stale', 55, async () => {
-    await requeueStale(database.db, logger)
-  })
-})
-
-safeInterval('campaigns', SCHEDULER_INTERVAL_MS, async () => {
-  await runLocked(context, 'campaigns', 55, async () => {
-    const result = await runCampaignScheduler(context)
-    if (result.started || result.finished) logger.info(result, 'campaign scheduler')
-    await finishStaleMessages(context)
-  })
-})
-
-safeInterval('daily', DAILY_INTERVAL_MS, async () => {
-  // A 20-hour lock makes these effectively once-a-day even though the loop is frequent —
-  // frequent checks matter because organisations span timezones.
-  await runLocked(context, 'birthdays', 20 * 3_600, async () => {
-    const sent = await runBirthdayAutomations(context)
-    if (sent > 0) logger.info({ sent }, 'birthday automations queued')
-  })
-  await runLocked(context, 'expiry', 3_600, async () => {
-    const rewards = await expireRewards(context)
-    const cards = await expireInactiveCards(context)
-    if (rewards || cards) logger.info({ rewards, cards }, 'expiry sweep')
-  })
+safeInterval('cron', CRON_INTERVAL_MS, async () => {
+  await runner.cron()
 })
 
 async function shutdown(signal: string): Promise<void> {

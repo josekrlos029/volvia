@@ -42,6 +42,11 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
   TOKEN_PEPPER: z.string().min(32),
+  /**
+   * Bearer token for `/internal/jobs/*`, the endpoints the scheduler and the API itself
+   * call to run background work. Empty disables them (the local worker runs instead).
+   */
+  JOBS_SECRET: z.string().default(''),
 
   MAIL_TRANSPORT: z.enum(['smtp', 'log']).default('smtp'),
   SMTP_HOST: z.string().default('localhost'),
@@ -120,6 +125,10 @@ export function unsafeForProduction(env: Env): string[] {
   const placeholder = (value: string) => /dev-only|change-me|^changeme|^secret$|^test$/i.test(value)
   for (const key of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'TOKEN_PEPPER'] as const) {
     if (placeholder(env[key])) problems.push(`${key} still holds the development placeholder`)
+  }
+
+  if (env.JOBS_SECRET.length < 32 || placeholder(env.JOBS_SECRET)) {
+    problems.push('JOBS_SECRET must be a real secret of at least 32 characters')
   }
 
   if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
