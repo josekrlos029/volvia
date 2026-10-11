@@ -3,7 +3,8 @@ import { ActivityFeed, type ActivityItem } from '@/components/ActivityFeed'
 import { ShareCard } from '@/components/ShareCard'
 import { Badge, EmptyState, Metric, Panel, buttonClass } from '@/components/ui'
 import { formatNumber, formatPercent, formatRelative } from '@/lib/format'
-import { apiFetch } from '@/lib/session'
+import { apiFetch, getSession } from '@/lib/session'
+import { roleAtLeast } from '@volvia/shared'
 import Link from 'next/link'
 
 interface Overview {
@@ -41,6 +42,8 @@ interface Pulse {
 }
 
 export default async function DashboardHome() {
+  const session = await getSession()
+  const isAdmin = session ? roleAtLeast(session.role, 'admin') : false
   const [overview, series, cards, customers, pulse, org] = await Promise.all([
     apiFetch<Overview>('/v1/analytics/overview?preset=30d'),
     apiFetch<Array<{ date: string; stamps: number; joins: number }>>(
@@ -57,15 +60,22 @@ export default async function DashboardHome() {
   if (cards.length === 0) {
     return (
       <Panel>
-        <EmptyState
-          title="Crea tu primera tarjeta"
-          body="Define cuántos sellos hacen falta y qué se lleva el cliente. En dos minutos tienes el QR listo para el mostrador."
-          action={
-            <Link href="/cards/new" className={buttonClass('primary')}>
-              Crear tarjeta
-            </Link>
-          }
-        />
+        {isAdmin ? (
+          <EmptyState
+            title="Crea tu primera tarjeta"
+            body="Define cuántos sellos hacen falta y qué se lleva el cliente. En dos minutos tienes el QR listo para el mostrador."
+            action={
+              <Link href="/cards/new" className={buttonClass('primary')}>
+                Crear tarjeta
+              </Link>
+            }
+          />
+        ) : (
+          <EmptyState
+            title="Todavía no hay tarjetas"
+            body="Cuando el dueño o un administrador publique una, aquí verás su QR y podrás sellar."
+          />
+        )}
       </Panel>
     )
   }

@@ -29,13 +29,17 @@ export function CustomerSelection({
   apiUrl,
   canExport,
   canMessage = false,
+  canCampaign = true,
 }: {
   rows: CustomerRow[]
   apiUrl: string
   canExport: boolean
   canMessage?: boolean
+  canCampaign?: boolean
 }) {
   const [selected, setSelected] = useState<string[]>([])
+  // With nothing to do afterwards, the checkboxes would only be noise.
+  const canSelect = canCampaign || canMessage || canExport
 
   const allOnPage = rows.length > 0 && selected.length === rows.length
   const toggle = (id: string) =>
@@ -55,12 +59,14 @@ export function CustomerSelection({
           </p>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Link
-              href={`/campaigns?customers=${ids}`}
-              className="rounded-[9px] bg-white px-3 py-1.5 text-[13px] font-medium text-[var(--color-ink)]"
-            >
-              Crear campaña
-            </Link>
+            {canCampaign ? (
+              <Link
+                href={`/campaigns?customers=${ids}`}
+                className="rounded-[9px] bg-white px-3 py-1.5 text-[13px] font-medium text-[var(--color-ink)]"
+              >
+                Crear campaña
+              </Link>
+            ) : null}
             {canMessage ? (
               <Link
                 href={`/messages/new?customers=${ids}`}
@@ -100,15 +106,17 @@ export function CustomerSelection({
         <table className="w-full text-left text-[14px]">
           <thead className="border-b border-[var(--color-line)] bg-[var(--color-surface-muted)] text-[13px] text-[var(--color-ink-muted)]">
             <tr>
-              <th scope="col" className="w-10 px-4 py-2.5">
-                <input
-                  type="checkbox"
-                  aria-label="Seleccionar todos los de esta página"
-                  checked={allOnPage}
-                  onChange={() => setSelected(allOnPage ? [] : rows.map((row) => row.id))}
-                  className="size-4 accent-[var(--color-primary)]"
-                />
-              </th>
+              {canSelect ? (
+                <th scope="col" className="w-10 px-4 py-2.5">
+                  <input
+                    type="checkbox"
+                    aria-label="Seleccionar todos los de esta página"
+                    checked={allOnPage}
+                    onChange={() => setSelected(allOnPage ? [] : rows.map((row) => row.id))}
+                    className="size-4 accent-[var(--color-primary)]"
+                  />
+                </th>
+              ) : null}
               <th scope="col" className="px-4 py-2.5 font-medium">
                 Cliente
               </th>
@@ -136,15 +144,17 @@ export function CustomerSelection({
                     : 'hover:bg-[var(--color-surface-muted)]'
                 }
               >
-                <td className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    aria-label={`Seleccionar a ${customer.firstName}`}
-                    checked={selected.includes(customer.id)}
-                    onChange={() => toggle(customer.id)}
-                    className="size-4 accent-[var(--color-primary)]"
-                  />
-                </td>
+                {canSelect ? (
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label={`Seleccionar a ${customer.firstName}`}
+                      checked={selected.includes(customer.id)}
+                      onChange={() => toggle(customer.id)}
+                      className="size-4 accent-[var(--color-primary)]"
+                    />
+                  </td>
+                ) : null}
                 <td className="px-4 py-3">
                   <Link href={`/customers/${customer.id}`} className="font-medium">
                     {customer.firstName}
@@ -180,13 +190,15 @@ export function CustomerSelection({
                 : 'border-[var(--color-line)]',
             ].join(' ')}
           >
-            <input
-              type="checkbox"
-              aria-label={`Seleccionar a ${customer.firstName}`}
-              checked={selected.includes(customer.id)}
-              onChange={() => toggle(customer.id)}
-              className="mt-1 size-4 shrink-0 accent-[var(--color-primary)]"
-            />
+            {canSelect ? (
+              <input
+                type="checkbox"
+                aria-label={`Seleccionar a ${customer.firstName}`}
+                checked={selected.includes(customer.id)}
+                onChange={() => toggle(customer.id)}
+                className="mt-1 size-4 shrink-0 accent-[var(--color-primary)]"
+              />
+            ) : null}
             <Link href={`/customers/${customer.id}`} className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -207,11 +219,11 @@ export function CustomerSelection({
         ))}
       </ul>
 
-      {selected.length === 0 ? (
+      {canSelect && selected.length === 0 ? (
         <p className="text-[13px] text-[var(--color-ink-muted)]">
-          Marca clientes para crear una campaña solo para ellos
-          {canMessage ? ', enviarles un mensaje' : ''}
-          {canExport ? ' o exportarlos' : ''}.
+          Marca clientes para{canCampaign ? ' crear una campaña solo para ellos' : ''}
+          {canMessage ? `${canCampaign ? ',' : ''} enviarles un mensaje` : ''}
+          {canExport ? `${canCampaign || canMessage ? ' o' : ''} exportarlos` : ''}.
         </p>
       ) : null}
     </div>

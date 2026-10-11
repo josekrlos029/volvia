@@ -1,8 +1,7 @@
 import { Kiosk } from '@/components/Kiosk'
-import { apiFetch, getSession } from '@/lib/session'
+import { apiFetch, requireRole } from '@/lib/session'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = { title: 'Kiosko · Volvia' }
 
@@ -18,8 +17,8 @@ export default async function KioskPage({
 }: {
   searchParams: Promise<{ cardId?: string; locationId?: string }>
 }) {
-  const session = await getSession()
-  if (!session) redirect('/login')
+  // Starting a kiosk session is an admin call on the API, so the screen is admin-only too.
+  await requireRole('admin')
 
   const query = await searchParams
   const [cards, locations, org] = await Promise.all([

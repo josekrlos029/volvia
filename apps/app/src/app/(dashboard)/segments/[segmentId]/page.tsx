@@ -1,6 +1,6 @@
 import { SegmentEditor } from '@/components/SegmentEditor'
 import { EmptyState, Panel } from '@/components/ui'
-import { apiFetch } from '@/lib/session'
+import { apiFetch, requireRole } from '@/lib/session'
 import type { SegmentDefinition } from '@volvia/shared'
 
 interface Segment {
@@ -16,6 +16,7 @@ export default async function EditSegmentPage({
 }: {
   params: Promise<{ segmentId: string }>
 }) {
+  await requireRole('admin')
   const org = await apiFetch<{ entitlements: { features: Record<string, boolean> } }>('/v1/org')
   if (!org.entitlements.features.custom_segments) {
     return (

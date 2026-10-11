@@ -1,6 +1,7 @@
 import { Badge, EmptyState, Panel, buttonClass } from '@/components/ui'
 import { formatNumber } from '@/lib/format'
-import { apiFetch } from '@/lib/session'
+import { apiFetch, getSession } from '@/lib/session'
+import { roleAtLeast } from '@volvia/shared'
 import Link from 'next/link'
 
 interface CardRow {
@@ -15,7 +16,8 @@ interface CardRow {
 }
 
 export default async function CardsPage() {
-  const cards = await apiFetch<CardRow[]>('/v1/cards')
+  const [cards, session] = await Promise.all([apiFetch<CardRow[]>('/v1/cards'), getSession()])
+  const isAdmin = session ? roleAtLeast(session.role, 'admin') : false
 
   return (
     <div className="flex flex-col gap-6">
@@ -26,20 +28,28 @@ export default async function CardsPage() {
             Cada tarjeta tiene su propio QR y sus recompensas.
           </p>
         </div>
-        <Link href="/cards/new" className={buttonClass('primary', 'sm')}>
-          Nueva tarjeta
-        </Link>
+        {isAdmin ? (
+          <Link href="/cards/new" className={buttonClass('primary', 'sm')}>
+            Nueva tarjeta
+          </Link>
+        ) : null}
       </header>
 
       {cards.length === 0 ? (
         <Panel>
           <EmptyState
             title="Todavía no tienes tarjetas"
-            body="Crea una, publícala y pega el QR en el mostrador. Tus clientes se unen escaneándolo."
+            body={
+              isAdmin
+                ? 'Crea una, publícala y pega el QR en el mostrador. Tus clientes se unen escaneándolo.'
+                : 'Cuando el dueño o un administrador publique una, aquí verás su QR.'
+            }
             action={
-              <Link href="/cards/new" className={buttonClass('primary')}>
-                Crear tarjeta
-              </Link>
+              isAdmin ? (
+                <Link href="/cards/new" className={buttonClass('primary')}>
+                  Crear tarjeta
+                </Link>
+              ) : undefined
             }
           />
         </Panel>

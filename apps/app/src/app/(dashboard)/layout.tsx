@@ -35,6 +35,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         orgName={org.name}
         plan={PLAN_NAMES[org.entitlements.effectivePlan] ?? org.plan}
         userName={session.user.name}
+        role={session.role}
         isSuperadmin={session.user.isSuperadmin}
         locked={locked}
       />

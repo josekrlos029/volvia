@@ -4,8 +4,13 @@ import { type CustomerRow, CustomerSelection } from '@/components/CustomerSelect
 import { EmptyState, Panel, buttonClass } from '@/components/ui'
 import { formatNumber } from '@/lib/format'
 import { COMMUNITY_LABELS, EXTRA_SEGMENT_LABELS, segmentLabel } from '@/lib/segments'
-import { apiFetch } from '@/lib/session'
-import { COMMUNITY_SEGMENTS, SUGGESTED_SEGMENT_LIST, type VisitFrequency } from '@volvia/shared'
+import { apiFetch, getSession } from '@/lib/session'
+import {
+  COMMUNITY_SEGMENTS,
+  SUGGESTED_SEGMENT_LIST,
+  type VisitFrequency,
+  roleAtLeast,
+} from '@volvia/shared'
 import Link from 'next/link'
 
 interface SegmentList {
@@ -91,16 +96,19 @@ export default async function CustomersPage({
   listQuery.set('page', String(page))
   listQuery.set('pageSize', '25')
 
-  const [customers, counts, org, cards, segmentList] = await Promise.all([
+  const [customers, counts, org, cards, segmentList, session] = await Promise.all([
     apiFetch<CustomerPage>(`/v1/customers?${listQuery}`),
     apiFetch<SegmentCounts>(`/v1/customers/segments?${scope}`),
     apiFetch<{ entitlements: { features: Record<string, boolean> } }>('/v1/org'),
     apiFetch<Array<{ id: string; name: string }>>('/v1/cards'),
     apiFetch<SegmentList>('/v1/segments'),
+    getSession(),
   ])
 
-  const canExport = org.entitlements.features.csv_export ?? false
-  const canMessage = org.entitlements.features.customer_messages ?? false
+  // Exporting and messaging are admin calls on the API; counter accounts only look.
+  const isAdmin = session ? roleAtLeast(session.role, 'admin') : false
+  const canExport = isAdmin && (org.entitlements.features.csv_export ?? false)
+  const canMessage = isAdmin && (org.entitlements.features.customer_messages ?? false)
   const activeSaved = segmentId
     ? segmentList.segments.find((item) => item.id === segmentId)
     : undefined
@@ -253,6 +261,7 @@ export default async function CustomersPage({
             apiUrl={apiUrl}
             canExport={canExport}
             canMessage={canMessage}
+            canCampaign={isAdmin}
           />
 
           {customers.total > customers.pageSize ? (

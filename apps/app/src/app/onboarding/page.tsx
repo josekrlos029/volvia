@@ -1,6 +1,7 @@
 import { MarkQrPrinted } from '@/components/OnboardingChecklist'
 import { Panel, buttonClass } from '@/components/ui'
 import { apiFetch, getSession } from '@/lib/session'
+import { roleAtLeast } from '@volvia/shared'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -46,6 +47,8 @@ interface Step {
 export default async function OnboardingPage() {
   const session = await getSession()
   if (!session) redirect('/login?next=/onboarding')
+  // The checklist belongs to whoever runs the business; a counter account just stamps.
+  if (!roleAtLeast(session.role, 'admin')) redirect('/')
 
   const [org, cards, overview] = await Promise.all([
     apiFetch<Org>('/v1/org'),

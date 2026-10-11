@@ -1,6 +1,6 @@
 import { CardEditor } from '@/components/CardEditor'
 import type { ProfileQuestion } from '@/components/SignupFormEditor'
-import { apiFetch } from '@/lib/session'
+import { apiFetch, requireRole } from '@/lib/session'
 
 interface Org {
   name: string
@@ -8,6 +8,7 @@ interface Org {
 }
 
 export default async function NewCardPage() {
+  await requireRole('admin')
   const [org, profileQuestions] = await Promise.all([
     apiFetch<Org>('/v1/org'),
     apiFetch<ProfileQuestion[]>('/v1/org/profile-questions'),

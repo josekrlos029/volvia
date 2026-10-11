@@ -4,8 +4,8 @@ import { CardQr } from '@/components/CardQr'
 import { PublishButton } from '@/components/PublishButton'
 import type { ProfileQuestion } from '@/components/SignupFormEditor'
 import { Badge, Panel } from '@/components/ui'
-import { apiFetch } from '@/lib/session'
-import type { CardMessages } from '@volvia/shared'
+import { apiFetch, getSession } from '@/lib/session'
+import { type CardMessages, roleAtLeast } from '@volvia/shared'
 import Link from 'next/link'
 
 interface CardDetail {
@@ -31,11 +31,14 @@ interface Org {
 
 export default async function CardDetailPage({ params }: { params: Promise<{ cardId: string }> }) {
   const { cardId } = await params
+  const session = await getSession()
+  // A counter account can show the card and its QR, but only admins get the editor.
+  const canEdit = session ? roleAtLeast(session.role, 'admin') : false
   const [card, org, cards, profileQuestions] = await Promise.all([
     apiFetch<CardDetail>(`/v1/cards/${cardId}`),
     apiFetch<Org>('/v1/org'),
     apiFetch<Array<{ id: string; holders: number }>>('/v1/cards'),
-    apiFetch<ProfileQuestion[]>('/v1/org/profile-questions'),
+    canEdit ? apiFetch<ProfileQuestion[]>('/v1/org/profile-questions') : Promise.resolve([]),
   ])
 
   const holders = cards.find((row) => row.id === cardId)?.holders ?? 0
@@ -73,34 +76,59 @@ export default async function CardDetailPage({ params }: { params: Promise<{ car
           </p>
         </div>
 
-        {card.status !== 'active' ? <PublishButton cardId={card.id} /> : null}
+        {canEdit && card.status !== 'active' ? <PublishButton cardId={card.id} /> : null}
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px] lg:items-start">
-        <CardEditor
-          cardId={card.id}
-          businessName={org.name}
-          canCustomiseBranding={org.entitlements.features.custom_branding ?? false}
-          canUseKiosk={org.entitlements.features.kiosk_mode ?? false}
-          profileQuestions={profileQuestions}
-          lengthLocked={card.status === 'active' && holders > 0}
-          initial={{
-            name: card.name,
-            stampsRequired: card.stampsRequired,
-            design: card.design,
-            rewards: card.rewards.map((reward) => ({
-              atStamp: reward.atStamp,
-              title: reward.title,
-              description: reward.description,
-            })),
-            terms: card.terms,
-            collectBirthday: card.collectBirthday,
-            signupQuestionIds: card.signupQuestionIds,
-            initialStamps: card.initialStamps,
-            messages: card.messages,
-            rules: card.rules,
-          }}
-        />
+        {canEdit ? (
+          <CardEditor
+            cardId={card.id}
+            businessName={org.name}
+            canCustomiseBranding={org.entitlements.features.custom_branding ?? false}
+            canUseKiosk={org.entitlements.features.kiosk_mode ?? false}
+            profileQuestions={profileQuestions}
+            lengthLocked={card.status === 'active' && holders > 0}
+            initial={{
+              name: card.name,
+              stampsRequired: card.stampsRequired,
+              design: card.design,
+              rewards: card.rewards.map((reward) => ({
+                atStamp: reward.atStamp,
+                title: reward.title,
+                description: reward.description,
+              })),
+              terms: card.terms,
+              collectBirthday: card.collectBirthday,
+              signupQuestionIds: card.signupQuestionIds,
+              initialStamps: card.initialStamps,
+              messages: card.messages,
+              rules: card.rules,
+            }}
+          />
+        ) : (
+          <Panel title="Cómo funciona">
+            <p className="tabular text-[14px]">
+              {card.stampsRequired} sellos para completar la tarjeta.
+            </p>
+            <ul className="mt-3 flex flex-col gap-2 text-[14px]">
+              {card.rewards.map((reward) => (
+                <li key={reward.atStamp} className="flex gap-3">
+                  <span className="tabular w-16 shrink-0 text-[var(--color-ink-muted)]">
+                    Sello {reward.atStamp}
+                  </span>
+                  <span>
+                    <span className="font-medium">{reward.title}</span>
+                    {reward.description ? (
+                      <span className="block text-[13px] text-[var(--color-ink-muted)]">
+                        {reward.description}
+                      </span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        )}
 
         <aside className="lg:sticky lg:top-8">
           <Panel title="Código para el mostrador">

@@ -1,6 +1,7 @@
 import { EmptyState, Panel, PlanLock, buttonClass } from '@/components/ui'
 import { formatNumber } from '@/lib/format'
-import { apiFetch } from '@/lib/session'
+import { apiFetch, getSession } from '@/lib/session'
+import { roleAtLeast } from '@volvia/shared'
 import Link from 'next/link'
 
 interface SegmentList {
@@ -15,11 +16,15 @@ interface SegmentList {
 }
 
 export default async function SegmentsPage() {
-  const [list, org] = await Promise.all([
+  const [list, org, session] = await Promise.all([
     apiFetch<SegmentList>('/v1/segments'),
     apiFetch<{ entitlements: { features: Record<string, boolean> } }>('/v1/org'),
+    getSession(),
   ])
-  const canMessage = org.entitlements.features.customer_messages ?? false
+  // Counter accounts can look at segments and their customers, nothing more.
+  const isAdmin = session ? roleAtLeast(session.role, 'admin') : false
+  const canMessage = isAdmin && (org.entitlements.features.customer_messages ?? false)
+  const canCreate = isAdmin && list.canCreate
 
   return (
     <div className="flex flex-col gap-6">
@@ -31,7 +36,7 @@ export default async function SegmentsPage() {
             así que nunca se quedan viejos.
           </p>
         </div>
-        {list.canCreate ? (
+        {canCreate ? (
           <Link href="/segments/new" className={buttonClass('primary', 'sm')}>
             Nuevo segmento
           </Link>
@@ -69,7 +74,7 @@ export default async function SegmentsPage() {
                     Enviar mensaje
                   </Link>
                 ) : null}
-                {list.canCreate ? (
+                {canCreate ? (
                   <Link
                     href={`/segments/new?from=${item.key}`}
                     className="text-[var(--color-ink-muted)] underline underline-offset-2"
@@ -84,7 +89,7 @@ export default async function SegmentsPage() {
       </Panel>
 
       <Panel title="Tus segmentos">
-        {!list.canCreate ? (
+        {!list.canCreate && isAdmin ? (
           <div className="flex flex-col gap-4">
             <PlanLock feature="Guardar segmentos propios" upgradeTo="Negocio" />
             <p className="text-[14px] text-[var(--color-ink-muted)]">
@@ -95,11 +100,17 @@ export default async function SegmentsPage() {
         ) : list.segments.length === 0 ? (
           <EmptyState
             title="Todavía no tienes segmentos propios"
-            body="Empieza desde uno sugerido y afínalo, o crea uno desde cero con los filtros que te importan."
+            body={
+              canCreate
+                ? 'Empieza desde uno sugerido y afínalo, o crea uno desde cero con los filtros que te importan.'
+                : 'Los segmentos que guarde el dueño o un administrador aparecerán aquí.'
+            }
             action={
-              <Link href="/segments/new" className={buttonClass('secondary')}>
-                Crear el primero
-              </Link>
+              canCreate ? (
+                <Link href="/segments/new" className={buttonClass('secondary')}>
+                  Crear el primero
+                </Link>
+              ) : undefined
             }
           />
         ) : (
@@ -132,9 +143,11 @@ export default async function SegmentsPage() {
                       Enviar mensaje
                     </Link>
                   ) : null}
-                  <Link href={`/segments/${item.id}`} className="underline underline-offset-2">
-                    Editar
-                  </Link>
+                  {isAdmin ? (
+                    <Link href={`/segments/${item.id}`} className="underline underline-offset-2">
+                      Editar
+                    </Link>
+                  ) : null}
                 </div>
               </li>
             ))}

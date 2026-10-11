@@ -215,6 +215,12 @@ test.describe('joining a team by invitation', () => {
 
     await page.waitForURL(`${urls.app}/`)
     await expect(page.getByRole('link', { name: 'Clientes' })).toBeVisible()
+
+    // A counter account sees nothing it cannot use, and typing the URL bounces it home.
+    await expect(page.getByRole('link', { name: 'Equipo' })).not.toBeVisible()
+    await expect(page.getByRole('link', { name: 'Ajustes' })).not.toBeVisible()
+    await page.goto(`${urls.app}/team`)
+    await page.waitForURL(`${urls.app}/`)
   })
 
   test('an invitation already used does not let a second person in', async ({ page, request }) => {

@@ -1,5 +1,7 @@
 'use client'
 
+import { visibleSections } from '@/lib/nav'
+import type { Role } from '@volvia/shared'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -8,28 +10,16 @@ interface NavProps {
   orgName: string
   plan: string
   userName: string
+  role: Role
   isSuperadmin: boolean
   /** Sections the plan does not include are shown but marked, never hidden. */
   locked: Record<string, boolean>
 }
 
-const SECTIONS = [
-  { href: '/', label: 'Resumen' },
-  { href: '/cards', label: 'Tarjetas' },
-  { href: '/customers', label: 'Clientes' },
-  { href: '/segments', label: 'Segmentos' },
-  { href: '/campaigns', label: 'Campañas', feature: 'campaigns' },
-  { href: '/messages', label: 'Mensajes', feature: 'customer_messages' },
-  { href: '/surveys', label: 'Encuestas', feature: 'surveys' },
-  { href: '/reviews', label: 'Reseñas', feature: 'google_review_requests' },
-  { href: '/automations', label: 'Automatizaciones', feature: 'birthday_automation' },
-  { href: '/team', label: 'Equipo', feature: 'team_accounts' },
-  { href: '/settings', label: 'Ajustes' },
-] as const
-
-export function Nav({ orgName, plan, userName, isSuperadmin, locked }: NavProps) {
+export function Nav({ orgName, plan, userName, role, isSuperadmin, locked }: NavProps) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const sections = visibleSections(role)
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href))
 
@@ -68,8 +58,8 @@ export function Nav({ orgName, plan, userName, isSuperadmin, locked }: NavProps)
         </div>
 
         <ul className="flex flex-col gap-0.5 p-2">
-          {SECTIONS.map((section) => {
-            const isLocked = 'feature' in section && locked[section.feature as string]
+          {sections.map((section) => {
+            const isLocked = section.feature ? locked[section.feature] : false
             return (
               <li key={section.href}>
                 <Link
