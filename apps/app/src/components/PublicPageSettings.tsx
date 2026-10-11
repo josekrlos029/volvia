@@ -138,7 +138,8 @@ export function PublicPageSettings({
         <div className="flex flex-col gap-2">
           <p className="text-[14px] font-medium">Enlaces</p>
           <p className="text-[13px] leading-snug text-[var(--color-ink-muted)]">
-            WhatsApp, tu Instagram, la carta, reservas. Lo que ya usas.
+            WhatsApp, tu Instagram, la carta, reservas. Lo que ya usas. También aparecen en la
+            tarjeta guardada en Apple Wallet y Google Wallet.
           </p>
 
           <ul className="mt-1 flex flex-col gap-2">

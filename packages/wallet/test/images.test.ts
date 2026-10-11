@@ -30,6 +30,11 @@ const content: PassContent = {
   places: [],
   offerMessage: null,
   latestMessage: null,
+  customerName: '',
+  about: '',
+  links: [],
+  place: null,
+  promoImageUrl: null,
   locale: 'es',
   updatedAt: new Date('2026-10-10T15:00:00Z'),
 }
@@ -103,5 +108,15 @@ describe('google images', () => {
     expect(imageVersion({ ...content, labelColor: '#E4572E' })).not.toBe(base)
     expect(imageVersion({ ...content, offerMessage: 'Hoy sellos dobles' })).toBe(base)
     expect(imageVersion({ ...content, updatedAt: new Date() })).toBe(base)
+    // What the back of the pass says is text, not pixels: it must not roll the URLs.
+    expect(
+      imageVersion({
+        ...content,
+        customerName: 'Laura',
+        about: 'Café de origen',
+        links: [{ id: 'website-0', label: 'Sitio web', url: 'https://raices.co', kind: 'web' }],
+        promoImageUrl: 'https://cdn.example/cover.jpg',
+      }),
+    ).toBe(base)
   })
 })

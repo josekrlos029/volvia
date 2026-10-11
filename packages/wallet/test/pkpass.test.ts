@@ -45,6 +45,33 @@ const content: PassContent = {
   places: [{ latitude: 10.46, longitude: -73.25 }],
   offerMessage: null,
   latestMessage: null,
+  customerName: 'Laura',
+  about: 'Hamburguesas a la parrilla desde 2014.',
+  links: [
+    {
+      id: 'instagram-0',
+      label: 'Instagram',
+      url: 'https://www.instagram.com/burgertrain/?utm=a&b=c',
+      kind: 'web',
+    },
+    {
+      id: 'maps',
+      label: 'Cómo llegar',
+      url: 'https://maps.google.com/?q=10.46,-73.25',
+      kind: 'maps',
+    },
+    { id: 'phone', label: 'Teléfono', url: 'tel:+573001234567', kind: 'phone' },
+  ],
+  place: {
+    address: 'Calle 12 #4-56',
+    city: 'Valledupar',
+    hours: [
+      { day: 1, opens: '09:00', closes: '18:00' },
+      { day: 2, opens: '09:00', closes: '18:00' },
+      { day: 6, opens: '10:00', closes: '14:00' },
+    ],
+  },
+  promoImageUrl: null,
   locale: 'es',
   updatedAt: new Date('2026-09-02T15:00:00Z'),
 }
@@ -77,10 +104,28 @@ interface StoreCardPass {
   logoText?: string
   storeCard: {
     headerFields: Array<{ key: string; label: string; value: string; changeMessage?: string }>
-    primaryFields: Array<{ key: string; label: string; value: string; changeMessage?: string }>
-    secondaryFields: Array<{ key: string; label: string; value: string; dateStyle?: string }>
-    auxiliaryFields: Array<{ key: string; value: string; changeMessage?: string }>
-    backFields: Array<{ key: string; label: string; value: string; changeMessage?: string }>
+    primaryFields?: Array<{ key: string; label: string; value: string }>
+    secondaryFields: Array<{
+      key: string
+      label: string
+      value: string
+      changeMessage?: string
+    }>
+    auxiliaryFields: Array<{
+      key: string
+      label: string
+      value: string
+      changeMessage?: string
+      dateStyle?: string
+    }>
+    backFields: Array<{
+      key: string
+      label: string
+      value: string
+      changeMessage?: string
+      attributedValue?: string
+      dataDetectorTypes?: string[]
+    }>
   }
   barcodes: Array<{ format: string; message: string }>
   locations: Array<{ latitude: number; longitude: number; relevantText: string }>
@@ -93,7 +138,7 @@ describe('pass.json', () => {
     expect(hexToRgbString('#FFF')).toBe('rgb(255, 255, 255)')
   })
 
-  it('describes the card as a store card: business and progress in the header, reward up front', () => {
+  it('describes the card as a store card: business and progress in the header, reward under the strip', () => {
     const json = buildPassJson(content, options) as unknown as StoreCardPass
     expect(json.formatVersion).toBe(1)
     expect(json.passTypeIdentifier).toBe(options.passTypeIdentifier)
@@ -102,11 +147,12 @@ describe('pass.json', () => {
     // left names both brands, so the text on the right is the business and the count.
     expect(json.logoText).toBeUndefined()
     expect(json.storeCard.headerFields[0]).toMatchObject({ label: 'Burger Train', value: '4/8' })
-    expect(json.storeCard.primaryFields[0]).toMatchObject({
+    expect(json.storeCard.secondaryFields[0]).toMatchObject({
+      key: 'reward',
       label: 'Próxima recompensa',
       value: 'Hamburguesa gratis',
     })
-    expect(json.storeCard.secondaryFields[0]).toMatchObject({
+    expect(json.storeCard.secondaryFields[1]).toMatchObject({
       label: 'Te faltan',
       value: '4 sellos',
     })
@@ -127,7 +173,12 @@ describe('pass.json', () => {
     expect(json.storeCard.headerFields[0]!.changeMessage).toBe(
       '¡Sello sumado! Llevas %@. Te faltan 4 para Hamburguesa gratis.',
     )
-    expect(json.storeCard.primaryFields[0]!.changeMessage).toBeUndefined()
+    expect(json.storeCard.secondaryFields[0]!.changeMessage).toBeUndefined()
+  })
+
+  it('keeps the strip clear: a store card paints primary fields over the stamps', () => {
+    const json = buildPassJson(content, options) as unknown as StoreCardPass
+    expect(json.storeCard.primaryFields).toBeUndefined()
   })
 
   it('announces a claimable reward, which a reset count alone cannot express', () => {
@@ -137,12 +188,14 @@ describe('pass.json', () => {
       { ...content, stampsCount: 0, pendingRewardCount: 1 },
       options,
     ) as unknown as StoreCardPass
-    expect(completed.storeCard.primaryFields[0]).toMatchObject({
+    expect(completed.storeCard.secondaryFields[0]).toMatchObject({
+      key: 'reward',
       label: 'Recompensa lista',
       value: '¡Listo para reclamar!',
       changeMessage: 'Burger Train: %@',
     })
-    expect(completed.storeCard.secondaryFields[0]).toMatchObject({
+    expect(completed.storeCard.secondaryFields[1]).toMatchObject({
+      key: 'prize',
       label: 'Tu recompensa',
       value: 'Hamburguesa gratis',
     })
@@ -153,18 +206,18 @@ describe('pass.json', () => {
       { ...content, stampsCount: 0, pendingRewardCount: 0 },
       options,
     ) as unknown as StoreCardPass
-    expect(fresh.storeCard.primaryFields[0]!.value).toBe('Hamburguesa gratis')
+    expect(fresh.storeCard.secondaryFields[0]!.value).toBe('Hamburguesa gratis')
   })
 
   it('shows the lap from the second one on, and the last visit before that', () => {
     const first = buildPassJson(content, options) as unknown as StoreCardPass
-    expect(first.storeCard.secondaryFields[1]).toMatchObject({
+    expect(first.storeCard.auxiliaryFields[0]).toMatchObject({
       key: 'lastVisit',
       dateStyle: 'PKDateStyleMedium',
     })
 
     const second = buildPassJson({ ...content, cycleIndex: 1 }, options) as unknown as StoreCardPass
-    expect(second.storeCard.secondaryFields[1]).toMatchObject({ label: 'Vuelta', value: '2' })
+    expect(second.storeCard.auxiliaryFields[0]).toMatchObject({ label: 'Vuelta', value: '2' })
   })
 
   it('surfaces an active campaign offer, and announces it', () => {
@@ -172,8 +225,82 @@ describe('pass.json', () => {
       { ...content, offerMessage: 'Hoy sellos dobles' },
       options,
     ) as unknown as StoreCardPass
-    expect(json.storeCard.auxiliaryFields[0]!.value).toBe('Hoy sellos dobles')
-    expect(json.storeCard.auxiliaryFields[0]!.changeMessage).toContain('%@')
+    const offer = json.storeCard.auxiliaryFields.find((field) => field.key === 'offer')!
+    expect(offer.value).toBe('Hoy sellos dobles')
+    expect(offer.changeMessage).toContain('%@')
+  })
+
+  describe('back of the pass', () => {
+    const back = (overrides: Partial<PassContent> = {}) =>
+      (buildPassJson({ ...content, ...overrides }, options) as unknown as StoreCardPass).storeCard
+        .backFields
+    const find = (fields: StoreCardPass['storeCard']['backFields'], key: string) =>
+      fields.find((field) => field.key === key)
+
+    it('names the customer, and says nothing when the name is unknown', () => {
+      expect(find(back(), 'customer')).toMatchObject({ label: 'Tarjeta de', value: 'Laura' })
+      expect(find(back({ customerName: '' }), 'customer')).toBeUndefined()
+      expect(find(back({ locale: 'en' }), 'customer')!.label).toBe('Card of')
+    })
+
+    it('makes each business link tappable, with the bare URL as the fallback', () => {
+      const fields = back()
+      const instagram = find(fields, 'link-instagram-0')!
+      expect(instagram.label).toBe('Instagram')
+      expect(instagram.value).toBe('https://www.instagram.com/burgertrain/?utm=a&b=c')
+      // Only the anchor is markup; the ampersand in the URL must not become one.
+      expect(instagram.attributedValue).toBe(
+        '<a href="https://www.instagram.com/burgertrain/?utm=a&amp;b=c">instagram.com/burgertrain/?utm=a&amp;b=c</a>',
+      )
+      expect(instagram.dataDetectorTypes).toEqual(['PKDataDetectorTypeLink'])
+
+      const maps = find(fields, 'link-maps')!
+      expect(maps.attributedValue).toContain('>Cómo llegar</a>')
+
+      // A number is left to iOS's own detector, which is what makes it dial.
+      const phone = find(fields, 'link-phone')!
+      expect(phone).toMatchObject({
+        label: 'Teléfono',
+        value: '+573001234567',
+        dataDetectorTypes: ['PKDataDetectorTypePhoneNumber'],
+      })
+      expect(phone.attributedValue).toBeUndefined()
+
+      const volvia = find(fields, 'link')!
+      expect(volvia.value).toBe(content.cardUrl)
+      expect(volvia.attributedValue).toBe(`<a href="${content.cardUrl}">Volvia</a>`)
+    })
+
+    it('describes the business and its branch, with the address left to the maps detector', () => {
+      const fields = back()
+      expect(find(fields, 'about')).toMatchObject({
+        label: 'Burger Train',
+        value: 'Hamburguesas a la parrilla desde 2014.',
+      })
+      expect(find(fields, 'address')).toMatchObject({
+        label: 'Dirección',
+        value: 'Calle 12 #4-56, Valledupar',
+        dataDetectorTypes: ['PKDataDetectorTypeAddress'],
+      })
+      expect(find(fields, 'hours')).toMatchObject({
+        label: 'Horario',
+        value: 'Lun–Mar 9:00–18:00\nSáb 10:00–14:00',
+      })
+      expect(find(back({ locale: 'en' }), 'hours')!.value).toBe(
+        'Mon–Tue 9:00–18:00\nSat 10:00–14:00',
+      )
+    })
+
+    it('stays short for a business that filled nothing in, in a fixed order', () => {
+      const fields = back({ links: [], place: null, about: '', terms: 'Una por visita.' })
+      expect(fields.map((field) => field.key)).toEqual([
+        'customer',
+        'rewardDetails',
+        'message',
+        'link',
+        'terms',
+      ])
+    })
   })
 
   it('always carries a message field, so the first message can be a change', () => {

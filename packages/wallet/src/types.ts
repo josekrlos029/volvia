@@ -1,4 +1,4 @@
-import type { StampIcon, StampStyle } from '@volvia/shared'
+import type { OpeningHours, StampIcon, StampStyle } from '@volvia/shared'
 
 /** Everything a wallet pass needs to render, independent of Apple/Google specifics. */
 export interface PassContent {
@@ -49,8 +49,38 @@ export interface PassContent {
    * phone show a notification, so the text is already rendered for this customer.
    */
   latestMessage: { headline: string; body: string; sentAt: Date } | null
+  /** The customer's first name. Google shows it as the account holder; Apple on the back. Empty when unknown. */
+  customerName: string
+  /** The business's own description, as written in its settings. Empty when it has none. */
+  about: string
+  /**
+   * Everything on the pass the customer can tap, in display order, already localized
+   * and capped at eight: the business's links, directions, phone and email. The Volvia
+   * card link is `cardUrl` and stays separate.
+   */
+  links: PassLink[]
+  /** The branch shown on the back: the oldest active location with an address. */
+  place: PassPlace | null
+  /** A promotional picture for Google's image module: the org cover or the card's image banner. */
+  promoImageUrl: string | null
   locale: 'es' | 'en'
   updatedAt: Date
+}
+
+export type PassLinkKind = 'web' | 'phone' | 'email' | 'maps'
+
+export interface PassLink {
+  /** Stable within the pass; becomes the field key on Apple and the uri id on Google. */
+  id: string
+  label: string
+  url: string
+  kind: PassLinkKind
+}
+
+export interface PassPlace {
+  address: string | null
+  city: string | null
+  hours: OpeningHours
 }
 
 export type WalletMode = 'stub' | 'real' | 'disabled'

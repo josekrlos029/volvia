@@ -8,7 +8,6 @@ import {
   eq,
   gte,
   inArray,
-  isNotNull,
   isNull,
   locations,
   lte,
@@ -42,6 +41,7 @@ import { AppError } from '../../lib/errors'
 import { isWithinActiveHours, orgHour } from '../../lib/time'
 import { derivePassAuthToken } from '../../lib/tokens'
 import { walletConfig } from './config'
+import { passLinksFor, pinsOf, primaryPlaceOf } from './pass-details'
 
 /**
  * Assembles everything a pass shows, from the customer's current card state.
@@ -74,52 +74,56 @@ export async function loadPassContent(
 
   if (!row) throw new AppError('CUSTOMER_CARD_NOT_FOUND', { message: 'card not found' })
 
-  const [cardRewards, pending, activeCampaigns, places, [latestDelivery]] = await Promise.all([
-    db.select().from(rewards).where(eq(rewards.cardId, row.card.id)).orderBy(rewards.atStamp),
-    db
-      .select({ value: sql<number>`count(*)::int` })
-      .from(rewardGrants)
-      .where(
-        and(
-          eq(rewardGrants.customerCardId, row.customerCard.id),
-          eq(rewardGrants.status, 'pending'),
+  const [cardRewards, pending, activeCampaigns, orgLocations, [latestDelivery]] = await Promise.all(
+    [
+      db.select().from(rewards).where(eq(rewards.cardId, row.card.id)).orderBy(rewards.atStamp),
+      db
+        .select({ value: sql<number>`count(*)::int` })
+        .from(rewardGrants)
+        .where(
+          and(
+            eq(rewardGrants.customerCardId, row.customerCard.id),
+            eq(rewardGrants.status, 'pending'),
+          ),
         ),
-      ),
-    db
-      .select()
-      .from(campaigns)
-      .where(
-        and(
-          eq(campaigns.orgId, row.org.id),
-          eq(campaigns.status, 'running'),
-          lte(campaigns.startsAt, new Date()),
-          gte(campaigns.endsAt, new Date()),
+      db
+        .select()
+        .from(campaigns)
+        .where(
+          and(
+            eq(campaigns.orgId, row.org.id),
+            eq(campaigns.status, 'running'),
+            lte(campaigns.startsAt, new Date()),
+            gte(campaigns.endsAt, new Date()),
+          ),
         ),
-      ),
-    loadPassPlaces(db, row.org.id),
-    // Queued counts too: the iPhone fetches the rebuilt pass the moment the push lands,
-    // before the worker has had the chance to mark the delivery as done.
-    db
-      .select({
-        headline: messages.headline,
-        body: messages.body,
-        sentAt: sql<Date>`coalesce(${messages.scheduledAt}, ${messages.createdAt})`,
-      })
-      .from(messageDeliveries)
-      .innerJoin(messages, eq(messages.id, messageDeliveries.messageId))
-      .where(
-        and(
-          eq(messageDeliveries.customerCardId, row.customerCard.id),
-          inArray(messageDeliveries.status, ['queued', 'delivered']),
-        ),
-      )
-      .orderBy(desc(sql`coalesce(${messages.scheduledAt}, ${messages.createdAt})`))
-      .limit(1),
-  ])
+      loadPassLocations(db, row.org.id),
+      // Queued counts too: the iPhone fetches the rebuilt pass the moment the push lands,
+      // before the worker has had the chance to mark the delivery as done.
+      db
+        .select({
+          headline: messages.headline,
+          body: messages.body,
+          sentAt: sql<Date>`coalesce(${messages.scheduledAt}, ${messages.createdAt})`,
+        })
+        .from(messageDeliveries)
+        .innerJoin(messages, eq(messages.id, messageDeliveries.messageId))
+        .where(
+          and(
+            eq(messageDeliveries.customerCardId, row.customerCard.id),
+            inArray(messageDeliveries.status, ['queued', 'delivered']),
+          ),
+        )
+        .orderBy(desc(sql`coalesce(${messages.scheduledAt}, ${messages.createdAt})`))
+        .limit(1),
+    ],
+  )
 
   const design = row.card.design as CardDesign
   const upcoming = cardRewards.find((reward) => reward.atStamp > row.customerCard.stampsCount)
   const nextReward = upcoming ?? cardRewards[cardRewards.length - 1]
+  const places = pinsOf(orgLocations)
+  const primaryPlace = primaryPlaceOf(orgLocations)
 
   const liveCampaign = activeCampaigns.find((campaign) =>
     isWithinActiveHours(
@@ -175,6 +179,21 @@ export async function loadPassContent(
             sentAt: new Date(latestDelivery.sentAt),
           }
         : null,
+      customerName: row.customer.firstName.trim(),
+      about: row.org.about.trim(),
+      links: passLinksFor({
+        socialLinks: row.org.socialLinks,
+        contactPhone: row.org.contactPhone,
+        contactEmail: row.org.contactEmail,
+        place: primaryPlace,
+        locale: row.customer.locale,
+      }),
+      place: primaryPlace
+        ? { address: primaryPlace.address, city: primaryPlace.city, hours: primaryPlace.hours }
+        : null,
+      // The card's own picture when it has one; otherwise the business's cover.
+      promoImageUrl:
+        design.banner.kind === 'image' ? design.banner.url : (row.org.coverUrl ?? null),
       locale: row.customer.locale,
       updatedAt: row.customerCard.updatedAt,
     },
@@ -345,32 +364,22 @@ export async function issueGoogleSaveUrl(
 }
 
 /**
- * The pins that make the pass surface when the customer walks up to the shop. Both
- * wallets cap relevance points at ten, so a business with more branches keeps its
- * oldest ten: those are the ones its customers already know.
+ * The active branches of the business, oldest first. The pins come from the ones with
+ * coordinates (`pinsOf`); the back of the pass describes one of them (`primaryPlaceOf`).
  */
-export async function loadPassPlaces(
-  db: Database,
-  orgId: string,
-): Promise<Array<{ latitude: number; longitude: number }>> {
-  const rows = await db
-    .select({ latitude: locations.latitude, longitude: locations.longitude })
+export async function loadPassLocations(db: Database, orgId: string) {
+  return db
+    .select({
+      address: locations.address,
+      city: locations.city,
+      phone: locations.phone,
+      latitude: locations.latitude,
+      longitude: locations.longitude,
+      hours: locations.hours,
+    })
     .from(locations)
     .where(
-      and(
-        eq(locations.orgId, orgId),
-        eq(locations.isActive, true),
-        isNull(locations.deletedAt),
-        isNotNull(locations.latitude),
-        isNotNull(locations.longitude),
-      ),
+      and(eq(locations.orgId, orgId), eq(locations.isActive, true), isNull(locations.deletedAt)),
     )
     .orderBy(locations.createdAt)
-    .limit(10)
-
-  return rows.flatMap((row) =>
-    row.latitude !== null && row.longitude !== null
-      ? [{ latitude: row.latitude, longitude: row.longitude }]
-      : [],
-  )
 }

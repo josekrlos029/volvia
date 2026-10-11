@@ -113,9 +113,12 @@ export async function patchGooglePass(
   if (options.refreshClass) await syncGoogleClass(content, pass.orgId, logger)
 
   await patchLoyaltyObject(config, serial, {
+    accountName: object.accountName,
     loyaltyPoints: object.loyaltyPoints,
     secondaryLoyaltyPoints: object.secondaryLoyaltyPoints,
     textModulesData: object.textModulesData,
+    linksModuleData: object.linksModuleData,
+    imageModulesData: object.imageModulesData,
     merchantLocations: object.merchantLocations,
     // A new URL each stamp, which is what makes Google fetch the new strip.
     heroImage: object.heroImage,

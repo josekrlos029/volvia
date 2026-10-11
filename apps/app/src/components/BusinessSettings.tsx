@@ -237,7 +237,11 @@ export function BusinessSettings({ org }: { org: Org }) {
           />
         </Labelled>
 
-        <Labelled label="Sobre el negocio" htmlFor="org-about">
+        <Labelled
+          label="Sobre el negocio"
+          htmlFor="org-about"
+          help="También se muestra en el reverso de la tarjeta en la wallet."
+        >
           <textarea
             id="org-about"
             value={value.about}
@@ -272,7 +276,11 @@ export function BusinessSettings({ org }: { org: Org }) {
               className={field}
             />
           </Labelled>
-          <Labelled label="Teléfono" htmlFor="org-phone">
+          <Labelled
+            label="Teléfono"
+            htmlFor="org-phone"
+            help="Aparece en la tarjeta de la wallet, para llamar con un toque."
+          >
             <input
               id="org-phone"
               type="tel"

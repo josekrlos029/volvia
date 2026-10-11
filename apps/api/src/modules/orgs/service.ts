@@ -32,33 +32,61 @@ export async function getOrg(db: Database, orgId: string) {
   return org
 }
 
+/**
+ * What of the business travels on every pass it issues. The first set changes the
+ * pictures or the Google class (the name is the Apple header label and the program
+ * name; the logo feeds the lockup when the card has none), the second only the text
+ * and links on the back.
+ */
+const PASS_DESIGN_FIELDS = ['name', 'logoUrl', 'coverUrl'] as const
+const PASS_DETAIL_FIELDS = ['socialLinks', 'contactPhone', 'contactEmail', 'about'] as const
+
+function changedAny<T extends object>(before: T, after: T, keys: readonly (keyof T)[]): boolean {
+  return keys.some((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
+}
+
 /** Slug changes break existing public links, so collisions are rejected, not renamed. */
 export async function updateOrg(db: Database, orgId: string, input: UpdateOrgInput) {
-  if (input.slug) {
-    const [taken] = await db
-      .select({ id: organizations.id })
-      .from(organizations)
-      .where(eq(organizations.slug, input.slug))
-      .limit(1)
-    if (taken && taken.id !== orgId) {
-      throw new AppError('CONFLICT', { message: 'that address is already taken' })
+  return db.transaction(async (tx) => {
+    if (input.slug) {
+      const [taken] = await tx
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(eq(organizations.slug, input.slug))
+        .limit(1)
+      if (taken && taken.id !== orgId) {
+        throw new AppError('CONFLICT', { message: 'that address is already taken' })
+      }
     }
-  }
 
-  // Settings arrive as a patch — saving one preference must not wipe the rest.
-  const { settings, ...fields } = input
-  const merged = settings
-    ? { settings: { ...(await getOrg(db, orgId)).settings, ...settings } }
-    : {}
+    const [before] = await tx
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .for('update')
+      .limit(1)
+    if (!before) throw new AppError('ORG_NOT_FOUND', { message: 'organization not found' })
 
-  const [updated] = await db
-    .update(organizations)
-    .set({ ...fields, ...merged, updatedAt: new Date() })
-    .where(eq(organizations.id, orgId))
-    .returning()
+    // Settings arrive as a patch — saving one preference must not wipe the rest.
+    const { settings, ...fields } = input
+    const merged = settings ? { settings: { ...before.settings, ...settings } } : {}
 
-  if (!updated) throw new AppError('ORG_NOT_FOUND', { message: 'organization not found' })
-  return updated
+    const [updated] = await tx
+      .update(organizations)
+      .set({ ...fields, ...merged, updatedAt: new Date() })
+      .where(eq(organizations.id, orgId))
+      .returning()
+    if (!updated) throw new AppError('ORG_NOT_FOUND', { message: 'organization not found' })
+
+    // Anything a pass shows has to reach the phones that already carry it. A save that
+    // changed nothing the pass uses stays silent: no outbox rows, no pushes.
+    if (changedAny(before, updated, PASS_DESIGN_FIELDS)) {
+      await enqueueWalletUpdatesForOrg(tx, orgId, { reason: 'design' })
+    } else if (changedAny(before, updated, PASS_DETAIL_FIELDS)) {
+      await enqueueWalletUpdatesForOrg(tx, orgId, { reason: 'details' })
+    }
+    return updated
+  })
 }
 
 export async function suggestSlug(db: Database, name: string): Promise<string> {
@@ -118,8 +146,12 @@ export async function createLocation(
       .returning()
 
     // A new pin changes every pass of the business, so each installed one is refreshed.
+    // Without a pin, a branch with an address can still become the one the back of the
+    // pass describes, when the older ones have none.
     if (isPassRelevant(created!)) {
       await enqueueWalletUpdatesForOrg(tx, input.orgId, { reason: 'location' })
+    } else if (hasPassDetails(created!)) {
+      await enqueueWalletUpdatesForOrg(tx, input.orgId, { reason: 'details' })
     }
     return created!
   })
@@ -139,6 +171,17 @@ function isPassRelevant(location: {
     location.longitude !== null
   )
 }
+
+/** What the back of the pass shows of a branch: anything the owner filled in. */
+function hasPassDetails(location: {
+  address: string | null
+  phone: string | null
+  hours: unknown[]
+}): boolean {
+  return Boolean(location.address || location.phone || location.hours.length > 0)
+}
+
+const LOCATION_DETAIL_FIELDS = ['address', 'city', 'phone', 'hours', 'isActive'] as const
 
 export async function updateLocation(
   db: Database,
@@ -161,14 +204,17 @@ export async function updateLocation(
       .where(eq(locations.id, locationId))
       .returning()
 
-    // Renaming a branch or changing its hours is invisible to the pass; only the pin
-    // (or the branch going on or off the map) is worth waking every phone for.
+    // The pin moving (or the branch going on or off the map) changes where every pass
+    // surfaces; the address, phone and hours change what its back says. Renaming a
+    // branch is invisible to the pass.
     const pinChanged =
       before.latitude !== updated!.latitude ||
       before.longitude !== updated!.longitude ||
       isPassRelevant(before) !== isPassRelevant(updated!)
     if (pinChanged && (isPassRelevant(before) || isPassRelevant(updated!))) {
       await enqueueWalletUpdatesForOrg(tx, orgId, { reason: 'location' })
+    } else if (changedAny(before, updated!, LOCATION_DETAIL_FIELDS)) {
+      await enqueueWalletUpdatesForOrg(tx, orgId, { reason: 'details' })
     }
     return updated!
   })
@@ -194,9 +240,12 @@ export async function deleteLocation(db: Database, orgId: string, locationId: st
       )
       .returning()
 
-    // The branch had a pin: the passes still point at it until they are rebuilt.
+    // The passes still point at the branch's pin, and may still describe it on the
+    // back, until they are rebuilt.
     if (deleted && deleted.latitude !== null && deleted.longitude !== null) {
       await enqueueWalletUpdatesForOrg(tx, orgId, { reason: 'location' })
+    } else if (deleted && hasPassDetails(deleted)) {
+      await enqueueWalletUpdatesForOrg(tx, orgId, { reason: 'details' })
     }
     return { deleted: true }
   })

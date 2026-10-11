@@ -33,8 +33,10 @@ export default async function SettingsPage() {
         name: string
         address: string | null
         city: string | null
+        phone: string | null
         latitude: number | null
         longitude: number | null
+        hours: Array<{ day: number; opens: string; closes: string }>
       }>
     >('/v1/org/locations'),
   ])

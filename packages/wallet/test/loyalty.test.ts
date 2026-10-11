@@ -48,6 +48,33 @@ const content: PassContent = {
   ],
   offerMessage: null,
   latestMessage: null,
+  customerName: 'Laura',
+  about: 'Hamburguesas a la parrilla desde 2014.',
+  links: [
+    {
+      id: 'instagram-0',
+      label: 'Instagram',
+      url: 'https://instagram.com/burgertrain',
+      kind: 'web',
+    },
+    {
+      id: 'maps',
+      label: 'Cómo llegar',
+      url: 'https://maps.google.com/?q=10.46,-73.25',
+      kind: 'maps',
+    },
+    { id: 'phone', label: 'Teléfono', url: 'tel:+573001234567', kind: 'phone' },
+  ],
+  place: {
+    address: 'Calle 12 #4-56',
+    city: 'Valledupar',
+    hours: [
+      { day: 1, opens: '09:00', closes: '18:00' },
+      { day: 2, opens: '09:00', closes: '18:00' },
+      { day: 6, opens: '10:00', closes: '14:00' },
+    ],
+  },
+  promoImageUrl: null,
   locale: 'es',
   updatedAt: new Date('2026-09-02T15:00:00Z'),
 }
@@ -118,6 +145,76 @@ describe('google loyalty object', () => {
       heroImageUrl: 'https://api.example/wallet/google/images/abc/hero.png?v=1',
     }) as { heroImage: { sourceUri: { uri: string } } }
     expect(object.heroImage.sourceUri.uri).toContain('/hero.png')
+  })
+
+  it('names the customer as the account holder, and the business when the name is unknown', () => {
+    expect(buildLoyaltyObject(config, content, orgId).accountName).toBe('Laura')
+    expect(buildLoyaltyObject(config, { ...content, customerName: '' }, orgId).accountName).toBe(
+      'Burger Train',
+    )
+  })
+
+  it("lists the business's links before the Volvia card link, each with an id", () => {
+    const object = buildLoyaltyObject(config, content, orgId) as {
+      linksModuleData: { uris: Array<{ id: string; uri: string; description: string }> }
+    }
+    expect(object.linksModuleData.uris.map((uri) => uri.id)).toEqual([
+      'instagram-0',
+      'maps',
+      'phone',
+      'card',
+    ])
+    expect(object.linksModuleData.uris[2]).toEqual({
+      id: 'phone',
+      uri: 'tel:+573001234567',
+      description: 'Teléfono',
+    })
+    expect(object.linksModuleData.uris[3]!.uri).toBe(content.cardUrl)
+  })
+
+  it('adds hours, about and terms as text modules, clipped to what Google shows', () => {
+    const object = buildLoyaltyObject(
+      config,
+      { ...content, terms: 'Una recompensa por visita.' },
+      orgId,
+    ) as { textModulesData: Array<{ id: string; header: string; body: string }> }
+    expect(object.textModulesData.map((module) => module.id)).toEqual([
+      'reward',
+      'hours',
+      'about',
+      'terms',
+    ])
+    expect(object.textModulesData[1]).toEqual({
+      id: 'hours',
+      header: 'Horario',
+      body: 'Lun–Mar 9:00–18:00\nSáb 10:00–14:00',
+    })
+    expect(object.textModulesData[2]!.header).toBe('Burger Train')
+
+    const long = buildLoyaltyObject(config, { ...content, about: 'x'.repeat(600) }, orgId) as {
+      textModulesData: Array<{ id: string; body: string }>
+    }
+    const about = long.textModulesData.find((module) => module.id === 'about')!
+    expect(about.body).toHaveLength(500)
+    expect(about.body.endsWith('…')).toBe(true)
+
+    const bare = buildLoyaltyObject(config, { ...content, about: '', place: null }, orgId) as {
+      textModulesData: Array<{ id: string }>
+    }
+    expect(bare.textModulesData.map((module) => module.id)).toEqual(['reward'])
+  })
+
+  it('carries the promotional picture as an image module, and an empty list without one', () => {
+    const withCover = buildLoyaltyObject(
+      config,
+      { ...content, promoImageUrl: 'https://cdn.example/cover.jpg' },
+      orgId,
+    ) as { imageModulesData: Array<{ id: string; mainImage: { sourceUri: { uri: string } } }> }
+    expect(withCover.imageModulesData[0]!.id).toBe('promo')
+    expect(withCover.imageModulesData[0]!.mainImage.sourceUri.uri).toBe(
+      'https://cdn.example/cover.jpg',
+    )
+    expect(buildLoyaltyObject(config, content, orgId).imageModulesData).toEqual([])
   })
 
   it('puts the lockup in the class as the wide logo, which replaces the round one in the header', () => {

@@ -2,6 +2,7 @@
 
 import { api } from '@/lib/api-client'
 import { mapsUrl, parseCoordinates, roundCoordinate } from '@/lib/geo'
+import { WEEKDAY_SHORT, WEEK_ORDER } from '@volvia/shared'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Panel, buttonClass } from './ui'
@@ -11,11 +12,30 @@ interface Location {
   name: string
   address: string | null
   city: string | null
+  phone: string | null
   latitude: number | null
   longitude: number | null
+  hours: Array<{ day: number; opens: string; closes: string }>
 }
 
 type Pin = { latitude: number; longitude: number }
+
+/** One range per weekday. A split shift saved through the API shows as its first range. */
+type Week = Record<number, { open: boolean; opens: string; closes: string }>
+
+const WEEKDAY_FULL = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+
+function weekFrom(hours: Location['hours']): Week {
+  const week: Week = {}
+  for (const day of WEEK_ORDER) week[day] = { open: false, opens: '09:00', closes: '18:00' }
+  for (const entry of hours) {
+    const current = week[entry.day]
+    if (current && !current.open) {
+      week[entry.day] = { open: true, opens: entry.opens, closes: entry.closes }
+    }
+  }
+  return week
+}
 
 const field =
   'w-full rounded-[9px] border border-[var(--color-line)] bg-white px-3.5 py-2.5 text-[14px] placeholder:text-[#8A908A] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25'
@@ -33,7 +53,9 @@ export function LocationsSettings({ locations }: { locations: Location[] }) {
       <p className="mb-4 text-[13px] leading-snug text-[var(--color-ink-muted)]">
         Con la ubicación de cada sede, la tarjeta aparece sola en la pantalla de bloqueo del iPhone
         cuando el cliente está cerca (sin sonido) y Google Wallet le envía un aviso en Android. Solo
-        pasa si tiene la tarjeta guardada en su Wallet y permite el acceso a su ubicación.
+        pasa si tiene la tarjeta guardada en su Wallet y permite el acceso a su ubicación. La
+        dirección, el teléfono y el horario de la primera sede también se muestran en el reverso de
+        la tarjeta en Apple Wallet y en los detalles en Google Wallet.
       </p>
       <ul className="flex flex-col divide-y divide-[var(--color-line)]">
         {locations.map((location) => (
@@ -133,12 +155,9 @@ function LocationRow({ location }: { location: Location }) {
 
   return (
     <li className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0">
-      <div>
-        <p className="text-[14px] font-medium">{location.name}</p>
-        <p className="text-[13px] text-[var(--color-ink-muted)]">
-          {[location.address, location.city].filter(Boolean).join(', ') || 'Sin dirección'}
-        </p>
-      </div>
+      <p className="text-[14px] font-medium">{location.name}</p>
+
+      <LocationDetails location={location} />
 
       <div className="flex flex-col gap-3 rounded-[10px] bg-[var(--color-surface-muted)] p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -227,5 +246,168 @@ function LocationRow({ location }: { location: Location }) {
         ) : null}
       </div>
     </li>
+  )
+}
+
+/**
+ * What the pass says about the branch: where it is, how to call, when it opens. Saved
+ * apart from the pin so a typo in the street never touches the coordinates.
+ */
+function LocationDetails({ location }: { location: Location }) {
+  const router = useRouter()
+  const [details, setDetails] = useState({
+    address: location.address ?? '',
+    city: location.city ?? '',
+    phone: location.phone ?? '',
+  })
+  const [week, setWeek] = useState<Week>(() => weekFrom(location.hours))
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [error, setError] = useState<string | null>(null)
+
+  function setDay(day: number, patch: Partial<Week[number]>) {
+    setWeek({ ...week, [day]: { ...week[day]!, ...patch } })
+  }
+
+  async function save() {
+    setStatus('saving')
+    setError(null)
+    try {
+      await api.patch(`/v1/org/locations/${location.id}`, {
+        address: details.address.trim() || null,
+        city: details.city.trim() || null,
+        phone: details.phone.trim() || null,
+        hours: WEEK_ORDER.filter((day) => week[day]!.open).map((day) => ({
+          day,
+          opens: week[day]!.opens,
+          closes: week[day]!.closes,
+        })),
+      })
+      setStatus('saved')
+      router.refresh()
+      setTimeout(() => setStatus('idle'), 2_000)
+    } catch {
+      setStatus('idle')
+      setError('No pudimos guardar los datos de la sede.')
+    }
+  }
+
+  const id = (name: string) => `location-${name}-${location.id}`
+
+  return (
+    <div className="flex flex-col gap-3 rounded-[10px] bg-[var(--color-surface-muted)] p-3">
+      <p className="text-[13px] font-medium">Datos de la sede</p>
+
+      <div className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr]">
+        <div className="flex flex-col gap-1">
+          <label htmlFor={id('address')} className="text-[13px] text-[var(--color-ink-muted)]">
+            Dirección
+          </label>
+          <input
+            id={id('address')}
+            value={details.address}
+            onChange={(event) => setDetails({ ...details, address: event.target.value })}
+            maxLength={200}
+            placeholder="Calle 12 #4-56"
+            className={field}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor={id('city')} className="text-[13px] text-[var(--color-ink-muted)]">
+            Ciudad
+          </label>
+          <input
+            id={id('city')}
+            value={details.city}
+            onChange={(event) => setDetails({ ...details, city: event.target.value })}
+            maxLength={80}
+            className={field}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor={id('phone')} className="text-[13px] text-[var(--color-ink-muted)]">
+            Teléfono
+          </label>
+          <input
+            id={id('phone')}
+            type="tel"
+            value={details.phone}
+            onChange={(event) => setDetails({ ...details, phone: event.target.value })}
+            maxLength={30}
+            placeholder="+57 300 123 4567"
+            className={field}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <p className="text-[13px] text-[var(--color-ink-muted)]">Horario</p>
+        <ul className="flex flex-col gap-1.5">
+          {WEEK_ORDER.map((day) => {
+            const entry = week[day]!
+            return (
+              <li
+                key={day}
+                className="grid grid-cols-[64px_1fr_auto_1fr] items-center gap-2 text-[13px]"
+              >
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={entry.open}
+                    onChange={(event) => setDay(day, { open: event.target.checked })}
+                  />
+                  {WEEKDAY_SHORT.es[day]}
+                </label>
+                {entry.open ? (
+                  <>
+                    <input
+                      type="time"
+                      step={900}
+                      value={entry.opens}
+                      onChange={(event) => setDay(day, { opens: event.target.value })}
+                      aria-label={`Abre ${WEEKDAY_FULL[day]}`}
+                      className={field}
+                    />
+                    <span className="text-[var(--color-ink-muted)]">a</span>
+                    <input
+                      type="time"
+                      step={900}
+                      value={entry.closes}
+                      onChange={(event) => setDay(day, { closes: event.target.value })}
+                      aria-label={`Cierra ${WEEKDAY_FULL[day]}`}
+                      className={field}
+                    />
+                  </>
+                ) : (
+                  <span className="col-span-3 text-[var(--color-ink-muted)]">Cerrado</span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+
+      {error ? (
+        <p
+          role="alert"
+          className="rounded-[9px] bg-[#FBEBEA] px-3.5 py-2.5 text-[13px] text-[var(--color-danger)]"
+        >
+          {error}
+        </p>
+      ) : null}
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={save}
+          disabled={status === 'saving'}
+          className={buttonClass('secondary', 'sm')}
+        >
+          {status === 'saving' ? 'Guardando' : 'Guardar datos'}
+        </button>
+        {status === 'saved' ? (
+          <span className="text-[13px] text-[var(--color-success)]">Datos guardados</span>
+        ) : null}
+      </div>
+    </div>
   )
 }

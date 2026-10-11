@@ -1,3 +1,4 @@
+import { formatOpeningHours } from '@volvia/shared'
 import { GoogleAuth } from 'google-auth-library'
 import { SignJWT, importPKCS8 } from 'jose'
 import type { PassContent } from '../types'
@@ -18,6 +19,14 @@ export interface GoogleWalletConfig {
 
 const API_BASE = 'https://walletobjects.googleapis.com/walletobjects/v1'
 const SAVE_URL = 'https://pay.google.com/gp/v/save'
+
+/** What Google renders of a text module body before it stops; longer text is cut, not scrolled. */
+const TEXT_MODULE_BODY_MAX = 500
+const TEXT_MODULE_HEADER_MAX = 100
+
+function clip(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`
+}
 
 export function classId(config: GoogleWalletConfig, orgId: string): string {
   // One class per business: it carries the branding every one of their cards shares.
@@ -90,6 +99,8 @@ export function buildLoyaltyObject(
           remaining: 'Te faltan',
           stamps: (count: number) => (count === 1 ? '1 sello' : `${count} sellos`),
           cycle: 'Vuelta',
+          hours: 'Horario',
+          terms: 'Términos',
         }
       : {
           points: 'Stamps',
@@ -100,17 +111,22 @@ export function buildLoyaltyObject(
           remaining: 'You need',
           stamps: (count: number) => (count === 1 ? '1 more stamp' : `${count} more stamps`),
           cycle: 'Round',
+          hours: 'Hours',
+          terms: 'Terms',
         }
   const hasReward = content.pendingRewardCount > 0
   const target = content.nextRewardAt ?? content.stampsRequired
   const remaining = Math.max(0, target - content.stampsCount)
   const lap = content.cycleIndex > 0 ? ` · ${labels.cycle} ${content.cycleIndex + 1}` : ''
+  const hoursText = content.place ? formatOpeningHours(content.place.hours, content.locale) : ''
 
   return {
     id: objectId(config, content.serial),
     classId: classId(config, orgId),
     state: 'ACTIVE',
-    accountName: content.organizationName,
+    // The holder's name, which is what this field is for; the business already names
+    // the program. Falls back to the business for a customer who gave no name.
+    accountName: content.customerName || content.organizationName,
     accountId: content.serial,
     loyaltyPoints: {
       label: labels.points,
@@ -135,10 +151,43 @@ export function buildLoyaltyObject(
             body: `${labels.stamps(remaining)} · ${content.rewardTitle}${lap}`,
           },
       ...(content.offerMessage ? [{ id: 'offer', header: '★', body: content.offerMessage }] : []),
+      ...(hoursText ? [{ id: 'hours', header: labels.hours, body: hoursText }] : []),
+      ...(content.about
+        ? [
+            {
+              id: 'about',
+              header: clip(content.organizationName, TEXT_MODULE_HEADER_MAX),
+              body: clip(content.about, TEXT_MODULE_BODY_MAX),
+            },
+          ]
+        : []),
+      ...(content.terms
+        ? [{ id: 'terms', header: labels.terms, body: clip(content.terms, TEXT_MODULE_BODY_MAX) }]
+        : []),
     ],
+    // The business's own links first, the Volvia card last. Google draws an icon per
+    // scheme: http, tel and mailto are all accepted here.
     linksModuleData: {
-      uris: [{ uri: content.cardUrl, description: 'Volvia', id: 'card' }],
+      uris: [
+        ...content.links.map((link) => ({ uri: link.url, description: link.label, id: link.id })),
+        { uri: content.cardUrl, description: 'Volvia', id: 'card' },
+      ],
     },
+    // Always present, empty when there is no picture, so a patch after the cover is
+    // removed clears it (the same contract `merchantLocations: []` relies on).
+    imageModulesData: content.promoImageUrl
+      ? [
+          {
+            id: 'promo',
+            mainImage: {
+              sourceUri: { uri: content.promoImageUrl },
+              contentDescription: {
+                defaultValue: { language: content.locale, value: content.organizationName },
+              },
+            },
+          },
+        ]
+      : [],
     // Google sends its own "pass nearby" notification around these points. The older
     // `locations` key still validates but no longer triggers anything.
     merchantLocations: content.places.map((place) => ({

@@ -1,4 +1,5 @@
-import type { PassContent } from '../types'
+import { formatOpeningHours } from '@volvia/shared'
+import type { PassContent, PassLink } from '../types'
 
 /**
  * Builds `pass.json` for a PassKit store card.
@@ -6,8 +7,9 @@ import type { PassContent } from '../types'
  * The layout mirrors how the card is read at the counter and in the stacked Wallet
  * list. The header is the only row visible while passes are collapsed, so it carries
  * the business (as a label) and the progress; the lockup in `logo.png` sits to its
- * left. The primary row is the reward the customer is working towards, because that
- * is the question the card answers; the stamps themselves are drawn in `strip.png`.
+ * left. The stamps are drawn in `strip.png`, and nothing is laid over them: on a store
+ * card Wallet paints the primary fields on top of the strip, so there are none. The
+ * reward the customer is working towards sits in the row under the strip instead.
  */
 export interface PassJsonOptions {
   passTypeIdentifier: string
@@ -31,6 +33,9 @@ const STRINGS = {
     terms: 'Términos',
     news: 'Novedades',
     noNews: 'Aquí verás lo que te cuente el negocio.',
+    cardOf: 'Tarjeta de',
+    address: 'Dirección',
+    hours: 'Horario',
     stamped: (remaining: number, reward: string) =>
       `¡Sello sumado! Llevas %@. Te faltan ${remaining} para ${reward}.`,
     earned: (org: string) => `${org}: %@`,
@@ -50,6 +55,9 @@ const STRINGS = {
     terms: 'Terms',
     news: 'News',
     noNews: 'Messages from the business will show up here.',
+    cardOf: 'Card of',
+    address: 'Address',
+    hours: 'Hours',
     stamped: (remaining: number, reward: string) =>
       `Stamp added! You have %@. ${remaining} more for ${reward}.`,
     earned: (org: string) => `${org}: %@`,
@@ -75,6 +83,119 @@ export function nearbyText(content: PassContent): string {
 export function stampsRemaining(content: PassContent): number {
   const target = content.nextRewardAt ?? content.stampsRequired
   return Math.max(0, target - content.stampsCount)
+}
+
+type Field = Record<string, unknown> & { key: string; label: string; value: string }
+
+/** PassKit only honours `<a href>` inside `attributedValue`; everything else must be text. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function anchor(url: string, text: string): string {
+  return `<a href="${escapeHtml(url)}">${escapeHtml(text)}</a>`
+}
+
+/** `https://www.instagram.com/burgertrain/` reads as `instagram.com/burgertrain`. */
+function displayUrl(url: string): string {
+  return url
+    .replace(/^[a-z]+:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/$/, '')
+}
+
+/**
+ * A back field the customer can tap. Links carry an anchor with readable text and the
+ * bare URL as the fallback value; a phone number is left to iOS's own detector, which
+ * is what makes it dial, rather than relying on `tel:` inside an anchor.
+ */
+function linkField(link: PassLink): Field {
+  const key = `link-${link.id}`
+  switch (link.kind) {
+    case 'phone':
+      return {
+        key,
+        label: link.label,
+        value: link.url.replace(/^tel:/, ''),
+        dataDetectorTypes: ['PKDataDetectorTypePhoneNumber'],
+      }
+    case 'email':
+      return {
+        key,
+        label: link.label,
+        value: link.url.replace(/^mailto:/, ''),
+        attributedValue: anchor(link.url, link.url.replace(/^mailto:/, '')),
+      }
+    case 'maps':
+      return {
+        key,
+        label: link.label,
+        value: link.url,
+        attributedValue: anchor(link.url, link.label),
+        dataDetectorTypes: ['PKDataDetectorTypeLink'],
+      }
+    default:
+      return {
+        key,
+        label: link.label,
+        value: link.url,
+        attributedValue: anchor(link.url, displayUrl(link.url)),
+        dataDetectorTypes: ['PKDataDetectorTypeLink'],
+      }
+  }
+}
+
+/**
+ * The back of the pass, top to bottom: whose card it is, what the reward is, the latest
+ * message, then the business itself (description, address, hours, links), the Volvia
+ * link and the terms. Fields the business left empty are not emitted at all.
+ */
+function backFields(content: PassContent): Field[] {
+  const strings = STRINGS[content.locale]
+  const place = content.place
+  const addressLine = place ? [place.address, place.city].filter(Boolean).join(', ') : ''
+  const hoursText = place ? formatOpeningHours(place.hours, content.locale) : ''
+
+  return [
+    ...(content.customerName
+      ? [{ key: 'customer', label: strings.cardOf, value: content.customerName }]
+      : []),
+    { key: 'rewardDetails', label: content.cardName, value: content.rewardDescription },
+    // Always present, even before the first message: the phone only alerts when a
+    // field it already knew changes value, so the key has to exist from install.
+    {
+      key: 'message',
+      label: content.latestMessage?.headline ?? strings.news,
+      value: content.latestMessage?.body ?? strings.noNews,
+      changeMessage: '%@',
+    },
+    ...(content.about
+      ? [{ key: 'about', label: content.organizationName, value: content.about }]
+      : []),
+    ...(place?.address
+      ? [
+          {
+            key: 'address',
+            label: strings.address,
+            value: addressLine,
+            dataDetectorTypes: ['PKDataDetectorTypeAddress'],
+          },
+        ]
+      : []),
+    ...(hoursText ? [{ key: 'hours', label: strings.hours, value: hoursText }] : []),
+    ...content.links.map(linkField),
+    {
+      key: 'link',
+      label: 'Volvia',
+      value: content.cardUrl,
+      attributedValue: anchor(content.cardUrl, 'Volvia'),
+    },
+    ...(content.terms ? [{ key: 'terms', label: strings.terms, value: content.terms }] : []),
+  ]
 }
 
 export function buildPassJson(
@@ -111,23 +232,28 @@ export function buildPassJson(
           label: content.organizationName,
           value: `${content.stampsCount}/${content.stampsRequired}`,
           // Each stamp changes this value, which is what makes the phone show a banner.
-          // Silenced while a reward is pending: the primary field announces that one,
+          // Silenced while a reward is pending: the reward field announces that one,
           // and the count resetting to zero is not news worth a second alert.
           ...(hasReward ? {} : { changeMessage: strings.stamped(remaining, content.rewardTitle) }),
         },
       ],
-      primaryFields: [
-        {
-          key: 'reward',
-          label: hasReward ? strings.rewardReady : strings.nextReward,
-          value: hasReward ? strings.ready : content.rewardTitle,
-          ...(hasReward ? { changeMessage: strings.earned(content.organizationName) } : {}),
-        },
-      ],
-      secondaryFields: [
-        hasReward
-          ? { key: 'remaining', label: strings.reward, value: content.rewardTitle }
-          : { key: 'remaining', label: strings.remaining, value: strings.stamps(remaining) },
+      // No primaryFields on purpose: Wallet would draw them over the stamps in the strip.
+      // Secondary and auxiliary fields share the row under the strip on a store card.
+      secondaryFields: hasReward
+        ? [
+            {
+              key: 'reward',
+              label: strings.rewardReady,
+              value: strings.ready,
+              changeMessage: strings.earned(content.organizationName),
+            },
+            { key: 'prize', label: strings.reward, value: content.rewardTitle },
+          ]
+        : [
+            { key: 'reward', label: strings.nextReward, value: content.rewardTitle },
+            { key: 'remaining', label: strings.remaining, value: strings.stamps(remaining) },
+          ],
+      auxiliaryFields: [
         ...(content.cycleIndex > 0
           ? [{ key: 'cycle', label: strings.cycle, value: String(content.cycleIndex + 1) }]
           : content.lastStampAt
@@ -141,23 +267,11 @@ export function buildPassJson(
                 },
               ]
             : []),
+        ...(content.offerMessage
+          ? [{ key: 'offer', label: '★', value: content.offerMessage, changeMessage: '%@' }]
+          : []),
       ],
-      auxiliaryFields: content.offerMessage
-        ? [{ key: 'offer', label: '★', value: content.offerMessage, changeMessage: '%@' }]
-        : [],
-      backFields: [
-        { key: 'about', label: content.cardName, value: content.rewardDescription },
-        { key: 'link', label: 'Volvia', value: content.cardUrl },
-        // Always present, even before the first message: the phone only alerts when a
-        // field it already knew changes value, so the key has to exist from install.
-        {
-          key: 'message',
-          label: content.latestMessage?.headline ?? strings.news,
-          value: content.latestMessage?.body ?? strings.noNews,
-          changeMessage: '%@',
-        },
-        ...(content.terms ? [{ key: 'terms', label: strings.terms, value: content.terms }] : []),
-      ],
+      backFields: backFields(content),
     },
 
     barcodes: [

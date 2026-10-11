@@ -306,6 +306,55 @@ Google no documenta si los avisos funcionan mientras la cuenta sigue en modo dem
 
 ---
 
+## Reverso del pase
+
+El frente lleva solo lo que cambia con cada visita: la cuadrícula de sellos en el strip y,
+debajo, la recompensa y cuánto falta. El reverso (en iPhone, el botón ⋯ de la tarjeta; en
+Android, "Detalles") es donde el pase presenta al negocio. Nada de esto se configura por
+tarjeta: sale de lo que el dueño ya tiene en Ajustes.
+
+| Qué sale | De dónde | iPhone | Android |
+|---|---|---|---|
+| Tarjeta de *nombre* | Nombre del cliente al darse de alta | Campo del reverso | `accountName`, bajo el nombre del programa |
+| Descripción de la recompensa | Tarjeta → Recompensas | Campo del reverso | Módulo de texto (junto a "Te faltan") |
+| Última novedad | Mensajes | Campo del reverso (su cambio dispara el aviso) | Mensaje con notificación |
+| Sobre el negocio | Ajustes → Tu negocio → Sobre el negocio | Campo del reverso | Módulo de texto |
+| Dirección | Ajustes → Sedes (la primera sede activa con dirección) | Tocable: iOS la detecta y abre Mapas | Enlace "Cómo llegar" a Google Maps (por coordenadas si hay pin, si no por la dirección) |
+| Horario | Ajustes → Sedes | "Lun–Vie 9:00–18:00", una línea por tramo | Módulo de texto |
+| Enlaces (Instagram, WhatsApp, web, carta, reservas…) | Ajustes → Tu página pública, en ese orden | Tocables, con el nombre que puso el negocio | Módulo de enlaces, con icono por tipo |
+| Teléfono | Teléfono de la sede, o el de contacto del negocio | Tocable: iOS lo detecta y marca | Enlace `tel:` |
+| Correo | Ajustes → Tu negocio → Correo de contacto | Tocable | Enlace `mailto:` |
+| Imagen promocional | Banner de imagen de la tarjeta, o la portada del negocio | No hay sitio en una tarjeta de tienda | Módulo de imagen bajo el strip |
+| Volvia | — | Enlace a la tarjeta web | Último enlace del módulo |
+| Términos | Tarjeta → Términos | Campo del reverso | Módulo de texto |
+
+Límites: hasta 8 enlaces del negocio más el de Volvia; en Google los textos se recortan a
+500 caracteres. Los campos que el negocio dejó vacíos no se emiten.
+
+**Por qué la recompensa no va encima de los sellos.** En una tarjeta de tienda de Apple
+(`storeCard`), Wallet pinta los `primaryFields` sobre el `strip.png`. Como el strip es la
+cuadrícula de sellos, el pase no lleva campos primarios: la recompensa y "Te faltan" van en
+los secundarios, y la última visita (o la vuelta) y la oferta activa en los auxiliares. En
+una tarjeta de tienda ambos grupos comparten la fila bajo el strip, así que un título de
+recompensa muy largo puede recortarse cuando hay oferta activa.
+
+**Cuándo se refrescan los pases instalados.** Cualquier guardado que cambie algo que el
+pase muestra encola un `wallet.update` por cada pase instalado del negocio (una fila de
+outbox por pase, en lotes de 500):
+
+| Guardado | `reason` | Qué hace el worker |
+|---|---|---|
+| Nombre, logo o portada del negocio | `design` | Rehace el pase Apple y reescribe también la clase de Google (nombre y lockup viven ahí; ojo: tras la aprobación de publicación, un cambio de clase puede devolverla a revisión) |
+| Enlaces, teléfono, correo o "Sobre el negocio" | `details` | Rehace el pase Apple y parchea el objeto de Google |
+| Dirección, ciudad, teléfono, horario o alta/baja de una sede | `details` | Igual |
+| Pin de una sede (o la sede entra o sale del mapa) | `location` | Igual, con las `locations` / `merchantLocations` nuevas |
+
+Un guardado que no cambia nada de lo anterior no encola nada. En iPhone estos refrescos
+no muestran banner: solo los campos con `changeMessage` (progreso, recompensa, mensaje,
+oferta) avisan, y ninguno cambia de valor por editar el reverso.
+
+---
+
 ## Imágenes del pase
 
 Los dos pases se dibujan a partir del diseño de la tarjeta (colores, icono de sello,
