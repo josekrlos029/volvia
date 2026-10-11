@@ -155,7 +155,7 @@ export default async function BusinessPageRoute({ params }: { params: Promise<{ 
               href={link.url}
               target="_blank"
               rel="noreferrer noopener"
-              className="rounded-[10px] border border-[var(--color-line)] bg-white px-4 py-3 text-center text-[15px] font-medium transition-transform duration-150 active:scale-[0.985]"
+              className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 text-center text-[15px] font-medium transition-transform duration-150 active:scale-[0.985]"
             >
               {link.label ?? SOCIAL_LABELS[link.platform] ?? link.platform}
             </a>
@@ -164,7 +164,7 @@ export default async function BusinessPageRoute({ params }: { params: Promise<{ 
       ) : null}
 
       {page.locations.length > 0 ? (
-        <section className="mb-6 rounded-[14px] border border-[var(--color-line)] bg-white p-4">
+        <section className="mb-6 rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
           <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-ink-muted)]">
             {copy.business.findUs}
           </h2>

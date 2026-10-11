@@ -112,7 +112,7 @@ export function SurveyCard({
 
   if (stage === 'thanks') {
     return (
-      <section className="rounded-[14px] border border-[var(--color-line)] bg-white p-4">
+      <section className="rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
         <h2 className="text-[16px] font-medium leading-snug">
           {review ? copy.survey.reviewTitle : copy.survey.thanksTitle}
         </h2>
@@ -154,7 +154,7 @@ export function SurveyCard({
   }
 
   return (
-    <section className="rounded-[14px] border border-[var(--color-line)] bg-white p-4">
+    <section className="rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
       <h2 className="text-[16px] font-medium leading-snug">{copy.survey.title}</h2>
       <p className="mt-1 text-[14px] leading-snug text-[var(--color-ink-muted)]">
         {survey.isAnonymous ? copy.survey.anonymous : copy.survey.intro}
@@ -187,7 +187,7 @@ export function SurveyCard({
                         className={`tabular h-12 flex-1 rounded-[10px] border text-[16px] font-medium transition-transform duration-150 active:scale-[0.97] ${
                           chosen
                             ? 'border-transparent text-white'
-                            : 'border-[var(--color-line)] bg-white text-[var(--color-ink)]'
+                            : 'border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)]'
                         }`}
                         style={chosen ? { backgroundColor: accentColor } : undefined}
                       >
@@ -210,7 +210,7 @@ export function SurveyCard({
                 placeholder={copy.survey.textPlaceholder}
                 value={answers[index]?.text ?? ''}
                 onChange={(event) => setAnswer(index, { text: event.target.value })}
-                className="w-full resize-none rounded-[10px] border border-[var(--color-line)] bg-white px-3.5 py-2.5 text-[15px] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25"
+                className="w-full resize-none rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-2.5 text-[15px] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25"
               />
             ) : null}
 
@@ -236,7 +236,7 @@ export function SurveyCard({
                       className={`rounded-[10px] border px-3.5 py-3 text-left text-[15px] transition-transform duration-150 active:scale-[0.99] ${
                         chosen
                           ? 'border-transparent text-white'
-                          : 'border-[var(--color-line)] bg-white'
+                          : 'border-[var(--color-line)] bg-[var(--color-surface)]'
                       }`}
                       style={chosen ? { backgroundColor: accentColor } : undefined}
                     >

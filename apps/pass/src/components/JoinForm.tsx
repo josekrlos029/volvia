@@ -210,7 +210,7 @@ export function JoinForm({
       {errors.form ? (
         <p
           role="alert"
-          className="rounded-[10px] bg-[#FBEBEA] px-3.5 py-3 text-[14px] text-[var(--color-danger)]"
+          className="rounded-[10px] bg-[var(--color-danger)]/10 px-3.5 py-3 text-[14px] text-[var(--color-danger)]"
         >
           {errors.form}
         </p>

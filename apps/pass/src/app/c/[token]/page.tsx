@@ -104,7 +104,7 @@ export default async function CardPage({
           </section>
         ) : null}
 
-        <section className="rounded-[14px] border border-[var(--color-line)] bg-white p-4">
+        <section className="rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
           {state.nextReward ? (
             <>
               <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-ink-muted)]">
@@ -152,7 +152,7 @@ export default async function CardPage({
         </p>
 
         {state.business.locations.length > 0 ? (
-          <section className="rounded-[14px] border border-[var(--color-line)] bg-white p-4">
+          <section className="rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
             <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-ink-muted)]">
               {copy.card.whereTitle}
             </h2>
@@ -182,7 +182,7 @@ export default async function CardPage({
         ) : null}
 
         {state.card.terms ? (
-          <details className="rounded-[14px] border border-[var(--color-line)] bg-white p-4">
+          <details className="rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
             <summary className="cursor-pointer text-[14px] font-medium">{copy.card.terms}</summary>
             <p className="mt-2 text-[14px] leading-relaxed text-[var(--color-ink-muted)]">
               {state.card.terms}

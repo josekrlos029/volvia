@@ -31,7 +31,7 @@ export function WalletButtons({ appleUrl, googleUrl, locale }: WalletButtonsProp
     <a
       key="apple"
       href={appleUrl}
-      className="flex items-center justify-center gap-2 rounded-[10px] bg-[#14171A] px-4 py-3.5 text-[15px] font-medium text-white transition-transform duration-150 active:scale-[0.985]"
+      className="flex items-center justify-center gap-2 rounded-[10px] bg-[var(--color-inverse-surface)] px-4 py-3.5 text-[15px] font-medium text-[var(--color-surface)] transition-transform duration-150 active:scale-[0.985]"
     >
       <AppleGlyph />
       {copy.card.addApple}
@@ -42,7 +42,7 @@ export function WalletButtons({ appleUrl, googleUrl, locale }: WalletButtonsProp
     <a
       key="google"
       href={googleUrl}
-      className="flex items-center justify-center gap-2 rounded-[10px] border border-[var(--color-line)] bg-white px-4 py-3.5 text-[15px] font-medium text-[var(--color-ink)] transition-transform duration-150 active:scale-[0.985]"
+      className="flex items-center justify-center gap-2 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3.5 text-[15px] font-medium text-[var(--color-ink)] transition-transform duration-150 active:scale-[0.985]"
     >
       <GoogleGlyph />
       {copy.card.addGoogle}

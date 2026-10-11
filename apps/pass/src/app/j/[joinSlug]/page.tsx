@@ -85,7 +85,7 @@ export default async function JoinPageRoute({ params }: { params: Promise<{ join
       </header>
 
       {page.rewards.length > 1 ? (
-        <section className="mb-7 rounded-[14px] border border-[var(--color-line)] bg-white p-4">
+        <section className="mb-7 rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
           <h2 className="text-[13px] font-medium uppercase tracking-[0.12em] text-[var(--color-ink-muted)]">
             {copy.join.rewardsTitle}
           </h2>

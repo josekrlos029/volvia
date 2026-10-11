@@ -39,8 +39,8 @@ export function Field({ label, htmlFor, help, error, children }: FieldProps) {
 }
 
 export const inputClass = [
-  'w-full rounded-[10px] border bg-white px-3.5 py-3 text-[16px] text-[var(--color-ink)]',
-  'border-[var(--color-line)] placeholder:text-[#8A908A]',
+  'w-full rounded-[10px] border bg-[var(--color-surface)] px-3.5 py-3 text-[16px] text-[var(--color-ink)]',
+  'border-[var(--color-line)] placeholder:text-[var(--color-ink-muted)]',
   'focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25',
   'disabled:opacity-60',
 ].join(' ')
