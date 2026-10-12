@@ -1,3 +1,4 @@
+import GoogleSignIn
 import SwiftUI
 
 @main
@@ -15,6 +16,8 @@ struct VolviaBizApp: App {
                 }
             }
             .environmentObject(model)
+            // Google's sign-in sheet returns through the reversed-client-id URL scheme.
+            .onOpenURL { url in GIDSignIn.sharedInstance.handle(url) }
             .onChange(of: scenePhase) { _, phase in
                 // Coming back to the foreground is the likeliest moment for the
                 // connection to have returned.

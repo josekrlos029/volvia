@@ -9,6 +9,10 @@ export const ERROR_CODES = {
   EMAIL_NOT_VERIFIED: 403,
   FORBIDDEN: 403,
   EMAIL_TAKEN: 409,
+  /** Sign in with Apple came back with a relay address; Volvia needs the real one. */
+  SOCIAL_EMAIL_HIDDEN: 403,
+  /** A social identity with no Volvia account behind it (native apps cannot sign up). */
+  ACCOUNT_NOT_FOUND: 404,
 
   // tenancy / plans
   ORG_NOT_FOUND: 404,

@@ -87,6 +87,16 @@ const envSchema = z.object({
 
   GOOGLE_OAUTH_CLIENT_ID: z.string().default(''),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().default(''),
+  /** The iOS OAuth client of Volvia Biz; its ID tokens are accepted by /auth/google/native. */
+  GOOGLE_OAUTH_IOS_CLIENT_ID: z.string().default(''),
+
+  // Sign in with Apple. The web flow authenticates as the Services ID; the native app
+  // as its bundle ID. Both are signed with the same .p8 key under APPLE_TEAM_ID.
+  APPLE_SIGNIN_SERVICES_ID: z.string().default(''),
+  APPLE_SIGNIN_KEY_ID: z.string().default(''),
+  /** Contents of the .p8 key (PEM). Inline because Cloud Run exposes secrets as variables. */
+  APPLE_SIGNIN_KEY_P8: z.string().default(''),
+  APPLE_SIGNIN_APP_BUNDLE_ID: z.string().default('co.volvia.biz'),
 
   BILLING_ENABLED: bool.default(true),
   STRIPE_SECRET_KEY: z.string().default(''),

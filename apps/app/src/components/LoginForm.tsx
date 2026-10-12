@@ -4,6 +4,7 @@ import { ApiError } from '@volvia/shared/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { AppleButton } from './auth/AppleButton'
 import { GoogleButton, OrDivider } from './auth/GoogleButton'
 import { buttonClass } from './ui'
 
@@ -11,11 +12,18 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
 type Mode = 'password' | 'magic'
 
-export function LoginForm({ next }: { next?: string }) {
+export function LoginForm({
+  next,
+  initialError = null,
+}: {
+  next?: string
+  /** What a Google or Apple round trip left behind, already translated. */
+  initialError?: string | null
+}) {
   const router = useRouter()
   const [mode, setMode] = useState<Mode>('password')
   const [status, setStatus] = useState<'idle' | 'working' | 'sent'>('idle')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(initialError)
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -85,7 +93,10 @@ export function LoginForm({ next }: { next?: string }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <GoogleButton label="Entrar con Google" redirectTo={next} />
+      <div className="flex flex-col gap-3">
+        <GoogleButton label="Entrar con Google" redirectTo={next} />
+        <AppleButton label="Entrar con Apple" redirectTo={next} />
+      </div>
       <OrDivider />
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">

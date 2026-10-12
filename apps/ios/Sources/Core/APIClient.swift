@@ -40,6 +40,20 @@ actor APIClient {
         )
     }
 
+    /// The identity token from `ASAuthorizationAppleIDCredential`. The name travels
+    /// separately because Apple puts it in the credential, not in the token, and only
+    /// the first time.
+    func logIn(appleIdentityToken token: String, name: String?) async throws -> TokenPair {
+        var body: [String: Any] = ["identityToken": token]
+        if let name, !name.isEmpty { body["name"] = name }
+        return try await send("/v1/auth/apple/native", body: body, authenticated: false)
+    }
+
+    /// The ID token the Google Sign-In SDK returns for the iOS client.
+    func logIn(googleIdToken token: String) async throws -> TokenPair {
+        try await send("/v1/auth/google/native", body: ["idToken": token], authenticated: false)
+    }
+
     func stamp(_ pending: PendingStamp) async throws -> StampResult {
         try await send(
             "/v1/stamp",

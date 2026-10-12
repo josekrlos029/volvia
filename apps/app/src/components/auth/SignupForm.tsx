@@ -6,6 +6,7 @@ import type { SessionUser } from '@volvia/shared'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { buttonClass } from '../ui'
+import { AppleButton } from './AppleButton'
 import { fieldClass, labelClass } from './AuthShell'
 import { FormError } from './FormError'
 import { GoogleButton, OrDivider } from './GoogleButton'
@@ -22,9 +23,15 @@ interface RegisterResponse {
 export function SignupForm({
   defaultEmail = '',
   defaultName = '',
+  socialToken = null,
 }: {
   defaultEmail?: string
   defaultName?: string
+  /**
+   * Set when Google or Apple already proved the address: the form drops the password
+   * and the email is fixed to the one the provider vouched for.
+   */
+  socialToken?: string | null
 }) {
   const router = useRouter()
   const [working, setWorking] = useState(false)
@@ -44,7 +51,7 @@ export function SignupForm({
         email: String(form.get('email') ?? '')
           .trim()
           .toLowerCase(),
-        password: String(form.get('password') ?? ''),
+        ...(socialToken ? { socialToken } : { password: String(form.get('password') ?? '') }),
         marketingOptIn: form.get('marketingOptIn') === 'on',
       })
 
@@ -59,8 +66,15 @@ export function SignupForm({
 
   return (
     <div className="flex flex-col gap-5">
-      <GoogleButton label="Continuar con Google" />
-      <OrDivider />
+      {socialToken ? null : (
+        <>
+          <div className="flex flex-col gap-3">
+            <GoogleButton label="Continuar con Google" />
+            <AppleButton label="Continuar con Apple" />
+          </div>
+          <OrDivider />
+        </>
+      )}
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
@@ -107,29 +121,38 @@ export function SignupForm({
             required
             autoComplete="email"
             defaultValue={defaultEmail}
-            className={fieldClass}
+            readOnly={Boolean(socialToken)}
+            aria-describedby={socialToken ? 'email-hint' : undefined}
+            className={`${fieldClass} ${socialToken ? 'bg-[var(--color-surface-muted)] text-[var(--color-ink-muted)]' : ''}`}
             placeholder="hola@tunegocio.com"
           />
+          {socialToken ? (
+            <p id="email-hint" className="text-[13px] text-[var(--color-ink-muted)]">
+              Es el correo de tu cuenta. Entrarás con el botón, sin contraseña.
+            </p>
+          ) : null}
         </div>
 
-        <div className="flex flex-col gap-2">
-          <label htmlFor="password" className={labelClass}>
-            Contraseña
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={12}
-            autoComplete="new-password"
-            aria-describedby="password-hint"
-            className={fieldClass}
-          />
-          <p id="password-hint" className="text-[13px] text-[var(--color-ink-muted)]">
-            Al menos 12 caracteres. Una frase que recuerdes sirve mejor que símbolos.
-          </p>
-        </div>
+        {socialToken ? null : (
+          <div className="flex flex-col gap-2">
+            <label htmlFor="password" className={labelClass}>
+              Contraseña
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              minLength={12}
+              autoComplete="new-password"
+              aria-describedby="password-hint"
+              className={fieldClass}
+            />
+            <p id="password-hint" className="text-[13px] text-[var(--color-ink-muted)]">
+              Al menos 12 caracteres. Una frase que recuerdes sirve mejor que símbolos.
+            </p>
+          </div>
+        )}
 
         <label className="flex items-start gap-2.5 text-[14px] leading-snug">
           <input

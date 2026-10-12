@@ -13,12 +13,13 @@ export const metadata: Metadata = {
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string; name?: string; from?: string }>
+  searchParams: Promise<{ email?: string; name?: string; from?: string; social?: string }>
 }) {
   const session = await getSession()
   if (session) redirect('/')
 
-  const { email, name, from } = await searchParams
+  const { email, name, from, social } = await searchParams
+  const providerName = from === 'apple' ? 'Apple' : from === 'google' ? 'Google' : null
 
   return (
     <AuthShell
@@ -36,16 +37,24 @@ export default async function SignupPage({
         </>
       }
     >
-      {from === 'google' ? (
+      {providerName ? (
         <div className="mb-5">
           <AuthNotice
             title="Primero crea tu negocio"
-            body="Tu cuenta de Google todavía no está en Volvia. Crea el negocio con este correo y a partir de ahí podrás entrar con Google."
+            body={
+              social
+                ? `Tu cuenta de ${providerName} todavía no está en Volvia. Ponle nombre a tu negocio y listo: no necesitas contraseña.`
+                : `Tu cuenta de ${providerName} todavía no está en Volvia. Crea el negocio con este correo y a partir de ahí podrás entrar con ${providerName}.`
+            }
           />
         </div>
       ) : null}
 
-      <SignupForm defaultEmail={email ?? ''} defaultName={name ?? ''} />
+      <SignupForm
+        defaultEmail={email ?? ''}
+        defaultName={name ?? ''}
+        socialToken={social ?? null}
+      />
     </AuthShell>
   )
 }

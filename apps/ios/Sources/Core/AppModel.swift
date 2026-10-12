@@ -78,6 +78,26 @@ final class AppModel: ObservableObject {
         await flush()
     }
 
+    func signIn(appleIdentityToken token: String, name: String?) async throws {
+        let pair = try await client.logIn(appleIdentityToken: token, name: name)
+        session.save(pair)
+        await flush()
+    }
+
+    func signIn(googleIdToken token: String) async throws {
+        let pair = try await client.logIn(googleIdToken: token)
+        session.save(pair)
+        await flush()
+    }
+
+    /// Google Sign-In only works when the iOS client ID was baked into the build.
+    static var googleSignInAvailable: Bool {
+        guard let id = Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String else {
+            return false
+        }
+        return !id.isEmpty && !id.hasPrefix("$(")
+    }
+
     func signOut() {
         session.signOut()
         outcome = nil

@@ -72,6 +72,7 @@ export const authTokenPurposeEnum = pgEnum('auth_token_purpose', [
   'email_verification',
   'password_reset',
   'invite',
+  'social_signup',
 ])
 export const outboxStatusEnum = pgEnum('outbox_status', ['pending', 'processing', 'done', 'failed'])
 export const messageStatusEnum = pgEnum('message_status', [

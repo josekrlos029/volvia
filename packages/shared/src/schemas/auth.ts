@@ -13,17 +13,42 @@ export const passwordSchema = z
     message: 'password_too_common',
   })
 
-export const registerSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
-  name: z.string().trim().min(2).max(120),
-  businessName: z.string().trim().min(2).max(120),
-  locale: localeSchema.optional(),
-  country: z.string().length(2).optional(),
-  timezone: z.string().optional(),
-  marketingOptIn: z.boolean().default(false),
-})
+export const SOCIAL_PROVIDERS = ['google', 'apple'] as const
+export type SocialProvider = (typeof SOCIAL_PROVIDERS)[number]
+export const socialProviderSchema = z.enum(SOCIAL_PROVIDERS)
+
+/**
+ * A business is created with a password *or* with a social identity that has just
+ * proved who the person is. `socialToken` is the single-use token the API issued when
+ * Google or Apple came back with an address that had no account yet.
+ */
+export const registerSchema = z
+  .object({
+    email: emailSchema,
+    password: passwordSchema.optional(),
+    socialToken: z.string().min(16).max(400).optional(),
+    name: z.string().trim().min(2).max(120),
+    businessName: z.string().trim().min(2).max(120),
+    locale: localeSchema.optional(),
+    country: z.string().length(2).optional(),
+    timezone: z.string().optional(),
+    marketingOptIn: z.boolean().default(false),
+  })
+  .refine((value) => Boolean(value.password) || Boolean(value.socialToken), {
+    path: ['password'],
+    message: 'password_required',
+  })
 export type RegisterInput = z.infer<typeof registerSchema>
+
+/** What a native app sends after the platform sign-in sheet: the provider's ID token. */
+export const nativeAppleSignInSchema = z.object({
+  identityToken: z.string().min(16).max(4000),
+  /** Apple only hands the name to the app, and only the first time. */
+  name: z.string().trim().max(120).optional(),
+})
+export const nativeGoogleSignInSchema = z.object({
+  idToken: z.string().min(16).max(4000),
+})
 
 export const loginSchema = z.object({
   email: emailSchema,

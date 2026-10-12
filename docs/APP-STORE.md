@@ -210,8 +210,11 @@ actualización.
 
 1. https://developer.apple.com/account → Certificates, Identifiers & Profiles →
    Identifiers → + → App IDs → App. Description "Volvia Biz", Bundle ID **explícito**
-   `co.volvia.biz`. Sin capabilities. (Xcode lo crearía solo al archivar, pero verlo
-   registrado evita sorpresas.)
+   `co.volvia.biz`, con la capability **Sign in with Apple** marcada: la pantalla de
+   entrada la usa, y `project.yml` la declara en `Sources/VolviaBiz.entitlements`. (Xcode
+   lo crearía solo al archivar, pero verlo registrado evita sorpresas.)
+   El botón de Google necesita además `GOOGLE_IOS_CLIENT_ID` y `GOOGLE_IOS_URL_SCHEME` en
+   `project.yml` (cliente OAuth de tipo iOS en Google Cloud); vacíos, el botón no aparece.
 2. https://appstoreconnect.apple.com → Mis apps → + → Nueva app:
    - Plataformas: iOS
    - Nombre: Volvia Biz (si está tomado en la tienda, "Volvia Biz · Sellos")

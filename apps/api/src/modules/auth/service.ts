@@ -17,7 +17,9 @@ import {
   MAGIC_LINK_TTL_SECONDS,
   PASSWORD_RESET_TTL_SECONDS,
   type RegisterInput,
+  SOCIAL_SIGNUP_TTL_SECONDS,
   type SessionUser,
+  type SocialProvider,
 } from '@volvia/shared'
 import { AUDIT_ACTIONS, audit } from '../../lib/audit'
 import { AppError } from '../../lib/errors'
@@ -62,11 +64,23 @@ export async function registerOwner(
   db: Database,
   input: RegisterInput,
   meta: { ip: string; userAgent: string },
+  /**
+   * Present when the person arrived through Google or Apple: the account is created
+   * without a password, with the identity linked and the address already verified,
+   * because the provider vouched for it a moment ago.
+   */
+  social?: IdentityLink,
 ) {
   const existing = await findUserByEmail(db, input.email)
   if (existing) throw new AppError('EMAIL_TAKEN', { message: 'that email already has an account' })
 
-  const passwordHash = await hashPassword(input.password)
+  if (!input.password && !social) {
+    throw new AppError('VALIDATION_FAILED', {
+      message: 'a password is required',
+      details: [{ path: 'password', message: 'password_required' }],
+    })
+  }
+  const passwordHash = input.password ? await hashPassword(input.password) : null
   const slug = await uniqueOrgSlug(db, input.businessName)
 
   return db.transaction(async (tx) => {
@@ -78,8 +92,18 @@ export async function registerOwner(
         name: input.name,
         locale: input.locale ?? 'es',
         marketingOptIn: input.marketingOptIn,
+        emailVerifiedAt: social ? new Date() : null,
       })
       .returning()
+
+    if (social) {
+      await tx.insert(authIdentities).values({
+        userId: user!.id,
+        provider: social.provider,
+        providerUserId: social.providerUserId,
+        profile: social.profile,
+      })
+    }
 
     const [org] = await tx
       .insert(organizations)
@@ -132,13 +156,19 @@ export async function verifyCredentials(db: Database, email: string, password: s
   return user
 }
 
-export type TokenPurpose = 'magic_link' | 'email_verification' | 'password_reset' | 'invite'
+export type TokenPurpose =
+  | 'magic_link'
+  | 'email_verification'
+  | 'password_reset'
+  | 'invite'
+  | 'social_signup'
 
 const TTL_BY_PURPOSE: Record<TokenPurpose, number> = {
   magic_link: MAGIC_LINK_TTL_SECONDS,
   email_verification: EMAIL_VERIFICATION_TTL_SECONDS,
   password_reset: PASSWORD_RESET_TTL_SECONDS,
   invite: 7 * 24 * 60 * 60,
+  social_signup: SOCIAL_SIGNUP_TTL_SECONDS,
 }
 
 /** Issues a single-use token and stores only its hash. Returns the plaintext once. */
@@ -214,28 +244,43 @@ export async function setPassword(db: Database, userId: string, password: string
     .where(eq(users.id, userId))
 }
 
-export async function linkGoogleIdentity(
+export interface IdentityLink {
+  provider: SocialProvider
+  providerUserId: string
+  profile: Record<string, unknown>
+}
+
+/** Attaches a Google or Apple identity to an account. Idempotent: re-linking is a no-op. */
+export async function linkIdentity(
   db: Database,
-  input: { userId: string; providerUserId: string; profile: Record<string, unknown> },
+  input: IdentityLink & { userId: string },
 ): Promise<void> {
   await db
     .insert(authIdentities)
     .values({
       userId: input.userId,
-      provider: 'google',
+      provider: input.provider,
       providerUserId: input.providerUserId,
       profile: input.profile,
     })
     .onConflictDoNothing()
 }
 
-export async function findUserByGoogleId(db: Database, providerUserId: string) {
+export async function findUserByIdentity(
+  db: Database,
+  provider: SocialProvider,
+  providerUserId: string,
+) {
   const [row] = await db
     .select({ user: users })
     .from(authIdentities)
     .innerJoin(users, eq(users.id, authIdentities.userId))
     .where(
-      and(eq(authIdentities.provider, 'google'), eq(authIdentities.providerUserId, providerUserId)),
+      and(
+        eq(authIdentities.provider, provider),
+        eq(authIdentities.providerUserId, providerUserId),
+        isNull(users.deletedAt),
+      ),
     )
     .limit(1)
   return row?.user ?? null

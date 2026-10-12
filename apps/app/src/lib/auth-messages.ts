@@ -22,6 +22,18 @@ const BY_CODE: Partial<Record<string, string>> = {
   CONFLICT: 'Esta invitación ya se usó.',
   RATE_LIMITED: 'Demasiados intentos. Espera unos minutos.',
   SERVICE_UNAVAILABLE: 'Ese método de entrada no está disponible ahora.',
+  SOCIAL_EMAIL_HIDDEN:
+    'Apple nos dio un correo oculto. Vuelve a intentarlo y elige "Compartir mi correo": Volvia necesita tu dirección real.',
+  ACCOUNT_NOT_FOUND: 'Ese correo no tiene cuenta en Volvia. Crea tu negocio primero.',
+}
+
+/**
+ * The social callbacks cannot show a page of their own, so they land on `/login?error=`
+ * with the API code. Unknown codes get the generic line rather than leaking the code.
+ */
+export function socialErrorMessage(code: string | undefined): string | null {
+  if (!code) return null
+  return BY_CODE[code] ?? 'No pudimos completar la entrada. Intenta de nuevo.'
 }
 
 export function authErrorMessage(caught: unknown): string {

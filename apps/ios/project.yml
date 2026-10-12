@@ -16,6 +16,11 @@ settings:
     # Bump these per release. CURRENT_PROJECT_VERSION must grow with every upload.
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
+    # Google Sign-In. The client ID of type "iOS" for bundle co.volvia.biz from Google
+    # Cloud → Credentials, and the same ID reversed (com.googleusercontent.apps.123-abc)
+    # as the URL scheme Google redirects back to. Empty hides the Google button.
+    GOOGLE_IOS_CLIENT_ID: ""
+    GOOGLE_IOS_URL_SCHEME: ""
   configs:
     Debug:
       # The simulator reaches the Mac as localhost. Override per run with the
@@ -25,10 +30,25 @@ settings:
     Release:
       VOLVIA_API_URL: https://api.somosvolvia.com
 
+packages:
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "8.0.0"
+
 targets:
   VolviaBiz:
     type: application
     platform: iOS
+    dependencies:
+      - package: GoogleSignIn
+        product: GoogleSignIn
+    # Sign in with Apple. The capability is also switched on for the App ID in the
+    # developer portal; Xcode's automatic signing picks it up from here.
+    entitlements:
+      path: Sources/VolviaBiz.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
     sources:
       - path: Sources
       - path: Resources
@@ -45,6 +65,12 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         VolviaAPIURL: $(VOLVIA_API_URL)
+        GIDClientID: $(GOOGLE_IOS_CLIENT_ID)
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: google-sign-in
+            CFBundleURLSchemes:
+              - $(GOOGLE_IOS_URL_SCHEME)
         UILaunchScreen:
           UIColorName: LaunchBackground
           UIImageName: LaunchLogo

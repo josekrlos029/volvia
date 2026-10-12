@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import formbody from '@fastify/formbody'
 import sensible from '@fastify/sensible'
 import Fastify, { type FastifyInstance } from 'fastify'
 import {
@@ -43,6 +44,11 @@ export async function buildApp(): Promise<App> {
           'req.body.currentPassword',
           'req.body.email',
           'req.body.token',
+          'req.body.socialToken',
+          'req.body.identityToken',
+          'req.body.idToken',
+          'req.body.id_token',
+          'req.body.code',
           'res.headers["set-cookie"]',
         ],
         remove: true,
@@ -70,6 +76,8 @@ export async function buildApp(): Promise<App> {
   })
 
   await app.register(sensible)
+  // Sign in with Apple returns to us with an HTML form POST, not JSON.
+  await app.register(formbody)
   await app.register(contextPlugin)
   await app.register(observabilityPlugin)
   await app.register(securityPlugin)

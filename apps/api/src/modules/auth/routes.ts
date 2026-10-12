@@ -2,6 +2,8 @@ import {
   changePasswordSchema,
   loginSchema,
   magicLinkRequestSchema,
+  nativeAppleSignInSchema,
+  nativeGoogleSignInSchema,
   passwordResetRequestSchema,
   passwordResetSchema,
   registerSchema,
@@ -17,22 +19,35 @@ import { AppError } from '../../lib/errors'
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../lib/jwt'
 import { rateLimits } from '../../plugins/security'
 import { typed } from '../../types'
+import {
+  appleConfigured,
+  buildAppleAuthorizeUrl,
+  exchangeAppleCode,
+  parseAppleUserField,
+  verifyNativeAppleToken,
+} from './apple'
 import { clearAuthCookies, cookieNames, setAuthCookies } from './cookies'
-import { buildAuthorizeUrl, consumeState, exchangeCodeForProfile, googleConfigured } from './google'
+import {
+  buildAuthorizeUrl,
+  consumeState,
+  exchangeCodeForProfile,
+  googleConfigured,
+  verifyNativeGoogleToken,
+} from './google'
 import { issueSession as issueUserSession } from './issue'
 import {
+  type IdentityLink,
   buildSessionUser,
   consumeAuthToken,
   findUserByEmail,
-  findUserByGoogleId,
   issueAuthToken,
-  linkGoogleIdentity,
   markEmailVerified,
   registerOwner,
   setPassword,
   verifyCredentials,
 } from './service'
 import { readSession, revokeAllSessions, revokeSession, rotateSession } from './sessions'
+import { type SocialOutcome, type SocialSignupPayload, resolveSocialProfile } from './social'
 
 const tokenPairSchema = z.object({
   accessToken: z.string(),
@@ -56,18 +71,40 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const meta = { ip: request.ip, userAgent: request.headers['user-agent'] ?? '' }
-      const { user } = await registerOwner(app.db, request.body, meta)
 
-      const { token } = await issueAuthToken(app.db, {
-        purpose: 'email_verification',
-        userId: user.id,
-        email: user.email,
-        ip: request.ip,
-      })
-      await app.mailer.send({
-        to: user.email,
-        template: verifyEmailTemplate(user.locale, `${env.APP_URL}/verify-email?token=${token}`),
-      })
+      // Arriving from Google or Apple: the token carries the identity and the address
+      // the provider vouched for. The form cannot pick a different email than that one,
+      // or the social sign-in would be a way to skip verification for any address.
+      let input = request.body
+      let social: IdentityLink | undefined
+      if (input.socialToken) {
+        const row = await consumeAuthToken(app.db, input.socialToken, 'social_signup')
+        const payload = row.payload as Partial<SocialSignupPayload>
+        if (!row.email || !payload.provider || !payload.sub) {
+          throw new AppError('TOKEN_EXPIRED', { message: 'link is invalid' })
+        }
+        input = { ...input, email: row.email }
+        social = {
+          provider: payload.provider,
+          providerUserId: payload.sub,
+          profile: { name: payload.name ?? null, picture: payload.picture ?? null },
+        }
+      }
+
+      const { user } = await registerOwner(app.db, input, meta, social)
+
+      if (!social) {
+        const { token } = await issueAuthToken(app.db, {
+          purpose: 'email_verification',
+          userId: user.id,
+          email: user.email,
+          ip: request.ip,
+        })
+        await app.mailer.send({
+          to: user.email,
+          template: verifyEmailTemplate(user.locale, `${env.APP_URL}/verify-email?token=${token}`),
+        })
+      }
 
       const session = await issueSession(user.id, user.email, meta)
       setAuthCookies(reply, session)
@@ -382,7 +419,53 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     },
   )
 
-  // ── Google OAuth ───────────────────────────────────────────────────────────
+  // ── Google / Apple ─────────────────────────────────────────────────────────
+  //
+  // Web: the API owns the client secrets and the state nonce, so the dashboard just
+  // navigates to /start and lands back on the dashboard with cookies set. Native: the
+  // app shows the platform sheet and hands us the ID token to verify.
+
+  /** Where the dashboard lands when a social sign-in cannot finish. */
+  const loginWithError = (reply: Parameters<typeof setAuthCookies>[0], code: string) => {
+    const url = new URL('/login', env.APP_URL)
+    url.searchParams.set('error', code)
+    return reply.redirect(url.toString(), 302)
+  }
+
+  const finishWebSignIn = async (
+    request: { ip: string; headers: Record<string, unknown> },
+    reply: Parameters<typeof setAuthCookies>[0],
+    outcome: SocialOutcome,
+    provider: 'google' | 'apple',
+    redirectTo: string,
+  ) => {
+    if (outcome.kind === 'signup') {
+      // An identity but no business yet, and nothing to create a tenant from. The signup
+      // form takes the business name; the token links the identity when it submits.
+      const signup = new URL('/signup', env.APP_URL)
+      signup.searchParams.set('social', outcome.token)
+      signup.searchParams.set('email', outcome.email)
+      signup.searchParams.set('from', provider)
+      if (outcome.name) signup.searchParams.set('name', outcome.name)
+      return reply.redirect(signup.toString(), 302)
+    }
+
+    const meta = { ip: request.ip, userAgent: String(request.headers['user-agent'] ?? '') }
+    await markEmailVerified(app.db, outcome.user.id)
+    const session = await issueSession(outcome.user.id, outcome.user.email, meta)
+    await audit(app.db, {
+      actorUserId: outcome.user.id,
+      action: AUDIT_ACTIONS.authLogin,
+      ip: request.ip,
+      userAgent: meta.userAgent,
+      meta: { provider },
+    })
+    setAuthCookies(reply, session)
+
+    const target = new URL(redirectTo || '/', env.APP_URL)
+    return reply.redirect(target.toString(), 302)
+  }
+
   app.get(
     '/google/start',
     {
@@ -403,52 +486,144 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     {
       config: { rateLimit: rateLimits.auth },
       schema: {
-        querystring: z.object({ code: z.string().min(1), state: z.string().min(1) }),
+        querystring: z.object({
+          code: z.string().min(1).optional(),
+          state: z.string().min(1),
+          error: z.string().optional(),
+        }),
         tags: ['auth'],
       },
     },
     async (request, reply) => {
-      if (!googleConfigured()) {
-        throw new AppError('SERVICE_UNAVAILABLE', { message: 'Google sign-in is not configured' })
-      }
-      const { redirectTo } = await consumeState(app.redis, request.query.state)
-      const profile = await exchangeCodeForProfile(request.query.code)
-      if (!profile.emailVerified) {
-        throw new AppError('FORBIDDEN', { message: 'google account email is not verified' })
-      }
+      if (!googleConfigured()) return loginWithError(reply, 'SERVICE_UNAVAILABLE')
+      const { redirectTo } = await consumeState(app.redis, request.query.state, 'google')
+      if (!request.query.code) return reply.redirect(new URL('/login', env.APP_URL).toString(), 302)
 
-      let user = await findUserByGoogleId(app.db, profile.sub)
-      if (!user) {
-        // Link to an existing local account with the same address rather than
-        // creating a duplicate business.
-        const existing = await findUserByEmail(app.db, profile.email)
-        if (!existing) {
-          // Google gives us an identity but not a business name, so there is nothing to
-          // create a tenant from. Send them to signup with the address filled in; the
-          // Google identity links itself the next time they use this button.
-          const signup = new URL('/signup', env.APP_URL)
-          signup.searchParams.set('email', profile.email)
-          signup.searchParams.set('from', 'google')
-          if (profile.name) signup.searchParams.set('name', profile.name)
-          return reply.redirect(signup.toString(), 302)
-        }
-        await linkGoogleIdentity(app.db, {
-          userId: existing.id,
-          providerUserId: profile.sub,
-          profile: { name: profile.name, picture: profile.picture },
+      try {
+        const profile = await exchangeCodeForProfile(request.query.code)
+        const outcome = await resolveSocialProfile(app.db, profile, {
+          allowSignup: true,
+          ip: request.ip,
         })
-        user = existing
+        return await finishWebSignIn(request, reply, outcome, 'google', redirectTo)
+      } catch (error) {
+        if (error instanceof AppError) return loginWithError(reply, error.code)
+        throw error
       }
+    },
+  )
 
-      await markEmailVerified(app.db, user.id)
-      const session = await issueSession(user.id, user.email, {
+  app.get(
+    '/apple/start',
+    {
+      config: { rateLimit: rateLimits.auth },
+      schema: {
+        querystring: z.object({ redirectTo: z.string().max(300).optional() }),
+        tags: ['auth'],
+      },
+    },
+    async (request, reply) => {
+      const url = await buildAppleAuthorizeUrl(app.redis, { redirectTo: request.query.redirectTo })
+      return reply.redirect(url, 302)
+    },
+  )
+
+  // Apple answers with a cross-site form POST. The state nonce in Redis is the CSRF
+  // check; cookies set on this response still reach the dashboard afterwards.
+  app.post(
+    '/apple/callback',
+    {
+      config: { rateLimit: rateLimits.auth },
+      schema: {
+        body: z.object({
+          code: z.string().min(1).optional(),
+          state: z.string().min(1),
+          user: z.string().max(2000).optional(),
+          error: z.string().optional(),
+        }),
+        tags: ['auth'],
+      },
+    },
+    async (request, reply) => {
+      if (!appleConfigured()) return loginWithError(reply, 'SERVICE_UNAVAILABLE')
+      const { redirectTo } = await consumeState(app.redis, request.body.state, 'apple')
+      // `user_cancelled_authorize`: they closed the sheet. Not an error worth showing.
+      if (!request.body.code) return reply.redirect(new URL('/login', env.APP_URL).toString(), 302)
+
+      try {
+        const profile = await exchangeAppleCode(request.body.code)
+        const outcome = await resolveSocialProfile(app.db, profile, {
+          allowSignup: true,
+          ip: request.ip,
+          nameHint: parseAppleUserField(request.body.user).name,
+        })
+        return await finishWebSignIn(request, reply, outcome, 'apple', redirectTo)
+      } catch (error) {
+        if (error instanceof AppError) return loginWithError(reply, error.code)
+        throw error
+      }
+    },
+  )
+
+  const nativeSignIn = async (
+    request: { ip: string; headers: Record<string, unknown> },
+    reply: Parameters<typeof setAuthCookies>[0],
+    outcome: SocialOutcome,
+    provider: 'google' | 'apple',
+  ) => {
+    if (outcome.kind !== 'user') throw new AppError('ACCOUNT_NOT_FOUND')
+    const meta = { ip: request.ip, userAgent: String(request.headers['user-agent'] ?? '') }
+    await markEmailVerified(app.db, outcome.user.id)
+    const session = await issueSession(outcome.user.id, outcome.user.email, meta)
+    await audit(app.db, {
+      actorUserId: outcome.user.id,
+      action: AUDIT_ACTIONS.authLogin,
+      ip: request.ip,
+      userAgent: meta.userAgent,
+      meta: { provider, native: true },
+    })
+    setAuthCookies(reply, session)
+    return session
+  }
+
+  app.post(
+    '/apple/native',
+    {
+      config: { rateLimit: rateLimits.auth },
+      schema: {
+        body: nativeAppleSignInSchema,
+        response: { 200: tokenPairSchema },
+        tags: ['auth'],
+      },
+    },
+    async (request, reply) => {
+      const profile = await verifyNativeAppleToken(request.body.identityToken)
+      const outcome = await resolveSocialProfile(app.db, profile, {
+        allowSignup: false,
         ip: request.ip,
-        userAgent: request.headers['user-agent'] ?? '',
+        nameHint: request.body.name,
       })
-      setAuthCookies(reply, session)
+      return nativeSignIn(request, reply, outcome, 'apple')
+    },
+  )
 
-      const target = new URL(redirectTo || '/', env.APP_URL)
-      return reply.redirect(target.toString(), 302)
+  app.post(
+    '/google/native',
+    {
+      config: { rateLimit: rateLimits.auth },
+      schema: {
+        body: nativeGoogleSignInSchema,
+        response: { 200: tokenPairSchema },
+        tags: ['auth'],
+      },
+    },
+    async (request, reply) => {
+      const profile = await verifyNativeGoogleToken(request.body.idToken)
+      const outcome = await resolveSocialProfile(app.db, profile, {
+        allowSignup: false,
+        ip: request.ip,
+      })
+      return nativeSignIn(request, reply, outcome, 'google')
     },
   )
 }

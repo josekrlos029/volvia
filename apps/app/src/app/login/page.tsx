@@ -1,5 +1,6 @@
 import { LoginForm } from '@/components/LoginForm'
 import { AuthShell } from '@/components/auth/AuthShell'
+import { socialErrorMessage } from '@/lib/auth-messages'
 import { getSession } from '@/lib/session'
 import type { Metadata } from 'next'
 import Link from 'next/link'
@@ -16,9 +17,10 @@ function safeNext(value: string | undefined): string | undefined {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>
+  searchParams: Promise<{ next?: string; error?: string }>
 }) {
-  const next = safeNext((await searchParams).next)
+  const params = await searchParams
+  const next = safeNext(params.next)
   const session = await getSession()
   if (session) redirect(next ?? '/')
 
@@ -38,7 +40,7 @@ export default async function LoginPage({
         </>
       }
     >
-      <LoginForm next={next} />
+      <LoginForm next={next} initialError={socialErrorMessage(params.error)} />
     </AuthShell>
   )
 }

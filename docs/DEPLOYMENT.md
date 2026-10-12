@@ -24,8 +24,41 @@ Cada escaneo pasa por Redis, así que esa cercanía se nota en el mostrador.
 
 Los secretos viven en Secret Manager y el servicio los lee con la cuenta
 `volvia-runtime`: `DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`,
-`TOKEN_PEPPER`, `JOBS_SECRET`, `SMTP_PASS`, `STORAGE_ACCESS_KEY` y `STORAGE_SECRET_KEY`. El resto de la
-configuración son variables normales del servicio.
+`TOKEN_PEPPER`, `JOBS_SECRET`, `SMTP_PASS`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`,
+`GOOGLE_OAUTH_CLIENT_SECRET` y `APPLE_SIGNIN_KEY_P8`. El resto de la configuración son
+variables normales del servicio.
+
+## Entrar con Google y con Apple
+
+Los dos flujos viven en la API (`apps/api/src/modules/auth`): el panel solo navega a
+`/v1/auth/{google,apple}/start` y vuelve con las cookies puestas; Volvia Biz manda el token
+del sistema a `/v1/auth/{google,apple}/native`. Sin credenciales los botones devuelven
+`SERVICE_UNAVAILABLE` y nada más cambia.
+
+| Variable | De dónde sale |
+| --- | --- |
+| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Google Cloud → Credentials → cliente **Web**, redirect `https://api.somosvolvia.com/v1/auth/google/callback` |
+| `GOOGLE_OAUTH_IOS_CLIENT_ID` | Mismo sitio, cliente **iOS** con bundle `co.volvia.biz` |
+| `APPLE_SIGNIN_SERVICES_ID` | Developer portal → Identifiers → Services ID (`co.volvia.web`), return URL `https://api.somosvolvia.com/v1/auth/apple/callback` |
+| `APPLE_SIGNIN_KEY_ID` / `APPLE_SIGNIN_KEY_P8` | Developer portal → Keys → clave con Sign in with Apple; el `.p8` se descarga una sola vez |
+| `APPLE_SIGNIN_APP_BUNDLE_ID` | `co.volvia.biz`, la audiencia del token que manda la app |
+
+```bash
+export CLOUDSDK_ACTIVE_CONFIG_NAME=volvia
+SA=volvia-runtime@somosvolvia-prod.iam.gserviceaccount.com
+printf '%s' "$GOOGLE_SECRET" | gcloud secrets create GOOGLE_OAUTH_CLIENT_SECRET --data-file=-
+gcloud secrets create APPLE_SIGNIN_KEY_P8 --data-file=AuthKey_XXXXXXXXXX.p8
+for s in GOOGLE_OAUTH_CLIENT_SECRET APPLE_SIGNIN_KEY_P8; do
+  gcloud secrets add-iam-policy-binding "$s" --member="serviceAccount:$SA" --role=roles/secretmanager.secretAccessor
+done
+gcloud run services update volvia-api --region us-east4 \
+  --update-env-vars GOOGLE_OAUTH_CLIENT_ID=...,GOOGLE_OAUTH_IOS_CLIENT_ID=...,APPLE_SIGNIN_SERVICES_ID=co.volvia.web,APPLE_SIGNIN_KEY_ID=... \
+  --update-secrets GOOGLE_OAUTH_CLIENT_SECRET=GOOGLE_OAUTH_CLIENT_SECRET:latest,APPLE_SIGNIN_KEY_P8=APPLE_SIGNIN_KEY_P8:latest
+```
+
+Apple no permite desactivar "Ocultar mi correo"; la API rechaza esas direcciones con
+`SOCIAL_EMAIL_HIDDEN` y el panel pide volver a entrar eligiendo "Compartir mi correo".
+La migración `0012_social_signup` tiene que estar aplicada antes de desplegar esta imagen.
 
 ## Publicar un cambio
 

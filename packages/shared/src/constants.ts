@@ -31,6 +31,8 @@ export const MAGIC_LINK_TTL_SECONDS = 15 * 60
 export const EMAIL_VERIFICATION_TTL_SECONDS = 24 * 60 * 60
 export const PASSWORD_RESET_TTL_SECONDS = 60 * 60
 export const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
+/** How long a Google/Apple identity waits for the person to name their business. */
+export const SOCIAL_SIGNUP_TTL_SECONDS = 15 * 60
 
 /** A head start, capped so the reward still has to be earned. */
 export const MAX_INITIAL_STAMPS = 3
