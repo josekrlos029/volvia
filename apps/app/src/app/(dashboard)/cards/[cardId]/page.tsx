@@ -17,6 +17,8 @@ interface CardDetail {
   rules: { cooldownMinutes: number; dailyCap: number; kioskEnabled: boolean }
   terms: string
   collectBirthday: boolean
+  collectPhone: boolean
+  phoneRequired: boolean
   initialStamps: number
   signupQuestionIds: string[]
   messages: CardMessages
@@ -26,6 +28,7 @@ interface CardDetail {
 
 interface Org {
   name: string
+  category: string
   entitlements: { features: Record<string, boolean> }
 }
 
@@ -84,6 +87,7 @@ export default async function CardDetailPage({ params }: { params: Promise<{ car
           <CardEditor
             cardId={card.id}
             businessName={org.name}
+            category={org.category}
             canCustomiseBranding={org.entitlements.features.custom_branding ?? false}
             canUseKiosk={org.entitlements.features.kiosk_mode ?? false}
             profileQuestions={profileQuestions}
@@ -99,6 +103,8 @@ export default async function CardDetailPage({ params }: { params: Promise<{ car
               })),
               terms: card.terms,
               collectBirthday: card.collectBirthday,
+              collectPhone: card.collectPhone,
+              phoneRequired: card.phoneRequired,
               signupQuestionIds: card.signupQuestionIds,
               initialStamps: card.initialStamps,
               messages: card.messages,

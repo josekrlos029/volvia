@@ -14,6 +14,9 @@ import type {
   AutomationConfig,
   CampaignAudience,
   CampaignOffer,
+  CampaignPassOverride,
+  PassOfferEndedReason,
+  PassOfferSource,
   SurveyAnswer,
   SurveyQuestion,
 } from '../types'
@@ -42,6 +45,8 @@ export const campaigns = pgTable(
     body: text().notNull(),
     offer: jsonb().$type<CampaignOffer>().notNull(),
     audience: jsonb().$type<CampaignAudience>().notNull(),
+    /** How the pass looks while the campaign runs: header, text, banner, stamp style. */
+    passOverride: jsonb().$type<CampaignPassOverride>().notNull().default({}),
     startsAt: timestamp({ withTimezone: true }).notNull(),
     endsAt: timestamp({ withTimezone: true }).notNull(),
     sendPush: boolean().notNull().default(true),
@@ -58,6 +63,49 @@ export const campaigns = pgTable(
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('campaigns_org_status_idx').on(table.orgId, table.status, table.startsAt)],
+)
+
+/**
+ * One row per customer a campaign or a birthday actually reached.
+ *
+ * The pass reads *this* table, not the campaign list, so a customer outside the
+ * audience never sees an offer meant for someone else. It also gives every offer its
+ * own clock: a birthday treat valid for a week, a happy hour that ends with the first
+ * stamp, a campaign that closes on its end date.
+ */
+export const passOffers = pgTable(
+  'pass_offers',
+  {
+    id: uuid().primaryKey().default(sql`gen_random_uuid()`),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    customerCardId: uuid()
+      .notNull()
+      .references(() => customerCards.id, { onDelete: 'cascade' }),
+    source: text().$type<PassOfferSource>().notNull(),
+    campaignId: uuid().references(() => campaigns.id, { onDelete: 'set null' }),
+    automationId: uuid().references(() => automations.id, { onDelete: 'set null' }),
+    /** Snapshot of what was promised, so editing the campaign later changes nothing here. */
+    offer: jsonb().$type<CampaignOffer | AutomationConfig['offer']>().notNull(),
+    passOverride: jsonb().$type<CampaignPassOverride>().notNull().default({}),
+    startsAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** Null means "until the campaign ends". */
+    expiresAt: timestamp({ withTimezone: true }),
+    endedAt: timestamp({ withTimezone: true }),
+    endedReason: text().$type<PassOfferEndedReason>(),
+    /** Set once the bonus stamps or the instant reward were handed over; a retry stops here. */
+    bonusAppliedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('pass_offers_card_campaign_key')
+      .on(table.customerCardId, table.campaignId)
+      .where(sql`${table.campaignId} is not null`),
+    index('pass_offers_card_idx').on(table.customerCardId, table.endedAt),
+    index('pass_offers_campaign_idx').on(table.campaignId, table.endedAt),
+    index('pass_offers_expiry_idx').on(table.expiresAt).where(sql`${table.endedAt} is null`),
+  ],
 )
 
 export const messages = pgTable(
@@ -216,8 +264,22 @@ export const automationRuns = pgTable(
   ],
 )
 
-export const campaignsRelations = relations(campaigns, ({ one }) => ({
+export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
   org: one(organizations, { fields: [campaigns.orgId], references: [organizations.id] }),
+  offers: many(passOffers),
+}))
+
+export const passOffersRelations = relations(passOffers, ({ one }) => ({
+  org: one(organizations, { fields: [passOffers.orgId], references: [organizations.id] }),
+  customerCard: one(customerCards, {
+    fields: [passOffers.customerCardId],
+    references: [customerCards.id],
+  }),
+  campaign: one(campaigns, { fields: [passOffers.campaignId], references: [campaigns.id] }),
+  automation: one(automations, {
+    fields: [passOffers.automationId],
+    references: [automations.id],
+  }),
 }))
 
 export const surveysRelations = relations(surveys, ({ one, many }) => ({

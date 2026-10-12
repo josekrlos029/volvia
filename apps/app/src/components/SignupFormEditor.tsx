@@ -1,7 +1,12 @@
 'use client'
 
 import { api } from '@/lib/api-client'
-import { MAX_PROFILE_QUESTIONS, PROFILE_QUESTION_TYPES } from '@volvia/shared'
+import {
+  MAX_PROFILE_QUESTIONS,
+  PROFILE_QUESTION_TYPES,
+  type SignupPreset,
+  presetsFor,
+} from '@volvia/shared'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { buttonClass } from './ui'
@@ -82,30 +87,53 @@ export function SignupFormEditor({
   questions,
   selectedIds,
   collectBirthday,
+  collectPhone,
+  phoneRequired,
+  category = 'other',
   onChange,
 }: {
   questions: ProfileQuestion[]
   selectedIds: string[]
   collectBirthday: boolean
-  onChange: (patch: { signupQuestionIds?: string[]; collectBirthday?: boolean }) => void
+  collectPhone: boolean
+  phoneRequired: boolean
+  /** The kind of business, which decides the suggested fields. */
+  category?: string
+  onChange: (patch: {
+    signupQuestionIds?: string[]
+    collectBirthday?: boolean
+    collectPhone?: boolean
+    phoneRequired?: boolean
+  }) => void
 }) {
   const router = useRouter()
   const [drafts, setDrafts] = useState<Draft[]>(questions)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
 
   // Name and email are always asked; the rest is the business's choice.
-  const fieldCount = 2 + (collectBirthday ? 1 : 0) + selectedIds.length
+  const fieldCount = 2 + (collectBirthday ? 1 : 0) + (collectPhone ? 1 : 0) + selectedIds.length
   const meter = ease(fieldCount)
 
-  async function saveQuestions(next: Draft[]) {
+  // Suggestions the business has not written already, by prompt.
+  const prompts = new Set(questions.map((question) => question.prompt.trim().toLowerCase()))
+  const suggestions = presetsFor(category).filter(
+    (preset) => !prompts.has(preset.prompt.toLowerCase()),
+  )
+
+  /**
+   * Saves the whole list and returns it with ids. Questions that already had an id
+   * keep it, so the cards that ask them are not left pointing at nothing.
+   */
+  async function saveQuestions(next: Draft[]): Promise<ProfileQuestion[]> {
     setSaving(true)
     setError(null)
     try {
-      // The endpoint replaces the whole list, so it takes the array itself.
-      await api.put(
+      const saved = await api.put<ProfileQuestion[]>(
         '/v1/org/profile-questions',
         next.map((draft) => ({
+          ...(draft.id ? { id: draft.id } : {}),
           prompt: draft.prompt.trim(),
           type: draft.type,
           options: draft.options.filter((option) => option.trim().length > 0),
@@ -113,11 +141,39 @@ export function SignupFormEditor({
           askOn: 'signup',
         })),
       )
+      setDrafts(saved)
       router.refresh()
+      return saved
     } catch {
       setError('No pudimos guardar las preguntas.')
+      return []
     } finally {
       setSaving(false)
+    }
+  }
+
+  /** One click adds a suggested question and asks it on this card. */
+  async function addPreset(preset: SignupPreset) {
+    if (drafts.length >= MAX_PROFILE_QUESTIONS) return
+    const saved = await saveQuestions([
+      ...drafts,
+      { prompt: preset.prompt, type: preset.type, options: preset.options, isRequired: false },
+    ])
+    const added = saved.find((question) => question.prompt === preset.prompt)
+    if (added && !selectedIds.includes(added.id)) {
+      onChange({ signupQuestionIds: [...selectedIds, added.id] })
+    }
+  }
+
+  function onAddField(value: string) {
+    if (value === 'phone') {
+      onChange({ collectPhone: true })
+    } else if (value === 'custom') {
+      setEditing(true)
+      setDrafts([...drafts, { prompt: '', type: 'text', options: [], isRequired: false }])
+    } else {
+      const preset = suggestions.find((item) => item.key === value)
+      if (preset) void addPreset(preset)
     }
   }
 
@@ -153,6 +209,40 @@ export function SignupFormEditor({
             />
           </label>
         </li>
+        <li>
+          <div className="flex items-center justify-between gap-3 rounded-[9px] border border-[var(--color-line)] px-3.5 py-2.5">
+            <span className="min-w-0">
+              <span className="block">Teléfono</span>
+              {collectPhone ? (
+                <label className="mt-1 flex items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
+                  <input
+                    type="checkbox"
+                    checked={phoneRequired}
+                    onChange={(event) => onChange({ phoneRequired: event.target.checked })}
+                    className="size-3.5 accent-[var(--color-primary)]"
+                  />
+                  Obligatorio
+                </label>
+              ) : (
+                <span className="block text-[13px] text-[var(--color-ink-muted)]">
+                  Para escribirle por WhatsApp o reconocerle por número.
+                </span>
+              )}
+            </span>
+            <input
+              type="checkbox"
+              checked={collectPhone}
+              onChange={(event) =>
+                onChange({
+                  collectPhone: event.target.checked,
+                  phoneRequired: event.target.checked ? phoneRequired : false,
+                })
+              }
+              aria-label="Pedir teléfono"
+              className="size-4 shrink-0 accent-[var(--color-primary)]"
+            />
+          </div>
+        </li>
         {questions.map((question) => (
           <li key={question.id}>
             <label className="flex items-center justify-between gap-3 rounded-[9px] border border-[var(--color-line)] px-3.5 py-2.5">
@@ -179,7 +269,38 @@ export function SignupFormEditor({
         ))}
       </ul>
 
-      <details className="rounded-[10px] border border-[var(--color-line)]">
+      <label className="flex flex-col gap-1.5 text-[13px] font-medium">
+        Añadir un campo
+        <select
+          value=""
+          disabled={saving}
+          onChange={(event) => onAddField(event.target.value)}
+          className={field}
+        >
+          <option value="">Elige qué más preguntar…</option>
+          {suggestions.length > 0 ? (
+            <optgroup label="Para tu tipo de negocio">
+              {suggestions.map((preset) => (
+                <option key={preset.key} value={preset.key}>
+                  {preset.prompt} · {preset.help}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
+          {!collectPhone ? (
+            <optgroup label="Datos básicos">
+              <option value="phone">Teléfono</option>
+            </optgroup>
+          ) : null}
+          <option value="custom">Crear un campo propio…</option>
+        </select>
+      </label>
+
+      <details
+        open={editing}
+        onToggle={(event) => setEditing(event.currentTarget.open)}
+        className="rounded-[10px] border border-[var(--color-line)]"
+      >
         <summary className="cursor-pointer px-3.5 py-2.5 text-[14px] font-medium">
           Tus preguntas
         </summary>
@@ -191,8 +312,7 @@ export function SignupFormEditor({
 
           <ul className="flex flex-col gap-3">
             {drafts.map((draft, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: drafts are positional until saved
-              <li key={index} className="flex flex-col gap-2">
+              <li key={draft.id ?? `new-${index}`} className="flex flex-col gap-2">
                 <input
                   value={draft.prompt}
                   onChange={(event) =>

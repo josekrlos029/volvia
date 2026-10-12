@@ -20,6 +20,7 @@ describe('visibleSections', () => {
   it('keeps the admin-only sections in step with the (manage) route group', () => {
     const gated = SECTIONS.filter((s) => s.minRole === 'admin').map((s) => s.href)
     expect(gated).toEqual([
+      '/page',
       '/campaigns',
       '/messages',
       '/surveys',

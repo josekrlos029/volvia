@@ -51,3 +51,46 @@ describe('campaign placeholders', () => {
     expect(CAMPAIGN_VARIABLES.length).toBe(5)
   })
 })
+
+describe('pass override', () => {
+  it('parses a campaign written before the pass could be overridden', async () => {
+    const { campaignSchema } = await import('../src/schemas/engagement')
+    const parsed = campaignSchema.parse({
+      name: 'Martes lento',
+      headline: 'Hoy sellos dobles',
+      body: 'Ven esta tarde',
+      offer: { kind: 'multiplier', factor: 2 },
+      audience: {},
+      startsAt: '2026-10-11T10:00:00Z',
+      endsAt: '2026-10-11T20:00:00Z',
+    })
+    expect(parsed.passOverride).toEqual({
+      header: null,
+      text: null,
+      banner: null,
+      stampStyle: null,
+      endsOnFirstStamp: false,
+    })
+  })
+
+  it('accepts a banner, a header and hidden stamps', async () => {
+    const { campaignPassOverrideSchema } = await import('../src/schemas/engagement')
+    const parsed = campaignPassOverrideSchema.parse({
+      header: 'SELLOS DOBLES',
+      banner: { kind: 'preset', value: 'stars' },
+      stampStyle: 'hidden',
+      endsOnFirstStamp: true,
+    })
+    expect(parsed.stampStyle).toBe('hidden')
+    expect(parsed.banner).toEqual({ kind: 'preset', value: 'stars' })
+    expect(parsed.text).toBeNull()
+  })
+
+  it('rejects a header too long for the pass and an unknown banner', async () => {
+    const { campaignPassOverrideSchema } = await import('../src/schemas/engagement')
+    expect(() => campaignPassOverrideSchema.parse({ header: 'x'.repeat(31) })).toThrow()
+    expect(() =>
+      campaignPassOverrideSchema.parse({ banner: { kind: 'preset', value: 'unicorn' } }),
+    ).toThrow()
+  })
+})

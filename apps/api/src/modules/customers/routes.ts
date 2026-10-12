@@ -55,7 +55,11 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
       if (!request.org!.entitlements.has('customer_contact_details')) {
         return {
           ...page,
-          items: page.items.map((item) => ({ ...item, email: maskEmail(item.email) })),
+          items: page.items.map((item) => ({
+            ...item,
+            email: maskEmail(item.email),
+            phone: maskPhone(item.phone),
+          })),
           masked: true,
         }
       }
@@ -74,7 +78,11 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
       if (!request.org!.entitlements.has('customer_contact_details')) {
         return {
           ...detail,
-          customer: { ...detail.customer, email: maskEmail(detail.customer.email) },
+          customer: {
+            ...detail.customer,
+            email: maskEmail(detail.customer.email),
+            phone: maskPhone(detail.customer.phone),
+          },
           masked: true,
         }
       }
@@ -182,6 +190,12 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
 }
 
 /** `maria@cliente.test` → `m•••@cliente.test`: recognisable, not contactable. */
+/** Keeps the last two digits: enough to tell two customers apart, not enough to dial. */
+function maskPhone(phone: string | null): string | null {
+  if (!phone) return null
+  return `${'•'.repeat(Math.max(3, phone.length - 2))}${phone.slice(-2)}`
+}
+
 function maskEmail(email: string): string {
   const [local = '', domain = ''] = email.split('@')
   const head = local.slice(0, 1)

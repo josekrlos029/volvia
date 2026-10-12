@@ -84,6 +84,20 @@ export const orgSettingsSchema = z.object({
   reviewRequestsPaused: z.boolean().default(false),
   /** What the button on the public page says. Empty means the default wording. */
   pageCtaLabel: z.string().trim().max(40).default(''),
+  /** The page's own accent; null falls back to the brand colour. */
+  pageAccentColor: hexColorSchema.nullable().default(null),
+  /** Shown on the page so a customer can connect without asking at the counter. */
+  guestWifi: z
+    .object({
+      ssid: z.string().trim().min(1).max(32),
+      password: z.string().trim().max(63).default(''),
+    })
+    .nullable()
+    .default(null),
+  /** An external booking page, linked from the page as "Reservar". */
+  reservationsUrl: z.string().trim().url().max(500).or(z.literal('')).default(''),
+  /** Whether the page offers the Google review link when the listing is connected. */
+  pageShowReviews: z.boolean().default(true),
 })
 export type OrgSettings = z.infer<typeof orgSettingsSchema>
 

@@ -3,6 +3,7 @@ import pino from 'pino'
 import { env, isProduction } from './env'
 import { createMailer } from './lib/email'
 import { createRedis } from './lib/redis'
+import { createStorage } from './lib/storage'
 import { createJobRunner } from './workers/jobs'
 
 /**
@@ -22,7 +23,7 @@ const logger = pino({
 const database = createDatabase({ url: env.DATABASE_URL, max: 5 })
 const redis = createRedis({ forQueue: true })
 const mailer = createMailer(logger)
-const runner = createJobRunner({ db: database.db, redis, logger, mailer })
+const runner = createJobRunner({ db: database.db, redis, logger, mailer, storage: createStorage() })
 
 const OUTBOX_INTERVAL_MS = 2_000
 const CRON_INTERVAL_MS = 60_000

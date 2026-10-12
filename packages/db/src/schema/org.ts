@@ -49,6 +49,8 @@ export const organizations = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp({ withTimezone: true }),
+    /** When a closed business is erased for good; until then the owner can restore it. */
+    purgeAt: timestamp({ withTimezone: true }),
   },
   (table) => [
     uniqueIndex('organizations_slug_key').on(table.slug),

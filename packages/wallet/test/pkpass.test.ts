@@ -18,6 +18,16 @@ const certificatePem = readFileSync(`${certsDir}pass-cert.pem`, 'utf8')
 const privateKeyPem = readFileSync(`${certsDir}pass-key.pem`, 'utf8')
 const wwdrPem = readFileSync(`${certsDir}wwdr.pem`, 'utf8')
 
+/** A text-only offer, as a campaign with no visual override produces. */
+const offerOf = (message: string): NonNullable<PassContent['offer']> => ({
+  message,
+  headerLabel: null,
+  text: null,
+  banner: null,
+  hideStamps: false,
+  endsAt: null,
+})
+
 const content: PassContent = {
   serial: 'abc123def456ghi789',
   organizationName: 'Burger Train',
@@ -43,7 +53,7 @@ const content: PassContent = {
   stampStyle: 'circle',
   cardUrl: 'http://localhost:3002/c/abc123def456ghi789',
   places: [{ latitude: 10.46, longitude: -73.25 }],
-  offerMessage: null,
+  offer: null,
   latestMessage: null,
   customerName: 'Laura',
   about: 'Hamburguesas a la parrilla desde 2014.',
@@ -222,7 +232,7 @@ describe('pass.json', () => {
 
   it('surfaces an active campaign offer, and announces it', () => {
     const json = buildPassJson(
-      { ...content, offerMessage: 'Hoy sellos dobles' },
+      { ...content, offer: offerOf('Hoy sellos dobles') },
       options,
     ) as unknown as StoreCardPass
     const offer = json.storeCard.auxiliaryFields.find((field) => field.key === 'offer')!
@@ -513,5 +523,34 @@ describe('generated images', () => {
   it('keeps the whole set small enough for a wallet download', () => {
     const total = Object.values(buildAppleImages(content)).reduce((sum, png) => sum + png.length, 0)
     expect(total).toBeLessThan(150_000)
+  })
+})
+
+describe('pass with a live offer', () => {
+  it('renames the header while the offer runs, unless a reward is waiting', () => {
+    const renamed = buildPassJson(
+      { ...content, offer: { ...offerOf('Hoy doble'), headerLabel: 'SELLOS DOBLES' } },
+      options,
+    ) as unknown as StoreCardPass
+    expect(renamed.storeCard.headerFields[0]!.label).toBe('SELLOS DOBLES')
+
+    const withReward = buildPassJson(
+      {
+        ...content,
+        pendingRewardCount: 1,
+        offer: { ...offerOf('Hoy doble'), headerLabel: 'SELLOS DOBLES' },
+      },
+      options,
+    ) as unknown as StoreCardPass
+    expect(withReward.storeCard.headerFields[0]!.label).toBe('Burger Train')
+  })
+
+  it('lets the offer replace the reward description on the back', () => {
+    const json = buildPassJson(
+      { ...content, offer: { ...offerOf('Hoy doble'), text: 'Cada visita cuenta por dos' } },
+      options,
+    ) as unknown as StoreCardPass
+    const details = json.storeCard.backFields.find((field) => field.key === 'rewardDetails')!
+    expect(details.value).toBe('Cada visita cuenta por dos')
   })
 })

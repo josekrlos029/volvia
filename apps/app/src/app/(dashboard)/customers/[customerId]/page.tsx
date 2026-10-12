@@ -8,6 +8,7 @@ interface CustomerDetail {
     id: string
     firstName: string
     email: string
+    phone: string | null
     birthdayMonth: number | null
     birthdayDay: number | null
     marketingConsent: boolean
@@ -90,7 +91,9 @@ export default async function CustomerDetailPage({
         </Link>
         <h1 className="mt-1 text-[22px] font-semibold tracking-[-0.01em]">{customer.firstName}</h1>
         <p className="mt-1 text-[14px] text-[var(--color-ink-muted)]">
-          {customer.email} · Cliente desde {formatDate(customer.joinedAt, 'long')}
+          {customer.email}
+          {customer.phone ? ` · ${customer.phone}` : ''} · Cliente desde{' '}
+          {formatDate(customer.joinedAt, 'long')}
         </p>
       </header>
 

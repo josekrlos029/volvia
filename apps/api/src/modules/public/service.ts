@@ -1,13 +1,10 @@
 import {
   type Database,
   and,
-  campaigns,
   customerCards,
   customers,
   eq,
-  gte,
   locations,
-  lte,
   organizations,
   rewardGrants,
   rewards,
@@ -16,12 +13,16 @@ import {
 import {
   type PublicCardState,
   cardMessagesSchema,
+  orgSettingsSchema,
   pickCardMessage,
   renderCampaignText,
 } from '@volvia/shared'
 import { env } from '../../env'
 import { AppError } from '../../lib/errors'
-import { isWithinActiveHours, orgHour } from '../../lib/time'
+import { orgHour } from '../../lib/time'
+import { resolveOfferWords } from '../engagement/offer-words'
+import { loadLiveOffer } from '../engagement/offers'
+import { loadPageSections } from '../page/service'
 import { pickPendingSurvey } from './surveys'
 
 /**
@@ -50,7 +51,7 @@ export async function loadPublicCardState(db: Database, token: string): Promise<
     throw new AppError('CUSTOMER_CARD_NOT_FOUND', { message: 'card not found' })
   }
 
-  const [cardRewards, orgLocations, pendingGrants, activeCampaigns] = await Promise.all([
+  const [cardRewards, orgLocations, pendingGrants, liveOffer] = await Promise.all([
     db.select().from(rewards).where(eq(rewards.cardId, row.card.id)).orderBy(rewards.atStamp),
     db
       .select({
@@ -70,29 +71,11 @@ export async function loadPublicCardState(db: Database, token: string): Promise<
         ),
       )
       .orderBy(rewardGrants.grantedAt),
-    db
-      .select()
-      .from(campaigns)
-      .where(
-        and(
-          eq(campaigns.orgId, row.org.id),
-          eq(campaigns.status, 'running'),
-          lte(campaigns.startsAt, new Date()),
-          gte(campaigns.endsAt, new Date()),
-        ),
-      ),
+    // This customer's own offer, already filtered to the campaign's weekday/hour
+    // window — a happy-hour banner showing at 9am would be worse than no banner.
+    loadLiveOffer(db, { customerCardId: row.customerCard.id, timezone: row.org.timezone }),
   ])
-
-  // Only surface a campaign that is inside its weekday/hour window right now — a
-  // happy-hour banner showing at 9am would be worse than no banner.
-  const liveCampaign = activeCampaigns.find((campaign) =>
-    isWithinActiveHours(
-      new Date(),
-      row.org.timezone,
-      campaign.activeWeekdays,
-      campaign.activeHours,
-    ),
-  )
+  const offerWords = liveOffer ? await resolveOfferWords(db, liveOffer) : null
 
   const nextReward =
     cardRewards.find((reward) => reward.atStamp > row.customerCard.stampsCount) ?? null
@@ -154,14 +137,30 @@ export async function loadPublicCardState(db: Database, token: string): Promise<
       code: grant.code,
       expiresAt: grant.expiresAt,
     })),
-    activeOffer: liveCampaign
-      ? {
-          // Placeholders resolve against this customer, not an average one.
-          title: renderCampaignText(liveCampaign.headline, campaignContext),
-          description: renderCampaignText(liveCampaign.body, campaignContext),
-          endsAt: liveCampaign.endsAt,
-        }
-      : null,
+    activeOffer:
+      liveOffer && offerWords
+        ? {
+            // Placeholders resolve against this customer, not an average one.
+            title: renderCampaignText(offerWords.headline, campaignContext),
+            description: renderCampaignText(offerWords.body, campaignContext),
+            endsAt: liveOffer.endsAt,
+            headerLabel: liveOffer.passOverride.header,
+            bannerUrl:
+              liveOffer.passOverride.banner?.kind === 'image'
+                ? liveOffer.passOverride.banner.url
+                : null,
+            bannerPreset:
+              liveOffer.passOverride.banner?.kind === 'preset'
+                ? liveOffer.passOverride.banner.value
+                : null,
+            hideStamps: liveOffer.passOverride.stampStyle === 'hidden',
+            stampStyle:
+              liveOffer.passOverride.stampStyle && liveOffer.passOverride.stampStyle !== 'hidden'
+                ? liveOffer.passOverride.stampStyle
+                : null,
+            endsOnFirstStamp: liveOffer.passOverride.endsOnFirstStamp,
+          }
+        : null,
     walletPasses: {
       appleUrl: `${env.API_URL}/wallet/apple/pass/${row.customerCard.token}`,
       googleUrl: `${env.API_URL}/wallet/google/save/${row.customerCard.token}`,
@@ -199,8 +198,11 @@ export async function loadBusinessPage(db: Database, slug: string) {
   ])
 
   const cardIds = activeCards.map((card) => card.id)
-  const rewardRows =
-    cardIds.length > 0 ? await db.select().from(rewards).where(eq(rewards.orgId, org.id)) : []
+  const [rewardRows, sections] = await Promise.all([
+    cardIds.length > 0 ? db.select().from(rewards).where(eq(rewards.orgId, org.id)) : [],
+    loadPageSections(db, org.id, { activeOnly: true }),
+  ])
+  const settings = orgSettingsSchema.parse(org.settings ?? {})
 
   return {
     business: {
@@ -209,13 +211,20 @@ export async function loadBusinessPage(db: Database, slug: string) {
       tagline: org.tagline,
       about: org.about,
       category: org.category,
+      locale: org.locale,
+      currency: org.currency,
       logoUrl: org.logoUrl,
       coverUrl: org.coverUrl,
       brandColor: org.brandColor,
+      /** The page's own accent, or the brand colour when none was picked. */
+      accentColor: settings.pageAccentColor ?? org.brandColor,
       socialLinks: org.socialLinks,
       contactPhone: org.contactPhone,
       /** Empty when the business kept the default wording. */
-      ctaLabel: typeof org.settings?.pageCtaLabel === 'string' ? org.settings.pageCtaLabel : '',
+      ctaLabel: settings.pageCtaLabel,
+      wifi: settings.guestWifi,
+      reservationsUrl: settings.reservationsUrl || null,
+      showReviews: settings.pageShowReviews,
       /**
        * Who is responsible for the customer's data. Shown on the business's own privacy
        * notice: the customer gave their email to this shop, not to Volvia, and the
@@ -251,6 +260,33 @@ export async function loadBusinessPage(db: Database, slug: string) {
         .sort((a, b) => a.atStamp - b.atStamp)
         .map((reward) => ({ atStamp: reward.atStamp, title: reward.title })),
     })),
+    /** What the business chose to show: the menu, products, services, work, news, events. */
+    modules: (Object.entries(sections) as Array<[string, (typeof sections)['menu']]>)
+      .filter(([, list]) => list.some((section) => section.items.length > 0))
+      .map(([kind, list]) => ({
+        kind,
+        sections: list
+          .filter((section) => section.items.length > 0)
+          .map((section) => ({
+            id: section.id,
+            title: section.title,
+            description: section.description,
+            items: section.items.map((item) => ({
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              priceAmount: item.priceAmount,
+              imageUrl: item.imageUrl,
+              durationMinutes: item.durationMinutes,
+              startsAt: item.startsAt,
+              endsAt: item.endsAt,
+              publishedAt: item.publishedAt,
+              buttonLabel: item.buttonLabel,
+              buttonUrl: item.buttonUrl,
+              askVia: item.askVia,
+            })),
+          })),
+      })),
   }
 }
 
@@ -290,6 +326,8 @@ export async function loadJoinPage(db: Database, joinSlug: string) {
       design: row.card.design,
       terms: row.card.terms,
       collectBirthday: row.card.collectBirthday,
+      collectPhone: row.card.collectPhone,
+      phoneRequired: row.card.phoneRequired,
       signupQuestionIds: row.card.signupQuestionIds,
     },
     rewards: cardRewards.map((reward) => ({

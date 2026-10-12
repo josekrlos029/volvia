@@ -1,7 +1,17 @@
 import type { BannerPattern, CardBanner, StampStyle } from '@volvia/shared'
-import { bannerBackground, patternLayer } from '@volvia/ui'
+import { presetBannerDataUri } from '@volvia/shared'
+import { bannerBackground, hexWithAlpha, patternLayer } from '@volvia/ui'
 import type { CSSProperties } from 'react'
 import { StampGrid } from './StampGrid'
+
+/** What a live campaign or birthday changes on the card, as the API describes it. */
+export interface CardOffer {
+  headerLabel: string | null
+  bannerPreset: string | null
+  bannerUrl: string | null
+  hideStamps: boolean
+  stampStyle: string | null
+}
 
 export interface CardDesign {
   backgroundColor: string
@@ -28,6 +38,10 @@ interface LoyaltyCardProps {
   animateLast?: boolean
   /** The line the business wants read on this visit, if there is one. */
   message?: string | null
+  /** The campaign dressing the card right now, if any. */
+  offer?: CardOffer | null
+  /** A reward waiting beats a campaign header, same as on the wallet pass. */
+  hasPendingReward?: boolean
 }
 
 /**
@@ -44,7 +58,22 @@ export function LoyaltyCard({
   cycleLabel,
   animateLast,
   message,
+  offer,
+  hasPendingReward = false,
 }: LoyaltyCardProps) {
+  const stampStyle = (
+    offer?.stampStyle && offer.stampStyle !== 'hidden' ? offer.stampStyle : design.stampStyle
+  ) as StampStyle | undefined
+  const offerBackground = offer?.bannerUrl
+    ? `url("${offer.bannerUrl}")`
+    : offer?.bannerPreset
+      ? presetBannerDataUri(offer.bannerPreset, 375, 123, {
+          accent: design.accentColor,
+          foreground: design.foregroundColor,
+          background: design.backgroundColor,
+        })
+      : null
+  const headerLabel = offer?.headerLabel && !hasPendingReward ? offer.headerLabel : businessName
   const style = {
     background: design.backgroundColor,
     color: design.foregroundColor,
@@ -75,7 +104,7 @@ export function LoyaltyCard({
           <header className="mb-5 flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="truncate text-[11px] font-medium uppercase tracking-[0.14em] opacity-70">
-                {businessName}
+                {headerLabel}
               </p>
               <h1 className="mt-1 truncate text-[22px] font-semibold leading-tight">
                 {design.headline || cardName}
@@ -103,16 +132,59 @@ export function LoyaltyCard({
             )}
           </header>
 
-          <StampGrid
-            filled={filled}
-            total={total}
-            rewardPositions={rewardPositions}
-            accentColor={design.accentColor}
-            emptyColor={design.emptyStampColor}
-            foregroundColor={design.foregroundColor}
-            stampStyle={design.stampStyle}
-            animateLast={animateLast}
-          />
+          <div
+            className={offerBackground ? 'relative overflow-hidden rounded-[12px]' : undefined}
+            style={
+              offerBackground
+                ? {
+                    backgroundImage: offerBackground,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }
+                : undefined
+            }
+          >
+            {offerBackground && !offer?.hideStamps ? (
+              <span
+                aria-hidden="true"
+                className="absolute inset-0"
+                style={{ background: design.backgroundColor, opacity: 0.35 }}
+              />
+            ) : null}
+            {offer?.hideStamps ? (
+              <div className="flex h-[108px] items-end justify-end p-2">
+                <span
+                  aria-label={`${filled} de ${total}`}
+                  className="flex items-center gap-1 rounded-full px-2.5 py-1.5"
+                  style={{ background: hexWithAlpha(design.backgroundColor, 0.85) }}
+                >
+                  {Array.from({ length: Math.min(total, 20) }, (_, index) => (
+                    <span
+                      key={`dot-${index + 1}`}
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{
+                        background: index < filled ? design.accentColor : design.foregroundColor,
+                        opacity: index < filled ? 1 : 0.3,
+                      }}
+                    />
+                  ))}
+                </span>
+              </div>
+            ) : (
+              <div className={offerBackground ? 'relative p-2' : undefined}>
+                <StampGrid
+                  filled={filled}
+                  total={total}
+                  rewardPositions={rewardPositions}
+                  accentColor={design.accentColor}
+                  emptyColor={design.emptyStampColor}
+                  foregroundColor={design.foregroundColor}
+                  stampStyle={stampStyle}
+                  animateLast={animateLast}
+                />
+              </div>
+            )}
+          </div>
 
           {message ? (
             <p className="mt-4 text-center text-[14px] leading-snug opacity-85">{message}</p>

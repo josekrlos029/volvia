@@ -196,6 +196,8 @@ export const createCardSchema = z
     /** Extra questions asked at signup, beyond name/email/birthday. */
     signupQuestionIds: z.array(z.string().uuid()).max(5).default([]),
     collectBirthday: z.boolean().default(true),
+    collectPhone: z.boolean().default(false),
+    phoneRequired: z.boolean().default(false),
     /**
      * Stamps granted the moment someone joins. A card that starts at zero feels like a
      * chore; one that starts with two feels like something already begun.
@@ -248,6 +250,8 @@ export const updateCardSchema = z.object({
   inactivityExpiryDays: z.number().int().min(30).max(1095).nullable().optional(),
   signupQuestionIds: z.array(z.string().uuid()).max(5).optional(),
   collectBirthday: z.boolean().optional(),
+  collectPhone: z.boolean().optional(),
+  phoneRequired: z.boolean().optional(),
   initialStamps: z.number().int().min(0).max(MAX_INITIAL_STAMPS).optional(),
   messages: cardMessagesSchema.partial().optional(),
   status: z.enum(CARD_STATUSES).optional(),

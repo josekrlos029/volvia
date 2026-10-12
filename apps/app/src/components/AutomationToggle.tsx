@@ -1,24 +1,64 @@
 'use client'
 
 import { api } from '@/lib/api-client'
+import { type CampaignPassOverrideInput, EMPTY_PASS_OVERRIDE } from '@volvia/shared'
 import { ApiError } from '@volvia/shared/client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import type { PreviewDesign } from './CardPreview'
+import { OfferDesigner } from './OfferDesigner'
 import { buttonClass } from './ui'
+
+/** The birthday look, before the business touches it: a cake, and gone after the visit. */
+export const BIRTHDAY_PASS_DEFAULTS: CampaignPassOverrideInput = {
+  ...EMPTY_PASS_OVERRIDE,
+  header: 'CUMPLEAÑOS',
+  banner: { kind: 'preset', value: 'cake' },
+  endsOnFirstStamp: true,
+}
+
+const VALIDITY_CHOICES = [
+  { days: 7, label: '1 semana' },
+  { days: 14, label: '2 semanas' },
+  { days: 30, label: '1 mes' },
+]
 
 export function AutomationToggle({
   active,
   headline,
   body,
   bonusStamps,
+  validForDays,
+  sendEmail,
+  passOverride,
+  businessName,
+  previewCard,
 }: {
   active: boolean
   headline: string
   body: string
   bonusStamps: number
+  validForDays: number
+  sendEmail: boolean
+  passOverride: CampaignPassOverrideInput
+  businessName: string
+  previewCard?: {
+    name: string
+    design: PreviewDesign
+    stampsRequired: number
+    rewardPositions: number[]
+  } | null
 }) {
   const router = useRouter()
-  const [value, setValue] = useState({ active, headline, body, bonusStamps })
+  const [value, setValue] = useState({
+    active,
+    headline,
+    body,
+    bonusStamps,
+    validForDays,
+    sendEmail,
+    passOverride,
+  })
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -36,10 +76,11 @@ export function AutomationToggle({
           kind: 'bonus_stamps',
           amount: next.bonusStamps,
           title: null,
-          validForDays: 14,
+          validForDays: next.validForDays,
         },
-        sendEmail: true,
+        sendEmail: next.sendEmail,
         sendPush: true,
+        passOverride: next.passOverride,
       })
       setValue(next)
       setStatus('saved')
@@ -106,6 +147,61 @@ export function AutomationToggle({
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <p className="text-[14px] font-medium">¿Cuánto dura el detalle?</p>
+        <div className="flex flex-wrap gap-2">
+          {VALIDITY_CHOICES.map((choice) => (
+            <button
+              key={choice.days}
+              type="button"
+              onClick={() => setValue({ ...value, validForDays: choice.days })}
+              aria-pressed={value.validForDays === choice.days}
+              className={[
+                'rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors',
+                value.validForDays === choice.days
+                  ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                  : 'border-[var(--color-line)] bg-white hover:bg-[var(--color-surface-muted)]',
+              ].join(' ')}
+            >
+              {choice.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[13px] leading-snug text-[var(--color-ink-muted)]">
+          Si el cliente no viene, la tarjeta vuelve a la normalidad sola al vencer.
+        </p>
+      </div>
+
+      <label className="flex items-start gap-3 text-[14px]">
+        <input
+          type="checkbox"
+          checked={value.sendEmail}
+          onChange={(event) => setValue({ ...value, sendEmail: event.target.checked })}
+          className="mt-0.5 h-[18px] w-[18px] accent-[var(--color-primary)]"
+        />
+        <span>
+          <span className="font-medium">Enviar también un correo</span>
+          <span className="mt-0.5 block text-[13px] text-[var(--color-ink-muted)]">
+            Sale entre las 8:00 y las 10:00 de tu hora, solo a quien aceptó recibir promociones.
+          </span>
+        </span>
+      </label>
+
+      <div className="flex flex-col gap-2">
+        <p className="text-[14px] font-medium">Cómo se ve en la tarjeta ese día</p>
+        <OfferDesigner
+          value={value.passOverride}
+          onChange={(passOverride) => setValue({ ...value, passOverride })}
+          design={previewCard?.design ?? null}
+          businessName={businessName}
+          cardName={previewCard?.name}
+          stampsRequired={previewCard?.stampsRequired}
+          rewardPositions={previewCard?.rewardPositions}
+          previewMessage={value.headline}
+          idPrefix="birthday"
+        />
       </div>
 
       {error ? (

@@ -5,10 +5,12 @@ import type { Role } from '@volvia/shared'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import { PlanWidget, type PlanWidgetProps } from './PlanWidget'
+import { WhatsNew } from './WhatsNew'
 
 interface NavProps {
   orgName: string
-  plan: string
+  plan: PlanWidgetProps
   userName: string
   role: Role
   isSuperadmin: boolean
@@ -30,15 +32,18 @@ export function Nav({ orgName, plan, userName, role, isSuperadmin, locked }: Nav
         <div className="min-w-0">
           <p className="truncate text-[15px] font-semibold">{orgName}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          aria-controls="main-nav"
-          className="rounded-[9px] border border-[var(--color-line)] px-3 py-1.5 text-[14px] font-medium"
-        >
-          {open ? 'Cerrar' : 'Menú'}
-        </button>
+        <div className="flex items-center gap-2">
+          <WhatsNew compact />
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            aria-controls="main-nav"
+            className="rounded-[9px] border border-[var(--color-line)] px-3 py-1.5 text-[14px] font-medium"
+          >
+            {open ? 'Cerrar' : 'Menú'}
+          </button>
+        </div>
       </div>
 
       <nav
@@ -54,7 +59,7 @@ export function Nav({ orgName, plan, userName, role, isSuperadmin, locked }: Nav
             Volvia
           </p>
           <p className="mt-3 truncate text-[15px] font-semibold">{orgName}</p>
-          <p className="mt-0.5 text-[13px] capitalize text-[var(--color-ink-muted)]">Plan {plan}</p>
+          <PlanWidget {...plan} />
         </div>
 
         <ul className="flex flex-col gap-0.5 p-2">
@@ -102,6 +107,9 @@ export function Nav({ orgName, plan, userName, role, isSuperadmin, locked }: Nav
               Admin Volvia
             </Link>
           ) : null}
+          <div className="mt-2 hidden lg:block">
+            <WhatsNew />
+          </div>
           <p className="mt-3 px-3 text-[13px] text-[var(--color-ink-muted)]">{userName}</p>
           <form action="/api/logout" method="post">
             <button

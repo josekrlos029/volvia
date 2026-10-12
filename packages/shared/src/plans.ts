@@ -28,6 +28,7 @@ export const FEATURE_KEYS = [
   'csv_export',
   'team_accounts',
   'kiosk_mode',
+  'page_catalogue',
   'multi_location',
   'priority_support',
 ] as const
@@ -98,6 +99,7 @@ const BUSINESS_FEATURES = [
   'csv_export',
   'team_accounts',
   'kiosk_mode',
+  'page_catalogue',
 ] as const satisfies readonly FeatureKey[]
 
 const MULTI_FEATURES = [

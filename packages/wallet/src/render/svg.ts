@@ -1,4 +1,4 @@
-import { GIFT_ICON_PATH, readableOn, stampIconPath } from '@volvia/shared'
+import { GIFT_ICON_PATH, presetBannerSvg, readableOn, stampIconPath } from '@volvia/shared'
 import type { StampStyle } from '@volvia/shared'
 import type { PassContent } from '../types'
 import type { RemoteImage } from './remote-image'
@@ -19,9 +19,11 @@ export interface PassArtwork {
   logo: RemoteImage | null
   /** A custom stamp icon, when the design uses an uploaded image. */
   stampIcon: RemoteImage | null
+  /** The picture a live campaign puts behind the stamps, when it uploaded one. */
+  banner: RemoteImage | null
 }
 
-export const EMPTY_ARTWORK: PassArtwork = { logo: null, stampIcon: null }
+export const EMPTY_ARTWORK: PassArtwork = { logo: null, stampIcon: null, banner: null }
 
 const fmt = (value: number) => Number(value.toFixed(2)).toString()
 
@@ -149,14 +151,73 @@ export function stripSvg(
 
   const dot = 1.3 * unit
   const cell = 14 * unit
+  const hidden = content.offer?.hideStamps ?? false
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(width)}" height="${fmt(height)}" viewBox="0 0 ${fmt(width)} ${fmt(height)}">`,
     `<defs><pattern id="dots" width="${fmt(cell)}" height="${fmt(cell)}" patternUnits="userSpaceOnUse"><circle cx="${fmt(cell / 2)}" cy="${fmt(cell / 2)}" r="${fmt(dot)}" fill="${content.foregroundColor}" fill-opacity="0.07"/></pattern></defs>`,
     `<rect width="${fmt(width)}" height="${fmt(height)}" fill="${content.backgroundColor}"/>`,
-    `<rect width="${fmt(width)}" height="${fmt(height)}" fill="url(#dots)"/>`,
-    ...slots,
+    stripBackground(content, artwork, width, height, hidden),
+    ...(hidden ? [progressPill(content, width, height)] : slots),
     '</svg>',
   ].join('')
+}
+
+/**
+ * What sits under the stamps: the quiet dot texture, or a campaign's banner while one
+ * runs. An uploaded picture is cropped to the strip; with stamps still drawn on top it
+ * gets a scrim in the card colour so the grid stays readable over any photo.
+ */
+function stripBackground(
+  content: PassContent,
+  artwork: PassArtwork,
+  width: number,
+  height: number,
+  hidden: boolean,
+): string {
+  const banner = content.offer?.banner ?? null
+  if (banner?.kind === 'image' && artwork.banner) {
+    const scrim = hidden
+      ? ''
+      : `<rect width="${fmt(width)}" height="${fmt(height)}" fill="${content.backgroundColor}" fill-opacity="0.35"/>`
+    return `<image href="${artwork.banner.dataUri}" x="0" y="0" width="${fmt(width)}" height="${fmt(height)}" preserveAspectRatio="xMidYMid slice"/>${scrim}`
+  }
+  if (banner?.kind === 'preset') {
+    const art = presetBannerSvg(banner.value, width, height, {
+      accent: content.labelColor,
+      foreground: content.foregroundColor,
+    })
+    // Under a full grid the decoration steps back; alone it carries the strip.
+    return `<g opacity="${hidden ? '1' : '0.55'}">${art}</g>`
+  }
+  return `<rect width="${fmt(width)}" height="${fmt(height)}" fill="url(#dots)"/>`
+}
+
+/**
+ * With the grid hidden, the count still has to be seen at a glance: a pill in the
+ * bottom-right corner with one dot per stamp, filled in the accent. No digits, because
+ * the strip ships no font; the numbers live in the header beside it.
+ */
+function progressPill(content: PassContent, width: number, height: number): string {
+  const unit = width / 375
+  const total = Math.max(1, Math.min(content.stampsRequired, 20))
+  const dot = 6 * unit
+  const gap = 4 * unit
+  const padX = 10 * unit
+  const padY = 7 * unit
+  const pillW = padX * 2 + total * dot + (total - 1) * gap
+  const pillH = padY * 2 + dot
+  const x = width - pillW - 12 * unit
+  const y = height - pillH - 10 * unit
+  const onPill = content.labelColor
+  const dots: string[] = []
+  for (let index = 0; index < total; index += 1) {
+    const cx = x + padX + dot / 2 + index * (dot + gap)
+    const filled = index < content.stampsCount
+    dots.push(
+      `<circle cx="${fmt(cx)}" cy="${fmt(y + pillH / 2)}" r="${fmt(dot / 2)}" fill="${filled ? onPill : content.foregroundColor}" fill-opacity="${filled ? '1' : '0.3'}"/>`,
+    )
+  }
+  return `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(pillW)}" height="${fmt(pillH)}" rx="${fmt(pillH / 2)}" fill="${content.backgroundColor}" fill-opacity="0.85"/>${dots.join('')}`
 }
 
 /** The business on its own: its logo over the card colour, or the stamp icon on the accent. */

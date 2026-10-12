@@ -20,6 +20,12 @@ import { AppError } from '../../lib/errors'
 import { OUTBOX_KINDS, enqueue } from '../../lib/outbox'
 import { addDays, orgDay, orgHour, startOfOrgDay } from '../../lib/time'
 import { generateCode, randomToken } from '../../lib/tokens'
+import {
+  bumpCampaignStats,
+  endOffersForCard,
+  loadLiveOffer,
+  multiplierFor,
+} from '../engagement/offers'
 import { evaluateStamp, rewardsCrossed } from './rules'
 
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0]
@@ -137,6 +143,7 @@ export async function joinCard(
           firstName: input.data.firstName || existingCustomer.firstName,
           birthdayMonth: input.data.birthday?.month ?? existingCustomer.birthdayMonth,
           birthdayDay: input.data.birthday?.day ?? existingCustomer.birthdayDay,
+          phone: input.data.phone ?? existingCustomer.phone,
           marketingConsent: input.data.marketingConsent || existingCustomer.marketingConsent,
           consentAt: input.data.marketingConsent
             ? (existingCustomer.consentAt ?? now)
@@ -154,6 +161,7 @@ export async function joinCard(
           email,
           birthdayMonth: input.data.birthday?.month ?? null,
           birthdayDay: input.data.birthday?.day ?? null,
+          phone: input.data.phone,
           locale: input.data.locale ?? org.locale,
           marketingConsent: input.data.marketingConsent,
           consentAt: input.data.marketingConsent ? now : null,
@@ -349,6 +357,22 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
       }
     }
 
+    // A live campaign can multiply what the counter hands out. Bonus stamps the
+    // campaign itself awards (`source: 'campaign'`) are never multiplied again.
+    const liveOffer =
+      command.source === 'campaign'
+        ? null
+        : await loadLiveOffer(tx, {
+            customerCardId: row.customerCard.id,
+            timezone: row.org.timezone,
+            now,
+          })
+    const factor =
+      command.source === 'staff_scan' || command.source === 'kiosk' ? multiplierFor(liveOffer) : 1
+    const granted = decision.granted * factor
+    const note =
+      command.note ?? (factor > 1 && liveOffer ? `x${factor} · ${liveOffer.headline}` : null)
+
     const cardRewards = await tx
       .select()
       .from(rewards)
@@ -357,7 +381,7 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
 
     const crossing = rewardsCrossed({
       from: row.customerCard.stampsCount,
-      granted: decision.granted,
+      granted,
       stampsRequired: row.card.stampsRequired,
       rewardPositions: cardRewards.map((reward) => reward.atStamp),
     })
@@ -370,11 +394,11 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
       locationId: command.locationId ?? null,
       actorUserId: command.actorUserId ?? null,
       source: command.source,
-      delta: decision.granted,
+      delta: granted,
       resultingCount: crossing.finalCount,
       cycleIndex: nextCycle,
       purchaseAmount: command.purchaseAmount ?? null,
-      note: command.note ?? null,
+      note,
       idempotencyKey: command.idempotencyKey,
       occurredAt: now,
     })
@@ -409,7 +433,7 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
       .set({
         stampsCount: crossing.finalCount,
         cycleIndex: nextCycle,
-        lifetimeStamps: sql`${customerCards.lifetimeStamps} + ${decision.granted}`,
+        lifetimeStamps: sql`${customerCards.lifetimeStamps} + ${granted}`,
         lastStampAt: now,
         expiresAt: row.card.inactivityExpiryDays
           ? addDays(now, row.card.inactivityExpiryDays)
@@ -421,7 +445,7 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
     await tx
       .update(customers)
       .set({
-        totalStamps: sql`${customers.totalStamps} + ${decision.granted}`,
+        totalStamps: sql`${customers.totalStamps} + ${granted}`,
         totalRewards: sql`${customers.totalRewards} + ${grants.length}`,
         lastStampAt: now,
         updatedAt: now,
@@ -434,9 +458,18 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
       locationId: command.locationId ?? null,
       day: orgDay(now, row.org.timezone),
       hour: orgHour(now, row.org.timezone),
-      stamps: decision.granted,
+      stamps: granted,
       rewardsUnlocked: grants.length,
     })
+
+    // A visit is what some offers wait for: the first stamp ends them, and the pass
+    // update queued below is what returns the card to normal.
+    if (command.source !== 'campaign') {
+      await endOffersForCard(tx, row.customerCard.id, 'stamp')
+      if (liveOffer?.campaignId) {
+        await bumpCampaignStats(tx, liveOffer.campaignId, { stamps: granted })
+      }
+    }
 
     // The wallet pass must reflect the new count; the outbox guarantees it is sent
     // exactly when this transaction commits, and never if it rolls back.
@@ -469,7 +502,7 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
 
     return {
       customerCardId: row.customerCard.id,
-      stampsAdded: decision.granted,
+      stampsAdded: granted,
       stampsCount: crossing.finalCount,
       stampsRequired: row.card.stampsRequired,
       cycleIndex: nextCycle,

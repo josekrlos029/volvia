@@ -36,6 +36,10 @@ const FEATURE_LABELS: Record<FeatureKey, { es: string; en: string }> = {
   csv_export: { es: 'Exportar a CSV', en: 'CSV export' },
   team_accounts: { es: 'Cuentas de equipo', en: 'Team accounts' },
   kiosk_mode: { es: 'Modo kiosko', en: 'Kiosk mode' },
+  page_catalogue: {
+    es: 'Carta, productos y novedades en tu página',
+    en: 'Menu, products and updates on your page',
+  },
   multi_location: { es: 'Varias sedes', en: 'Multiple locations' },
   priority_support: { es: 'Soporte prioritario', en: 'Priority support' },
 }

@@ -24,8 +24,10 @@ import {
 } from '../lib/email'
 import { deferToNotificationHours } from '../lib/notification-hours'
 import { OUTBOX_KINDS, enqueue, fanOutWalletUpdates } from '../lib/outbox'
+import { type RedisClient, redisKeys } from '../lib/redis'
 import { visitFrequencyOf } from '../lib/segments'
 import { audienceConditions, resolveAudienceDefinition } from '../modules/engagement/audience'
+import { applyOfferBonuses, endOffersForCampaign, enrollOffers } from '../modules/engagement/offers'
 import { settleDelivery } from '../modules/messages/service'
 import { walletPushCounter } from '../plugins/observability'
 import type { OutboxHandler, OutboxHandlerContext } from './outbox'
@@ -37,12 +39,27 @@ import { patchGooglePass, pushAppleUpdate, pushGoogleMessage } from './wallet-pu
  * Every one of these must be safe to run twice: the outbox guarantees at-least-once
  * delivery, not exactly-once, and a retry after a partial failure is normal.
  */
-export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHandler> {
+export function buildHandlers(deps: {
+  mailer: Mailer
+  redis: RedisClient
+}): Record<string, OutboxHandler> {
   return {
     'wallet.update': async (payload, context) => {
       const customerCardId = String(payload.customerCardId)
       const reason = typeof payload.reason === 'string' ? payload.reason : null
       const messageId = reason === 'message' ? String(payload.messageId) : null
+
+      // Whatever changed the pass changed the web card too, and that one is served
+      // from a short cache: drop it first, so a customer who opens the link right
+      // after a campaign ends does not see the offer linger.
+      const [holder] = await context.db
+        .select({ token: customerCards.token })
+        .from(customerCards)
+        .where(eq(customerCards.id, customerCardId))
+        .limit(1)
+      if (holder) {
+        await deps.redis.del(redisKeys.cardState(holder.token)).catch(() => undefined)
+      }
 
       const passes = await context.db
         .select()
@@ -244,22 +261,50 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
 
       // Only a scheduled campaign starts: the scheduler and a deferred start can both
       // leave a row for the same campaign, and the second must not fan out again.
-      const started = await context.db
-        .update(campaigns)
-        .set({
-          status: 'running',
-          startedAt: new Date(),
-          stats: { ...campaign.stats, targeted: targets.length },
-        })
-        .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, 'scheduled')))
-        .returning({ id: campaigns.id })
-      if (started.length === 0) return
+      const enrolled = await context.db.transaction(async (tx) => {
+        const started = await tx
+          .update(campaigns)
+          .set({
+            status: 'running',
+            startedAt: new Date(),
+            stats: { ...campaign.stats, targeted: targets.length },
+          })
+          .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, 'scheduled')))
+          .returning({ id: campaigns.id })
+        if (started.length === 0) return null
 
-      // One wallet update per affected card, so the offer appears on the pass itself.
-      await fanOutWalletUpdates(context.db, campaign.orgId, targets, {
-        reason: 'campaign',
-        campaignId,
+        // One offer per customer in the audience: that row is what the pass reads, so
+        // nobody outside the audience ever sees the campaign on their card.
+        const rows = await enrollOffers(tx, {
+          orgId: campaign.orgId,
+          source: 'campaign',
+          campaignId,
+          offer: campaign.offer,
+          passOverride: campaign.passOverride,
+          customerCardIds: targets,
+          expiresAt: campaign.endsAt,
+        })
+
+        // One wallet update per affected card, so the offer appears on the pass itself.
+        await fanOutWalletUpdates(tx, campaign.orgId, targets, {
+          reason: 'campaign',
+          campaignId,
+        })
+        return rows
       })
+      if (!enrolled) return
+
+      // Bonus stamps and instant rewards are handed over after the commit: each stamp
+      // is its own transaction and queues its own pass refresh.
+      const applied = await applyOfferBonuses(context.db, {
+        orgId: campaign.orgId,
+        offerIds: enrolled.map((row) => row.id),
+        note: campaign.name,
+        logger: context.logger,
+      })
+      if (applied.stamps || applied.rewards) {
+        context.logger.info({ campaignId, ...applied }, 'campaign bonuses applied')
+      }
     },
 
     'message.send': async (payload, context) => {
@@ -360,10 +405,30 @@ export function buildHandlers(deps: { mailer: Mailer }): Record<string, OutboxHa
 
     'campaign.end': async (payload, context) => {
       const campaignId = String(payload.campaignId)
-      await context.db
-        .update(campaigns)
-        .set({ status: 'finished', finishedAt: new Date() })
-        .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, 'running')))
+      await context.db.transaction(async (tx) => {
+        const [campaign] = await tx
+          .update(campaigns)
+          .set({ status: 'finished', finishedAt: new Date() })
+          .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, 'running')))
+          .returning({ id: campaigns.id, orgId: campaigns.orgId })
+
+        // Whether it ran out or was cancelled, the offers close and every pass that
+        // showed one is refreshed: until this push lands the card still promises it.
+        const [stillOpen] = await tx
+          .select({ orgId: campaigns.orgId })
+          .from(campaigns)
+          .where(eq(campaigns.id, campaignId))
+          .limit(1)
+        const orgId = campaign?.orgId ?? stillOpen?.orgId
+        if (!orgId) return
+
+        const holders = await endOffersForCampaign(
+          tx,
+          campaignId,
+          campaign ? 'campaign_ended' : 'cancelled',
+        )
+        await fanOutWalletUpdates(tx, orgId, holders, { reason: 'campaign_end', campaignId })
+      })
     },
 
     'review.request': async (payload, context) => {

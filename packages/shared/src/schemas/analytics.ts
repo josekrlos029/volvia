@@ -18,6 +18,8 @@ export const overviewSchema = z.object({
   averageVisitsPerCustomer: z.number(),
   /** Median days between a customer's visits — the single best health signal. */
   medianDaysBetweenVisits: z.number().nullable(),
+  /** Opens of the public page in the range; absent on rows written before it was counted. */
+  pageViews: z.number().int().default(0),
   activeCards: z.number(),
 })
 export type Overview = z.infer<typeof overviewSchema>

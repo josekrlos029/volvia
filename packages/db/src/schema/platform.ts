@@ -88,6 +88,8 @@ export const analyticsDaily = pgTable(
     rewardsUnlocked: integer().notNull().default(0),
     rewardsRedeemed: integer().notNull().default(0),
     activeCustomers: integer().notNull().default(0),
+    /** Opens of the public business page, counted once per visitor and day. */
+    pageViews: integer().notNull().default(0),
     /** Stamps per hour bucket, for the "busiest hours" chart. */
     hourly: jsonb().$type<number[]>().notNull().default([]),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

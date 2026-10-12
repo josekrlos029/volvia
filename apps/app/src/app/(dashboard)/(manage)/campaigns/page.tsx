@@ -13,6 +13,16 @@ interface Campaign {
   startsAt: string
   endsAt: string
   stats: { targeted: number; delivered: number; redeemed: number; stamps: number }
+  passOverride?: { endsOnFirstStamp?: boolean; banner?: unknown; header?: string | null }
+}
+
+interface CardSummary {
+  id: string
+  name: string
+  status: string
+  stampsRequired: number
+  design: import('@/components/CardPreview').PreviewDesign
+  rewards: Array<{ atStamp: number }>
 }
 
 const STATUS = {
@@ -29,6 +39,7 @@ export default async function CampaignsPage({
   searchParams: Promise<{ customers?: string }>
 }) {
   const org = await apiFetch<{
+    name: string
     entitlements: { features: Record<string, boolean> }
   }>('/v1/org')
 
@@ -47,7 +58,7 @@ export default async function CampaignsPage({
     apiFetch<{ campaigns: Campaign[]; thisMonth: { used: number; limit: number | null } }>(
       '/v1/campaigns',
     ),
-    apiFetch<Array<{ id: string; name: string; status: string }>>('/v1/cards'),
+    apiFetch<CardSummary[]>('/v1/cards'),
     apiFetch<{
       segments: Array<{ id: string; name: string; count: number }>
       suggested: Array<{ key: string; name: string; count: number }>
@@ -59,6 +70,8 @@ export default async function CampaignsPage({
     ?.split(',')
     .map((id) => id.trim())
     .filter(Boolean)
+  const activeCards = cards.filter((card) => card.status === 'active')
+  const mainCard = activeCards[0]
 
   return (
     <div className="flex flex-col gap-6">
@@ -83,7 +96,18 @@ export default async function CampaignsPage({
       </header>
 
       <CampaignComposer
-        cards={cards.filter((card) => card.status === 'active')}
+        cards={activeCards}
+        businessName={org.name}
+        previewCard={
+          mainCard
+            ? {
+                name: mainCard.name,
+                design: mainCard.design,
+                stampsRequired: mainCard.stampsRequired,
+                rewardPositions: mainCard.rewards.map((reward) => reward.atStamp),
+              }
+            : null
+        }
         selectedCustomerIds={selection}
         remainingThisMonth={limit === null ? null : Math.max(0, limit - used)}
         suggested={segmentList.suggested.map((item) => ({
@@ -113,12 +137,25 @@ export default async function CampaignsPage({
                       {campaign.headline}
                     </p>
                   </div>
-                  <Badge tone={STATUS[campaign.status].tone}>{STATUS[campaign.status].label}</Badge>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {campaign.passOverride?.endsOnFirstStamp ? (
+                      <Badge tone="neutral">Termina con la visita</Badge>
+                    ) : null}
+                    <Badge tone={STATUS[campaign.status].tone}>
+                      {STATUS[campaign.status].label}
+                    </Badge>
+                  </div>
                 </div>
                 <p className="tabular mt-1.5 text-[13px] text-[var(--color-ink-muted)]">
                   {formatDate(campaign.startsAt)} a {formatDate(campaign.endsAt)}
                   {campaign.stats.targeted > 0
                     ? ` · ${formatNumber(campaign.stats.targeted)} clientes`
+                    : ''}
+                  {campaign.stats.stamps > 0
+                    ? ` · ${formatNumber(campaign.stats.stamps)} sellos`
+                    : ''}
+                  {campaign.stats.redeemed > 0
+                    ? ` · ${formatNumber(campaign.stats.redeemed)} canjes`
                     : ''}
                 </p>
               </li>

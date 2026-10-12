@@ -41,6 +41,14 @@ export const brandCopy = {
       cta: 'Ver mi tarjeta',
       footnote: 'Guarda este correo para volver a tu tarjeta cuando quieras.',
     },
+    orgClosed: {
+      subject: (org: string) => `Cerraste ${org} en Volvia`,
+      title: (org: string) => `${org} está cerrado`,
+      intro: (org: string, date: string) =>
+        `Tu página y tus tarjetas dejaron de funcionar. Si fue un error, puedes recuperar ${org} tal cual estaba hasta el ${date}. Después de esa fecha borramos todos los datos de forma definitiva.`,
+      cta: 'Recuperar mi negocio',
+      footnote: 'Si quieres que se borre, no tienes que hacer nada.',
+    },
     birthday: {
       subject: (org: string) => `${org} tiene algo para tu cumpleaños`,
       title: '¡Feliz cumpleaños!',
@@ -95,6 +103,14 @@ export const brandCopy = {
       intro: (reward: string) => `Your card is live. Fill it up and it is yours: ${reward}.`,
       cta: 'Open my card',
       footnote: 'Keep this email to find your card any time.',
+    },
+    orgClosed: {
+      subject: (org: string) => `You closed ${org} on Volvia`,
+      title: (org: string) => `${org} is closed`,
+      intro: (org: string, date: string) =>
+        `Your page and your cards have stopped working. If this was a mistake, you can bring ${org} back exactly as it was until ${date}. After that date every record is deleted for good.`,
+      cta: 'Restore my business',
+      footnote: 'If you do want it deleted, there is nothing else to do.',
     },
     birthday: {
       subject: (org: string) => `${org} left something for your birthday`,

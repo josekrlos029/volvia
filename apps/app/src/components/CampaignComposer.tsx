@@ -2,11 +2,39 @@
 
 import { api } from '@/lib/api-client'
 import { VARIABLE_HELP } from '@/lib/segments'
-import { CAMPAIGN_VARIABLES, renderCampaignText } from '@volvia/shared'
+import {
+  CAMPAIGN_VARIABLES,
+  type CampaignPassOverrideInput,
+  EMPTY_PASS_OVERRIDE,
+  renderCampaignText,
+} from '@volvia/shared'
 import { ApiError } from '@volvia/shared/client'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import type { PreviewDesign } from './CardPreview'
+import { OfferDesigner } from './OfferDesigner'
 import { Panel, buttonClass } from './ui'
+
+/** How each template dresses the pass while it runs; every field stays editable. */
+const PASS_DEFAULTS: Record<string, Partial<CampaignPassOverrideInput>> = {
+  slow_day: {
+    header: 'HOY DOBLE',
+    banner: { kind: 'preset', value: 'sparkle' },
+    endsOnFirstStamp: true,
+  },
+  happy_hour: { header: 'HORA FELIZ', banner: { kind: 'preset', value: 'stars' } },
+  win_back: {
+    header: 'TE EXTRAÑAMOS',
+    banner: { kind: 'preset', value: 'hearts' },
+    endsOnFirstStamp: true,
+  },
+  double_stamps: { header: 'SELLOS DOBLES', banner: { kind: 'preset', value: 'sparkle' } },
+  spend_and_get: { banner: { kind: 'preset', value: 'gift' }, endsOnFirstStamp: true },
+  new_offer: { banner: { kind: 'preset', value: 'confetti' } },
+  vip_thanks: { header: 'PARA TI', banner: { kind: 'preset', value: 'gift' } },
+  last_chance: { header: 'ÚLTIMA LLAMADA', banner: { kind: 'preset', value: 'sale' } },
+  special_deal: { header: 'SOLO HOY', banner: { kind: 'preset', value: 'sale' } },
+}
 
 /**
  * Campaign templates.
@@ -114,8 +142,18 @@ export function CampaignComposer({
   remainingThisMonth,
   suggested = [],
   segments = [],
+  businessName,
+  previewCard,
 }: {
   cards: Array<{ id: string; name: string }>
+  businessName: string
+  /** The business's main card, so the preview shows the pass it actually has. */
+  previewCard?: {
+    name: string
+    design: PreviewDesign
+    stampsRequired: number
+    rewardPositions: number[]
+  } | null
   /** A selection carried over from the customer list, if the business came from there. */
   selectedCustomerIds?: string[]
   remainingThisMonth: number | null
@@ -130,8 +168,16 @@ export function CampaignComposer({
   const [audienceSize, setAudienceSize] = useState<number | null>(null)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [passOverride, setPassOverride] = useState<CampaignPassOverrideInput>(EMPTY_PASS_OVERRIDE)
+  const [showDesigner, setShowDesigner] = useState(false)
 
   const template = TEMPLATES.find((item) => item.id === selected)
+
+  function pick(id: string) {
+    const next = selected === id ? null : id
+    setSelected(next)
+    setPassOverride({ ...EMPTY_PASS_OVERRIDE, ...(next ? PASS_DEFAULTS[next] : {}) })
+  }
   const picked = selectedCustomerIds ?? []
 
   /**
@@ -217,6 +263,7 @@ export function CampaignComposer({
         sendPush: true,
         activeWeekdays: [],
         activeHours: template.hours ?? null,
+        passOverride,
       })
       await api.post(`/v1/campaigns/${created.id}/launch`)
       setSelected(null)
@@ -253,7 +300,7 @@ export function CampaignComposer({
           <li key={item.id}>
             <button
               type="button"
-              onClick={() => setSelected(selected === item.id ? null : item.id)}
+              onClick={() => pick(item.id)}
               aria-pressed={selected === item.id}
               className={[
                 'h-full w-full rounded-[10px] border p-3.5 text-left transition-colors',
@@ -318,6 +365,42 @@ export function CampaignComposer({
               </select>
             </label>
           ) : null}
+
+          <div className="mt-4 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface-muted)]/50">
+            <button
+              type="button"
+              onClick={() => setShowDesigner((open) => !open)}
+              aria-expanded={showDesigner}
+              className="flex w-full items-center justify-between px-4 py-3 text-left text-[14px] font-medium"
+            >
+              <span>
+                Cómo se ve en la tarjeta
+                <span className="ml-2 font-normal text-[var(--color-ink-muted)]">
+                  {passOverride.header ? `${passOverride.header} · ` : ''}
+                  {passOverride.banner ? 'con banner' : 'sin banner'}
+                  {passOverride.endsOnFirstStamp ? ' · termina con la visita' : ''}
+                </span>
+              </span>
+              <span aria-hidden="true" className="text-[var(--color-ink-muted)]">
+                {showDesigner ? '−' : '+'}
+              </span>
+            </button>
+            {showDesigner ? (
+              <div className="border-t border-[var(--color-line)] px-4 py-4">
+                <OfferDesigner
+                  value={passOverride}
+                  onChange={setPassOverride}
+                  design={previewCard?.design ?? null}
+                  businessName={businessName}
+                  cardName={previewCard?.name}
+                  stampsRequired={previewCard?.stampsRequired}
+                  rewardPositions={previewCard?.rewardPositions}
+                  previewMessage={preview.headline}
+                  idPrefix="campaign"
+                />
+              </div>
+            ) : null}
+          </div>
 
           <p className="mt-3 text-[14px] text-[var(--color-ink-muted)]">
             {audienceSize === null

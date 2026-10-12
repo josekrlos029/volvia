@@ -41,3 +41,28 @@ export async function deferToNotificationHours(
   const settings = orgSettingsSchema.parse(org.settings ?? {})
   return nextNotificationSlot(instant, org.timezone, settings.notificationHours)
 }
+
+/** Birthday mail goes out mid-morning: early enough to plan the day, late enough to be read. */
+export const BIRTHDAY_EMAIL_WINDOW = { from: '08:00', to: '10:00' } as const
+
+/**
+ * When a birthday email should leave, for a run at `now`. Inside 08:00–10:00 local it
+ * goes now; before that, at a minute of this morning's window chosen from `seed` so a
+ * busy café's greetings are spread out instead of landing in one burst; after 10:00
+ * (a late cron, a retry) it goes now rather than tomorrow, when it would be wrong.
+ */
+export function birthdayEmailSlot(now: Date, timezone: string, seed: string): Date {
+  const local = DateTime.fromJSDate(now, { zone: timezone })
+  const [fromH = 8] = BIRTHDAY_EMAIL_WINDOW.from.split(':').map(Number)
+  const [toH = 10] = BIRTHDAY_EMAIL_WINDOW.to.split(':').map(Number)
+  const opening = local.set({ hour: fromH, minute: 0, second: 0, millisecond: 0 })
+  const closing = local.set({ hour: toH, minute: 0, second: 0, millisecond: 0 })
+  if (local >= opening) return now
+
+  // Deterministic jitter: the same customer always gets the same minute, so a retry
+  // never reschedules them.
+  let hash = 0
+  for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  const span = Math.max(1, closing.diff(opening, 'minutes').minutes - 10)
+  return opening.plus({ minutes: hash % span }).toJSDate()
+}

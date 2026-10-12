@@ -18,6 +18,7 @@ export interface NavSection {
 export const SECTIONS: readonly NavSection[] = [
   { href: '/', label: 'Resumen' },
   { href: '/cards', label: 'Tarjetas' },
+  { href: '/page', label: 'Tu página', minRole: 'admin' },
   { href: '/customers', label: 'Clientes' },
   { href: '/segments', label: 'Segmentos' },
   { href: '/campaigns', label: 'Campañas', feature: 'campaigns', minRole: 'admin' },

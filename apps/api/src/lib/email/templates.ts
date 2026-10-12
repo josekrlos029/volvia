@@ -151,6 +151,23 @@ export function welcomeCustomerTemplate(
   }
 }
 
+export function orgClosedTemplate(
+  locale: Locale,
+  input: { orgName: string; restoreUrl: string; purgeDate: string },
+): EmailTemplate {
+  const copy = brandCopy[locale].orgClosed
+  return {
+    subject: copy.subject(input.orgName),
+    ...render({
+      locale,
+      title: copy.title(input.orgName),
+      intro: copy.intro(input.orgName, input.purgeDate),
+      cta: { label: copy.cta, url: input.restoreUrl },
+      footnote: copy.footnote,
+    }),
+  }
+}
+
 export function birthdayTemplate(
   locale: Locale,
   input: { orgName: string; cardUrl: string; offer: string },

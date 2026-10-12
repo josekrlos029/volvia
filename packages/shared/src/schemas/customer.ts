@@ -6,6 +6,7 @@ import {
   emailSchema,
   localeSchema,
   paginationSchema,
+  phoneSchema,
   sortOrderSchema,
 } from './common'
 
@@ -14,6 +15,12 @@ export const joinCardSchema = z.object({
   firstName: z.string().trim().min(1).max(60),
   email: emailSchema,
   birthday: birthdaySchema.nullable().default(null),
+  /** Asked only when the card collects it; an empty string means "left blank". */
+  phone: z
+    .union([phoneSchema, z.literal('')])
+    .nullable()
+    .default(null)
+    .transform((value) => (value ? value : null)),
   marketingConsent: z.boolean().default(false),
   locale: localeSchema.optional(),
   /** Answers to the card's optional signup questions, keyed by question id. */
@@ -27,6 +34,7 @@ export const updateCustomerSchema = z.object({
   firstName: z.string().trim().min(1).max(60).optional(),
   email: emailSchema.optional(),
   birthday: birthdaySchema.nullable().optional(),
+  phone: phoneSchema.nullable().optional(),
   marketingConsent: z.boolean().optional(),
   notes: z.string().trim().max(1000).optional(),
 })
@@ -99,6 +107,8 @@ export type CustomerListQuery = z.infer<typeof customerListQuerySchema>
 export const PROFILE_QUESTION_TYPES = ['text', 'single_choice', 'date'] as const
 
 export const profileQuestionSchema = z.object({
+  /** Present when editing an existing question, so its answers stay attached. */
+  id: z.string().uuid().optional(),
   prompt: z.string().trim().min(3).max(140),
   type: z.enum(PROFILE_QUESTION_TYPES).default('text'),
   options: z.array(z.string().trim().min(1).max(60)).max(8).default([]),

@@ -4,6 +4,7 @@ import { apiFetch, requireRole } from '@/lib/session'
 
 interface Org {
   name: string
+  category: string
   entitlements: { features: Record<string, boolean> }
 }
 
@@ -25,6 +26,7 @@ export default async function NewCardPage() {
 
       <CardEditor
         businessName={org.name}
+        category={org.category}
         canCustomiseBranding={org.entitlements.features.custom_branding ?? false}
         canUseKiosk={org.entitlements.features.kiosk_mode ?? false}
         profileQuestions={profileQuestions}
@@ -48,6 +50,8 @@ export default async function NewCardPage() {
           signupQuestionIds: [],
           terms: '',
           collectBirthday: true,
+          collectPhone: false,
+          phoneRequired: false,
           initialStamps: 0,
           messages: { variants: [], perStamp: {} },
           rules: { cooldownMinutes: 30, dailyCap: 2, kioskEnabled: false },

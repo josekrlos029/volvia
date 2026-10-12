@@ -32,11 +32,13 @@ export type GoogleImageKind = keyof typeof GOOGLE_IMAGE_SIZES
 
 /** Fetches the uploads the design refers to. Failures degrade to the drawn fallbacks. */
 export async function loadPassArtwork(content: PassContent): Promise<PassArtwork> {
-  const [logo, stampIcon] = await Promise.all([
+  const bannerUrl = content.offer?.banner?.kind === 'image' ? content.offer.banner.url : null
+  const [logo, stampIcon, banner] = await Promise.all([
     content.logoUrl ? loadRemoteImage(content.logoUrl) : null,
     content.stampIcon.kind === 'image' ? loadRemoteImage(content.stampIcon.value) : null,
+    bannerUrl ? loadRemoteImage(bannerUrl) : null,
   ])
-  return { logo, stampIcon }
+  return { logo, stampIcon, banner }
 }
 
 /** Every PNG a `.pkpass` carries, at the three densities current iPhones use. */
@@ -98,6 +100,9 @@ export function imageVersion(content: PassContent): string {
       content.stampIcon,
       content.stampStyle,
       content.logoUrl,
+      // A campaign banner or hidden stamps change the strip as much as a stamp does.
+      content.offer?.banner ?? null,
+      content.offer?.hideStamps ?? false,
     ]),
   )
   return hash.digest('hex').slice(0, 12)

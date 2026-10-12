@@ -15,6 +15,7 @@ interface Overview {
   averageVisitsPerCustomer: number
   medianDaysBetweenVisits: number | null
   activeCards: number
+  pageViews?: number
   limited: boolean
   upgradeTo?: string | null
 }
@@ -127,7 +128,7 @@ export default async function DashboardHome() {
         ) : null}
       </Panel>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Metric
           label="Clientes"
           value={formatNumber(overview.customers.total)}
@@ -152,6 +153,11 @@ export default async function DashboardHome() {
           label="Vuelven"
           value={overview.limited ? 'Plan' : formatPercent(overview.repeatRate)}
           hint={overview.limited ? undefined : 'de tus clientes repiten'}
+        />
+        <Metric
+          label="Visitas a tu página"
+          value={formatNumber(overview.pageViews ?? 0)}
+          hint="en 30 días"
         />
       </div>
 

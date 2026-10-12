@@ -1,16 +1,13 @@
 import {
   type Database,
   and,
-  campaigns,
   customerCards,
   customers,
   desc,
   eq,
-  gte,
   inArray,
   isNull,
   locations,
-  lte,
   messageDeliveries,
   messages,
   organizations,
@@ -38,8 +35,10 @@ import {
 import type { FastifyBaseLogger } from 'fastify'
 import { env } from '../../env'
 import { AppError } from '../../lib/errors'
-import { isWithinActiveHours, orgHour } from '../../lib/time'
+import { orgHour } from '../../lib/time'
 import { derivePassAuthToken } from '../../lib/tokens'
+import { resolveOfferWords } from '../engagement/offer-words'
+import { loadLiveOffer } from '../engagement/offers'
 import { walletConfig } from './config'
 import { passLinksFor, pinsOf, primaryPlaceOf } from './pass-details'
 
@@ -74,50 +73,40 @@ export async function loadPassContent(
 
   if (!row) throw new AppError('CUSTOMER_CARD_NOT_FOUND', { message: 'card not found' })
 
-  const [cardRewards, pending, activeCampaigns, orgLocations, [latestDelivery]] = await Promise.all(
-    [
-      db.select().from(rewards).where(eq(rewards.cardId, row.card.id)).orderBy(rewards.atStamp),
-      db
-        .select({ value: sql<number>`count(*)::int` })
-        .from(rewardGrants)
-        .where(
-          and(
-            eq(rewardGrants.customerCardId, row.customerCard.id),
-            eq(rewardGrants.status, 'pending'),
-          ),
+  const [cardRewards, pending, liveOffer, orgLocations, [latestDelivery]] = await Promise.all([
+    db.select().from(rewards).where(eq(rewards.cardId, row.card.id)).orderBy(rewards.atStamp),
+    db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(rewardGrants)
+      .where(
+        and(
+          eq(rewardGrants.customerCardId, row.customerCard.id),
+          eq(rewardGrants.status, 'pending'),
         ),
-      db
-        .select()
-        .from(campaigns)
-        .where(
-          and(
-            eq(campaigns.orgId, row.org.id),
-            eq(campaigns.status, 'running'),
-            lte(campaigns.startsAt, new Date()),
-            gte(campaigns.endsAt, new Date()),
-          ),
+      ),
+    // Only this customer's own offer: a campaign aimed at twenty regulars must not
+    // show on every pass of the business.
+    loadLiveOffer(db, { customerCardId: row.customerCard.id, timezone: row.org.timezone }),
+    loadPassLocations(db, row.org.id),
+    // Queued counts too: the iPhone fetches the rebuilt pass the moment the push lands,
+    // before the worker has had the chance to mark the delivery as done.
+    db
+      .select({
+        headline: messages.headline,
+        body: messages.body,
+        sentAt: sql<Date>`coalesce(${messages.scheduledAt}, ${messages.createdAt})`,
+      })
+      .from(messageDeliveries)
+      .innerJoin(messages, eq(messages.id, messageDeliveries.messageId))
+      .where(
+        and(
+          eq(messageDeliveries.customerCardId, row.customerCard.id),
+          inArray(messageDeliveries.status, ['queued', 'delivered']),
         ),
-      loadPassLocations(db, row.org.id),
-      // Queued counts too: the iPhone fetches the rebuilt pass the moment the push lands,
-      // before the worker has had the chance to mark the delivery as done.
-      db
-        .select({
-          headline: messages.headline,
-          body: messages.body,
-          sentAt: sql<Date>`coalesce(${messages.scheduledAt}, ${messages.createdAt})`,
-        })
-        .from(messageDeliveries)
-        .innerJoin(messages, eq(messages.id, messageDeliveries.messageId))
-        .where(
-          and(
-            eq(messageDeliveries.customerCardId, row.customerCard.id),
-            inArray(messageDeliveries.status, ['queued', 'delivered']),
-          ),
-        )
-        .orderBy(desc(sql`coalesce(${messages.scheduledAt}, ${messages.createdAt})`))
-        .limit(1),
-    ],
-  )
+      )
+      .orderBy(desc(sql`coalesce(${messages.scheduledAt}, ${messages.createdAt})`))
+      .limit(1),
+  ])
 
   const design = row.card.design as CardDesign
   const upcoming = cardRewards.find((reward) => reward.atStamp > row.customerCard.stampsCount)
@@ -125,14 +114,8 @@ export async function loadPassContent(
   const places = pinsOf(orgLocations)
   const primaryPlace = primaryPlaceOf(orgLocations)
 
-  const liveCampaign = activeCampaigns.find((campaign) =>
-    isWithinActiveHours(
-      new Date(),
-      row.org.timezone,
-      campaign.activeWeekdays,
-      campaign.activeHours,
-    ),
-  )
+  const offerWords = liveOffer ? await resolveOfferWords(db, liveOffer) : null
+  const override = liveOffer?.passOverride
 
   const textContext: CampaignTextContext = {
     name: row.customer.firstName,
@@ -168,10 +151,26 @@ export async function loadPassContent(
       labelColor: design.accentColor,
       emptyStampColor: design.emptyStampColor,
       stampIcon: design.stampIcon,
-      stampStyle: design.stampStyle,
+      // A campaign may restyle the stamps for its run; `hidden` is a strip matter.
+      stampStyle:
+        override?.stampStyle && override.stampStyle !== 'hidden'
+          ? override.stampStyle
+          : design.stampStyle,
       cardUrl: `${env.PASS_URL}/c/${row.customerCard.token}`,
       places,
-      offerMessage: liveCampaign ? renderCampaignText(liveCampaign.headline, textContext) : null,
+      offer:
+        liveOffer && offerWords && override
+          ? {
+              message: renderCampaignText(offerWords.headline, textContext),
+              headerLabel: override.header
+                ? renderCampaignText(override.header, textContext)
+                : null,
+              text: override.text ? renderCampaignText(override.text, textContext) : null,
+              banner: override.banner,
+              hideStamps: override.stampStyle === 'hidden',
+              endsAt: liveOffer.endsAt,
+            }
+          : null,
       latestMessage: latestDelivery
         ? {
             headline: renderCampaignText(latestDelivery.headline, textContext),

@@ -138,7 +138,18 @@ export const publicCardStateSchema = z.object({
   ),
   /** Active campaign offer overlaid on the card, if any. */
   activeOffer: z
-    .object({ title: z.string(), description: z.string(), endsAt: z.coerce.date() })
+    .object({
+      title: z.string(),
+      description: z.string(),
+      /** Null while the offer has no date of its own (it ends with the campaign). */
+      endsAt: z.coerce.date().nullable(),
+      headerLabel: z.string().nullable(),
+      bannerUrl: z.string().nullable(),
+      bannerPreset: z.string().nullable(),
+      hideStamps: z.boolean(),
+      stampStyle: z.string().nullable(),
+      endsOnFirstStamp: z.boolean(),
+    })
     .nullable(),
   walletPasses: z.object({ appleUrl: z.string().nullable(), googleUrl: z.string().nullable() }),
   lastStampAt: z.coerce.date().nullable(),

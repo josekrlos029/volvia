@@ -63,3 +63,7 @@ export const ALLOWED_IMAGE_TYPES = [
 /** Surveys */
 export const MAX_SURVEY_QUESTIONS = 10
 export const MAX_PROFILE_QUESTIONS = 8
+
+/** The public page: how much content a business can list. */
+export const MAX_PAGE_SECTIONS_PER_KIND = 12
+export const MAX_PAGE_ITEMS_PER_SECTION = 60

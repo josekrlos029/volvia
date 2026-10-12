@@ -2,10 +2,13 @@ import type { Database } from '@volvia/db'
 import type { FastifyBaseLogger } from 'fastify'
 import type { Mailer } from '../lib/email'
 import { type RedisClient, redisKeys } from '../lib/redis'
+import type { StorageAdapter } from '../lib/storage'
 import {
   expireInactiveCards,
+  expirePassOffers,
   expireRewards,
   finishStaleMessages,
+  purgeClosedOrganizations,
   runBirthdayAutomations,
   runCampaignScheduler,
   runLocked,
@@ -18,6 +21,7 @@ export interface JobsDeps {
   redis: RedisClient
   logger: FastifyBaseLogger
   mailer: Mailer
+  storage: StorageAdapter
 }
 
 export interface OutboxTick {
@@ -49,8 +53,8 @@ const DAILY_EVERY_SECONDS = 15 * 60
  * Redis locks. The local worker (`worker.ts`) calls the same two functions on a timer.
  */
 export function createJobRunner(deps: JobsDeps) {
-  const handlers = buildHandlers({ mailer: deps.mailer })
-  const context = { db: deps.db, redis: deps.redis, logger: deps.logger }
+  const handlers = buildHandlers({ mailer: deps.mailer, redis: deps.redis })
+  const context = { db: deps.db, redis: deps.redis, logger: deps.logger, storage: deps.storage }
 
   async function outbox(options: { deadlineMs?: number } = {}): Promise<OutboxTick> {
     const deadline = Date.now() + (options.deadlineMs ?? OUTBOX_DEADLINE_MS)
@@ -86,6 +90,8 @@ export function createJobRunner(deps: JobsDeps) {
       await runLocked(context, 'campaigns', 55, async () => {
         const result = await runCampaignScheduler(context)
         if (result.started || result.finished) deps.logger.info(result, 'campaign scheduler')
+        const expired = await expirePassOffers(context)
+        if (expired) deps.logger.info({ expired }, 'pass offers expired')
         await finishStaleMessages(context)
       })
     ) {
@@ -110,6 +116,10 @@ export function createJobRunner(deps: JobsDeps) {
         const rewards = await expireRewards(context)
         const cards = await expireInactiveCards(context)
         if (rewards || cards) deps.logger.info({ rewards, cards }, 'expiry sweep')
+      })
+      await runLocked(context, 'purge', 3_600, async () => {
+        const purged = await purgeClosedOrganizations(context)
+        if (purged) deps.logger.info({ purged }, 'closed organizations purged')
       })
       ran.push('daily')
     }

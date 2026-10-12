@@ -109,6 +109,21 @@ export function Footer({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
               </Link>
             </li>
             <li>
+              <Link href={`${base}/dpa`} className="hover:text-[var(--color-primary)]">
+                {locale === 'es' ? 'Tratamiento de datos' : 'Data processing'}
+              </Link>
+            </li>
+            <li>
+              <Link href={`${base}/subencargados`} className="hover:text-[var(--color-primary)]">
+                {locale === 'es' ? 'Subencargados' : 'Sub-processors'}
+              </Link>
+            </li>
+            <li>
+              <Link href={`${base}/uso-aceptable`} className="hover:text-[var(--color-primary)]">
+                {locale === 'es' ? 'Uso aceptable' : 'Acceptable use'}
+              </Link>
+            </li>
+            <li>
               <Link href={`/${other}`} className="hover:text-[var(--color-primary)]">
                 {other === 'en' ? 'English' : 'Español'}
               </Link>

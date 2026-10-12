@@ -150,7 +150,15 @@ export function buildLoyaltyObject(
             header: labels.remaining,
             body: `${labels.stamps(remaining)} · ${content.rewardTitle}${lap}`,
           },
-      ...(content.offerMessage ? [{ id: 'offer', header: '★', body: content.offerMessage }] : []),
+      ...(content.offer
+        ? [
+            {
+              id: 'offer',
+              header: clip(content.offer.headerLabel || '★', TEXT_MODULE_HEADER_MAX),
+              body: clip(content.offer.message, TEXT_MODULE_BODY_MAX),
+            },
+          ]
+        : []),
       ...(hoursText ? [{ id: 'hours', header: labels.hours, body: hoursText }] : []),
       ...(content.about
         ? [

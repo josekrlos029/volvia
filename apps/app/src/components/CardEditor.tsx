@@ -14,6 +14,7 @@ import { STAMP_RADIUS, hexWithAlpha, patternLayer } from '@volvia/ui'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { CardPreview, type PreviewDesign } from './CardPreview'
+import { ImageUpload } from './ImageUpload'
 import { type ProfileQuestion, SignupFormEditor } from './SignupFormEditor'
 import { buttonClass } from './ui'
 
@@ -31,6 +32,8 @@ export interface CardEditorValue {
   rewards: Reward[]
   terms: string
   collectBirthday: boolean
+  collectPhone: boolean
+  phoneRequired: boolean
   initialStamps: number
   messages: CardMessages
   rules: { cooldownMinutes: number; dailyCap: number; kioskEnabled: boolean }
@@ -38,6 +41,8 @@ export interface CardEditorValue {
 
 interface CardEditorProps {
   businessName: string
+  /** The kind of business, which picks the suggested signup fields. */
+  category?: string
   initial: CardEditorValue
   cardId?: string
   canCustomiseBranding: boolean
@@ -107,6 +112,7 @@ const PALETTES = [
 
 export function CardEditor({
   businessName,
+  category,
   initial,
   cardId,
   canCustomiseBranding,
@@ -225,6 +231,8 @@ export function CardEditor({
       })),
       terms: value.terms,
       collectBirthday: value.collectBirthday,
+      collectPhone: value.collectPhone,
+      phoneRequired: value.phoneRequired,
       initialStamps: value.initialStamps,
       messages: {
         variants: value.messages.variants.map((line) => line.trim()).filter(Boolean),
@@ -567,23 +575,15 @@ export function CardEditor({
           ) : null}
 
           {value.design.banner.kind === 'image' ? (
-            <Labelled
-              label="Dirección de la imagen"
-              htmlFor="banner-url"
-              help="Pega el enlace de una foto tuya. Se recorta al ancho de la tarjeta."
-            >
-              <input
-                id="banner-url"
-                value={value.design.banner.url}
-                onChange={(event) =>
-                  updateDesign({
-                    banner: { kind: 'image', url: event.target.value } as never,
-                  })
-                }
-                placeholder="https://..."
-                className={fieldClass}
-              />
-            </Labelled>
+            <ImageUpload
+              kind="banner"
+              value={value.design.banner.url || null}
+              onChange={(url) =>
+                updateDesign({ banner: { kind: 'image', url: url ?? '' } as never })
+              }
+              label="Subir una foto"
+              help="Se recorta al ancho de la tarjeta. Una foto apaisada funciona mejor."
+            />
           ) : null}
 
           <Labelled
@@ -837,6 +837,9 @@ export function CardEditor({
             questions={profileQuestions}
             selectedIds={value.signupQuestionIds}
             collectBirthday={value.collectBirthday}
+            collectPhone={value.collectPhone}
+            phoneRequired={value.phoneRequired}
+            category={category}
             onChange={update}
           />
         </Section>

@@ -3,6 +3,7 @@ import {
   ALLOWED_IMAGE_TYPES,
   DEFAULT_ORG_SETTINGS,
   MAX_UPLOAD_BYTES,
+  PREMIUM_TRIAL_CUSTOMER_LIMIT,
   acceptInviteSchema,
   inviteMemberSchema,
   locationSchema,
@@ -16,7 +17,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { env } from '../../env'
 import { AUDIT_ACTIONS, audit } from '../../lib/audit'
-import { inviteTemplate } from '../../lib/email'
+import { inviteTemplate, orgClosedTemplate } from '../../lib/email'
 import { invalidateEntitlements } from '../../lib/entitlements'
 import { AppError } from '../../lib/errors'
 import { redisKeys } from '../../lib/redis'
@@ -27,6 +28,7 @@ import { issueSession } from '../auth/issue'
 import {
   acceptInvite,
   claimInvite,
+  closeOrg,
   countSeats,
   createLocation,
   deleteLocation,
@@ -35,9 +37,11 @@ import {
   listLocations,
   listMembers,
   listProfileQuestions,
+  listRestorableOrgs,
   previewInvite,
   removeMember,
   replaceProfileQuestions,
+  restoreOrg,
   suggestSlug,
   updateLocation,
   updateMember,
@@ -57,6 +61,9 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
         ...org,
         // Filled in, so the dashboard never has to guess a default.
         settings: { ...DEFAULT_ORG_SETTINGS, ...org.settings },
+        // The sidebar draws the trial as "12 de 30": both numbers come from here.
+        customerCount: org.customerCount,
+        trialCustomerLimit: PREMIUM_TRIAL_CUSTOMER_LIMIT,
         entitlements: {
           plan: entitlements.plan,
           effectivePlan: entitlements.effectivePlan,
@@ -82,6 +89,7 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
                 'csv_export',
                 'team_accounts',
                 'kiosk_mode',
+                'page_catalogue',
                 'multi_location',
                 'priority_support',
               ] as const
@@ -149,7 +157,7 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
       config: { rateLimit: rateLimits.upload },
       schema: {
         body: z.object({
-          kind: z.enum(['logo', 'banner', 'cover', 'stamp']),
+          kind: z.enum(['logo', 'banner', 'cover', 'stamp', 'page']),
           contentType: z.enum(ALLOWED_IMAGE_TYPES),
           contentLength: z.number().int().min(1).max(MAX_UPLOAD_BYTES),
         }),
@@ -380,12 +388,11 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
         })
       }
 
-      await app.db
-        .update(organizations)
-        .set({ deletedAt: new Date(), updatedAt: new Date() })
-        .where(eq(organizations.id, org.id))
+      const closed = await closeOrg(app.db, org.id)
 
       await invalidateEntitlements(app.redis, org.id)
+      // The public page is cached by slug; it must stop answering now, not in two minutes.
+      await app.redis.del(redisKeys.businessPage(org.slug))
       await audit(app.db, {
         orgId: org.id,
         actorUserId: request.auth!.userId,
@@ -395,7 +402,64 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
         ip: request.ip,
       })
 
+      // The way back, in writing: the mail carries the date and the restore link.
+      if (closed.owner && closed.org.purgeAt) {
+        const locale = closed.owner.locale
+        const purgeDate = new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'es-CO', {
+          day: 'numeric',
+          month: 'long',
+          timeZone: closed.org.timezone,
+        }).format(closed.org.purgeAt)
+        await app.mailer
+          .send({
+            to: closed.owner.email,
+            template: orgClosedTemplate(locale, {
+              orgName: closed.org.name,
+              restoreUrl: `${env.APP_URL}/closed?org=${closed.org.id}`,
+              purgeDate,
+            }),
+          })
+          .catch((error: unknown) => request.log.warn({ err: error }, 'org closed mail failed'))
+      }
+
       return { deleted: true }
+    },
+  )
+
+  /**
+   * The closed businesses this person can still bring back. Only `requireAuth`: the
+   * usual organisation guard filters closed ones out, which is the whole point here.
+   */
+  app.get(
+    '/closed',
+    { preHandler: [app.requireAuth], schema: { tags: ['org'] } },
+    async (request) => {
+      const orgs = await listRestorableOrgs(app.db, request.auth!.userId)
+      return { organizations: orgs }
+    },
+  )
+
+  app.post(
+    '/restore',
+    {
+      preHandler: [app.requireAuth],
+      schema: { body: z.object({ orgId: z.string().uuid() }), tags: ['org'] },
+    },
+    async (request) => {
+      const org = await restoreOrg(app.db, {
+        orgId: request.body.orgId,
+        userId: request.auth!.userId,
+      })
+      await invalidateEntitlements(app.redis, org.id)
+      await audit(app.db, {
+        orgId: org.id,
+        actorUserId: request.auth!.userId,
+        action: AUDIT_ACTIONS.orgRestored,
+        targetType: 'organization',
+        targetId: org.id,
+        ip: request.ip,
+      })
+      return { id: org.id, name: org.name, slug: org.slug, restored: true }
     },
   )
 

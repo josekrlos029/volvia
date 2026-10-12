@@ -67,7 +67,15 @@ export function customerScope(
 
   if (query.search) {
     const pattern = `%${query.search}%`
-    conditions.push(or(ilike(customers.firstName, pattern), ilike(customers.email, pattern))!)
+    // A phone typed with spaces or dashes still finds the number stored as digits.
+    const digits = query.search.replace(/[^0-9]/g, '')
+    conditions.push(
+      or(
+        ilike(customers.firstName, pattern),
+        ilike(customers.email, pattern),
+        ...(digits.length >= 4 ? [ilike(customers.phone, `%${digits}%`)] : []),
+      )!,
+    )
   }
 
   conditions.push(...filterConditions(query))
@@ -106,6 +114,7 @@ export async function listCustomers(
         id: customers.id,
         firstName: customers.firstName,
         email: customers.email,
+        phone: customers.phone,
         birthdayMonth: customers.birthdayMonth,
         birthdayDay: customers.birthdayDay,
         marketingConsent: customers.marketingConsent,
@@ -309,6 +318,7 @@ export async function exportCustomersCsv(
   const header = [
     'nombre',
     'email',
+    'telefono',
     'cumpleanos',
     'consentimiento_marketing',
     'sellos_totales',
@@ -330,6 +340,7 @@ export async function exportCustomersCsv(
       [
         csvCell(row.firstName),
         csvCell(row.email),
+        csvCell(row.phone ?? ''),
         csvCell(row.birthdayMonth ? `${row.birthdayDay}/${row.birthdayMonth}` : ''),
         csvCell(row.marketingConsent ? 'si' : 'no'),
         csvCell(row.totalStamps),

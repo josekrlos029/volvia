@@ -1,4 +1,5 @@
-import { AutomationToggle } from '@/components/AutomationToggle'
+import { AutomationToggle, BIRTHDAY_PASS_DEFAULTS } from '@/components/AutomationToggle'
+import type { PreviewDesign } from '@/components/CardPreview'
 import { WelcomeEmailEditor } from '@/components/WelcomeEmailEditor'
 import { EmptyState, Panel } from '@/components/ui'
 import { formatRelative } from '@/lib/format'
@@ -10,16 +11,32 @@ interface AutomationsResponse {
     type: string
     isActive: boolean
     lastRunAt: string | null
-    config: { headline: string; body: string; offer: { kind: string; amount: number | null } }
+    config: {
+      headline: string
+      body: string
+      offer: { kind: string; amount: number | null; validForDays?: number }
+      sendEmail?: boolean
+      passOverride?: Partial<typeof BIRTHDAY_PASS_DEFAULTS> | null
+    }
   }>
   birthdayReachThisMonth: number
 }
 
+interface CardSummary {
+  name: string
+  status: string
+  stampsRequired: number
+  design: PreviewDesign
+  rewards: Array<{ atStamp: number }>
+}
+
 export default async function AutomationsPage() {
-  const [data, org] = await Promise.all([
+  const [data, org, cards] = await Promise.all([
     apiFetch<AutomationsResponse>('/v1/automations'),
     apiFetch<{ name: string; entitlements: { features: Record<string, boolean> } }>('/v1/org'),
+    apiFetch<CardSummary[]>('/v1/cards'),
   ])
+  const mainCard = cards.find((card) => card.status === 'active')
 
   const canUse = org.entitlements.features.birthday_automation ?? false
   const birthday = data.automations.find((automation) => automation.type === 'birthday')
@@ -54,6 +71,20 @@ export default async function AutomationsPage() {
               headline={birthday?.config.headline ?? '¡Feliz cumpleaños!'}
               body={birthday?.config.body ?? 'Te dejamos algo en tu tarjeta para celebrar.'}
               bonusStamps={birthday?.config.offer.amount ?? 2}
+              validForDays={birthday?.config.offer.validForDays ?? 14}
+              sendEmail={birthday?.config.sendEmail ?? true}
+              passOverride={{ ...BIRTHDAY_PASS_DEFAULTS, ...(birthday?.config.passOverride ?? {}) }}
+              businessName={org.name}
+              previewCard={
+                mainCard
+                  ? {
+                      name: mainCard.name,
+                      design: mainCard.design,
+                      stampsRequired: mainCard.stampsRequired,
+                      rewardPositions: mainCard.rewards.map((reward) => reward.atStamp),
+                    }
+                  : null
+              }
             />
 
             {birthday?.lastRunAt ? (

@@ -20,13 +20,17 @@ import {
 import type { Database } from '@volvia/db'
 import type { FastifyBaseLogger } from 'fastify'
 import { DateTime } from 'luxon'
+import { birthdayEmailSlot } from '../lib/notification-hours'
 import { OUTBOX_KINDS } from '../lib/outbox'
 import { type RedisClient, acquireLock, redisKeys } from '../lib/redis'
+import type { StorageAdapter } from '../lib/storage'
+import { applyOfferBonuses, enrollOffers, expireOffers } from '../modules/engagement/offers'
 
 export interface CronContext {
   db: Database
   redis: RedisClient
   logger: FastifyBaseLogger
+  storage: StorageAdapter
 }
 
 /**
@@ -106,7 +110,13 @@ export async function runBirthdayAutomations(context: CronContext): Promise<numb
     const pending = candidates.filter((row) => !skip.has(row.customerId))
     if (pending.length === 0) continue
 
-    await context.db.transaction(async (tx) => {
+    // The treat is good for `validForDays` whole days in the business's own clock,
+    // counted from the end of the birthday itself.
+    const validForDays = Math.max(1, automation.config.offer.validForDays ?? 14)
+    const expiresAt = today.endOf('day').plus({ days: validForDays }).toJSDate()
+    const now = new Date()
+
+    const enrolled = await context.db.transaction(async (tx) => {
       await tx.insert(automationRuns).values(
         pending.map((row) => ({
           orgId: org.id,
@@ -115,6 +125,18 @@ export async function runBirthdayAutomations(context: CronContext): Promise<numb
           occurrenceKey,
         })),
       )
+
+      // The offer row is what puts the birthday on the pass, and what takes it off
+      // again on the first visit or when the days run out.
+      const offers = await enrollOffers(tx, {
+        orgId: org.id,
+        source: 'birthday',
+        automationId: automation.id,
+        offer: automation.config.offer,
+        passOverride: automation.config.passOverride ?? {},
+        customerCardIds: pending.map((row) => row.customerCardId),
+        expiresAt,
+      })
 
       const jobs = pending.flatMap((row) => {
         const entries: Array<typeof outbox.$inferInsert> = [
@@ -135,6 +157,8 @@ export async function runBirthdayAutomations(context: CronContext): Promise<numb
               customerCardToken: row.cardToken,
               offer: automation.config.offer.title ?? automation.config.headline,
             },
+            // Mid-morning, local time: a birthday mail at 00:05 reads like a robot.
+            runAt: birthdayEmailSlot(now, org.timezone, row.customerId),
           })
         }
         return entries
@@ -145,7 +169,18 @@ export async function runBirthdayAutomations(context: CronContext): Promise<numb
         .update(automations)
         .set({ lastRunAt: new Date() })
         .where(eq(automations.id, automation.id))
+      return offers
     })
+
+    const applied = await applyOfferBonuses(context.db, {
+      orgId: org.id,
+      offerIds: enrolled.map((row) => row.id),
+      note: automation.config.offer.title ?? automation.config.headline,
+      logger: context.logger,
+    })
+    if (applied.stamps || applied.rewards) {
+      context.logger.info({ orgId: org.id, ...applied }, 'birthday bonuses applied')
+    }
 
     sent += pending.length
   }
@@ -192,6 +227,24 @@ export async function runCampaignScheduler(
   }
 
   return { started: toStart.length, finished: toFinish.length }
+}
+
+/**
+ * Closes offers past their own expiry (a birthday treat nobody collected) and refreshes
+ * the passes that still show them. Runs every tick, not daily: a week-long offer
+ * should disappear at the hour it ends, not the next morning.
+ */
+export async function expirePassOffers(context: CronContext): Promise<number> {
+  const holders = await expireOffers(context.db)
+  if (holders.length > 0) {
+    await context.db.insert(outbox).values(
+      holders.map((customerCardId) => ({
+        kind: OUTBOX_KINDS.walletUpdate,
+        payload: { customerCardId, reason: 'offer_expired' },
+      })),
+    )
+  }
+  return holders.length
 }
 
 /**
@@ -281,4 +334,31 @@ export async function expireInactiveCards(context: CronContext): Promise<number>
     )
   }
   return rows.length
+}
+
+/**
+ * Erases businesses whose restore window has passed. The row goes, and every table
+ * that hangs off it follows by cascade; the uploads are removed from storage first,
+ * because nothing would point at them afterwards. Deliberately the last thing in the
+ * daily block: nothing here can be undone.
+ */
+export async function purgeClosedOrganizations(context: CronContext): Promise<number> {
+  const due = await context.db
+    .select({ id: organizations.id, name: organizations.name })
+    .from(organizations)
+    .where(and(isNotNull(organizations.deletedAt), lte(organizations.purgeAt, new Date())))
+
+  let purged = 0
+  for (const org of due) {
+    try {
+      const files = await context.storage.deletePrefix(`org/${org.id}/`)
+      await context.db.delete(organizations).where(eq(organizations.id, org.id))
+      context.logger.warn({ orgId: org.id, files }, 'organization purged')
+      purged += 1
+    } catch (error) {
+      // Try again tomorrow; a storage hiccup must not leave half a business behind.
+      context.logger.error({ err: error, orgId: org.id }, 'could not purge organization')
+    }
+  }
+  return purged
 }

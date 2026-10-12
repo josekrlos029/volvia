@@ -46,6 +46,9 @@ export const customers = pgTable(
     uniqueIndex('customers_org_email_key').on(table.orgId, sql`lower(${table.email})`),
     index('customers_org_last_stamp_idx').on(table.orgId, table.lastStampAt),
     index('customers_birthday_idx').on(table.orgId, table.birthdayMonth, table.birthdayDay),
+    index('customers_org_phone_idx')
+      .on(table.orgId, table.phone)
+      .where(sql`${table.phone} is not null`),
   ],
 )
 

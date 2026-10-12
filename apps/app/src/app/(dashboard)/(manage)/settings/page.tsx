@@ -1,8 +1,8 @@
 import { BusinessSettings } from '@/components/BusinessSettings'
 import { DangerZone } from '@/components/DangerZone'
+import { LegalDocuments } from '@/components/LegalDocuments'
 import { LegalSettings } from '@/components/LegalSettings'
 import { LocationsSettings } from '@/components/LocationsSettings'
-import { PublicPageSettings } from '@/components/PublicPageSettings'
 import { apiFetch } from '@/lib/session'
 import type { OrgSettings } from '@volvia/shared'
 import Link from 'next/link'
@@ -60,16 +60,21 @@ export default async function SettingsPage() {
 
       <BusinessSettings org={org} />
 
-      <PublicPageSettings
-        links={org.socialLinks}
-        brandColor={org.brandColor}
-        ctaLabel={org.settings.pageCtaLabel}
-        publicUrl={org.publicUrl}
-      />
+      <p className="text-[14px] text-[var(--color-ink-muted)]">
+        Tu página pública (portada, enlaces, carta, Wi-Fi) se edita en{' '}
+        <Link
+          href="/page"
+          className="font-medium text-[var(--color-primary)] underline underline-offset-2"
+        >
+          Tu página →
+        </Link>
+      </p>
 
       <LocationsSettings locations={locations} />
 
       <LegalSettings settings={org.settings} slug={org.slug} />
+
+      <LegalDocuments slug={org.slug} />
 
       <DangerZone businessName={org.name} />
     </div>

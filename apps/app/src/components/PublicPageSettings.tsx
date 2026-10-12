@@ -4,6 +4,7 @@ import { api } from '@/lib/api-client'
 import { SOCIAL_PLATFORMS } from '@volvia/shared'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { ImageUpload } from './ImageUpload'
 import { Panel, buttonClass } from './ui'
 
 interface SocialLink {
@@ -48,14 +49,41 @@ export function PublicPageSettings({
   brandColor,
   ctaLabel,
   publicUrl,
+  logoUrl = null,
+  coverUrl = null,
+  accentColor = null,
+  reservationsUrl = '',
+  showReviews = true,
+  hasGoogleListing = false,
+  contactPhone = null,
+  onSaved,
 }: {
   links: SocialLink[]
   brandColor: string
   ctaLabel: string
   publicUrl: string
+  logoUrl?: string | null
+  coverUrl?: string | null
+  /** The page's own accent; null means "same as the brand colour". */
+  accentColor?: string | null
+  reservationsUrl?: string
+  showReviews?: boolean
+  hasGoogleListing?: boolean
+  contactPhone?: string | null
+  onSaved?: () => void
 }) {
   const router = useRouter()
-  const [value, setValue] = useState({ links, brandColor, ctaLabel })
+  const [value, setValue] = useState({
+    links,
+    brandColor,
+    ctaLabel,
+    logoUrl,
+    coverUrl,
+    accentColor,
+    reservationsUrl,
+    showReviews,
+    contactPhone: contactPhone ?? '',
+  })
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -65,6 +93,9 @@ export function PublicPageSettings({
     try {
       await api.patch('/v1/org', {
         brandColor: value.brandColor,
+        logoUrl: value.logoUrl,
+        coverUrl: value.coverUrl,
+        contactPhone: value.contactPhone.trim() || null,
         socialLinks: value.links
           .filter((link) => link.url.trim().length > 0)
           .map((link) => ({
@@ -72,10 +103,16 @@ export function PublicPageSettings({
             url: link.url.trim(),
             ...(link.label?.trim() ? { label: link.label.trim() } : {}),
           })),
-        settings: { pageCtaLabel: value.ctaLabel.trim() },
+        settings: {
+          pageCtaLabel: value.ctaLabel.trim(),
+          pageAccentColor: value.accentColor,
+          reservationsUrl: value.reservationsUrl.trim(),
+          pageShowReviews: value.showReviews,
+        },
       })
       setStatus('saved')
       router.refresh()
+      onSaved?.()
       setTimeout(() => setStatus('idle'), 2_000)
     } catch {
       setStatus('idle')
@@ -100,6 +137,28 @@ export function PublicPageSettings({
       <div className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
+            <p className="text-[14px] font-medium">Logo</p>
+            <ImageUpload
+              kind="logo"
+              value={value.logoUrl}
+              onChange={(url) => setValue({ ...value, logoUrl: url })}
+              aspect="square"
+              help="Cuadrado, sobre fondo liso. Sale en la página y en la tarjeta."
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-[14px] font-medium">Foto de portada</p>
+            <ImageUpload
+              kind="cover"
+              value={value.coverUrl}
+              onChange={(url) => setValue({ ...value, coverUrl: url })}
+              help="Apaisada: tu local, tu trabajo, tu equipo. Encabeza la página."
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
             <label htmlFor="brand-color" className="text-[14px] font-medium">
               Color de tu marca
             </label>
@@ -121,6 +180,29 @@ export function PublicPageSettings({
           </div>
 
           <div className="flex flex-col gap-2">
+            <label htmlFor="accent-color" className="text-[14px] font-medium">
+              Color de los botones de la página
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="accent-color"
+                type="color"
+                value={value.accentColor ?? value.brandColor}
+                onChange={(event) => setValue({ ...value, accentColor: event.target.value })}
+                className="h-10 w-14 rounded-[9px] border border-[var(--color-line)]"
+              />
+              <button
+                type="button"
+                onClick={() => setValue({ ...value, accentColor: null })}
+                disabled={value.accentColor === null}
+                className={buttonClass('ghost', 'sm')}
+              >
+                {value.accentColor === null ? 'Usa el color de marca' : 'Usar el color de marca'}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
             <label htmlFor="cta-label" className="text-[14px] font-medium">
               Texto del botón
             </label>
@@ -134,6 +216,58 @@ export function PublicPageSettings({
             />
           </div>
         </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="contact-phone" className="text-[14px] font-medium">
+              Teléfono de contacto
+            </label>
+            <input
+              id="contact-phone"
+              value={value.contactPhone}
+              onChange={(event) => setValue({ ...value, contactPhone: event.target.value })}
+              maxLength={30}
+              placeholder="+57 300 123 4567"
+              className={field}
+            />
+            <p className="text-[13px] text-[var(--color-ink-muted)]">
+              Sale como botón de llamada en la página.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="reservations-url" className="text-[14px] font-medium">
+              Reservas
+            </label>
+            <input
+              id="reservations-url"
+              value={value.reservationsUrl}
+              onChange={(event) => setValue({ ...value, reservationsUrl: event.target.value })}
+              maxLength={500}
+              placeholder="https://..."
+              className={field}
+            />
+            <p className="text-[13px] text-[var(--color-ink-muted)]">
+              El enlace a donde ya reservan tus clientes. Aparece como “Reservar”.
+            </p>
+          </div>
+        </div>
+
+        <label className="flex items-start gap-3 text-[14px]">
+          <input
+            type="checkbox"
+            checked={value.showReviews}
+            onChange={(event) => setValue({ ...value, showReviews: event.target.checked })}
+            className="mt-0.5 h-[18px] w-[18px] accent-[var(--color-primary)]"
+          />
+          <span>
+            <span className="font-medium">Mostrar el botón de reseña en Google</span>
+            <span className="mt-0.5 block text-[13px] text-[var(--color-ink-muted)]">
+              {hasGoogleListing
+                ? 'Lleva a tu ficha de Google para dejar una reseña.'
+                : 'Conecta tu ficha de Google en Reseñas para que aparezca.'}
+            </span>
+          </span>
+        </label>
 
         <div className="flex flex-col gap-2">
           <p className="text-[14px] font-medium">Enlaces</p>

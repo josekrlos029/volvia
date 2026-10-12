@@ -30,6 +30,9 @@ export const stampCards = pgTable(
     /** Progress is wiped after this many days without a stamp; null = never. */
     inactivityExpiryDays: integer(),
     collectBirthday: boolean().notNull().default(true),
+    /** Whether the signup form asks for a phone, and whether it may be left empty. */
+    collectPhone: boolean().notNull().default(false),
+    phoneRequired: boolean().notNull().default(false),
     /** Stamps granted on joining, so a new card never starts empty. */
     initialStamps: integer().notNull().default(0),
     messages: jsonb().$type<CardMessages>().notNull().default({ variants: [], perStamp: {} }),

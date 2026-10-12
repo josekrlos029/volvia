@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { MAX_SURVEY_QUESTIONS } from '../constants'
 import { SUGGESTED_SEGMENT_KEYS } from '../segments'
+import { STAMP_STYLES } from './card'
 import { CUSTOMER_SEGMENTS } from './customer'
 
 /**
@@ -80,6 +81,52 @@ export const campaignOfferSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('message_only') }),
 ])
 
+/** Ready-made banners drawn on the pass strip; no upload needed. */
+export const CAMPAIGN_BANNER_PRESETS = [
+  'confetti',
+  'gift',
+  'stars',
+  'cake',
+  'hearts',
+  'sparkle',
+  'sale',
+  'coffee',
+] as const
+export type CampaignBannerPreset = (typeof CAMPAIGN_BANNER_PRESETS)[number]
+
+export const campaignBannerSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('preset'), value: z.enum(CAMPAIGN_BANNER_PRESETS) }),
+  z.object({ kind: z.literal('image'), url: z.string().url().max(500) }),
+])
+export type CampaignBanner = z.infer<typeof campaignBannerSchema>
+
+/** Stamp styles a campaign may force, plus `hidden`: the grid tucks behind the banner. */
+export const CAMPAIGN_STAMP_STYLES = [...STAMP_STYLES, 'hidden'] as const
+
+/**
+ * How the pass looks while a campaign (or a birthday) is live. Every field is
+ * optional: with none of them the pass only gains the offer line, as it always did.
+ */
+export const campaignPassOverrideSchema = z.object({
+  /** Replaces the business name in the pass header. Skipped while a reward waits. */
+  header: z.string().trim().max(30).nullable().default(null),
+  /** Replaces the reward description line on the card. */
+  text: z.string().trim().max(60).nullable().default(null),
+  banner: campaignBannerSchema.nullable().default(null),
+  stampStyle: z.enum(CAMPAIGN_STAMP_STYLES).nullable().default(null),
+  /** The first stamp or redemption ends the offer for that customer, not just the date. */
+  endsOnFirstStamp: z.boolean().default(false),
+})
+export type CampaignPassOverrideInput = z.infer<typeof campaignPassOverrideSchema>
+
+export const EMPTY_PASS_OVERRIDE: CampaignPassOverrideInput = {
+  header: null,
+  text: null,
+  banner: null,
+  stampStyle: null,
+  endsOnFirstStamp: false,
+}
+
 export const campaignSchema = z
   .object({
     name: z.string().trim().min(2).max(80),
@@ -98,6 +145,7 @@ export const campaignSchema = z
       .object({ from: z.string().regex(/^\d{2}:\d{2}$/), to: z.string().regex(/^\d{2}:\d{2}$/) })
       .nullable()
       .default(null),
+    passOverride: campaignPassOverrideSchema.default(EMPTY_PASS_OVERRIDE),
   })
   .refine((c) => c.endsAt > c.startsAt, { message: 'end_before_start', path: ['endsAt'] })
 export type CampaignInput = z.infer<typeof campaignSchema>
@@ -189,5 +237,6 @@ export const automationSchema = z.object({
     .default({ kind: 'none', amount: null, title: null, validForDays: 14 }),
   sendEmail: z.boolean().default(false),
   sendPush: z.boolean().default(true),
+  passOverride: campaignPassOverrideSchema.default(EMPTY_PASS_OVERRIDE),
 })
 export type AutomationInput = z.infer<typeof automationSchema>

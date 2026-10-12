@@ -2,6 +2,7 @@
 
 import { api } from '@/lib/api-client'
 import { PLAN_NAMES, formatMoney } from '@/lib/format'
+import { FEATURE_LABELS } from '@/lib/plan-copy'
 import { ApiError } from '@volvia/shared/client'
 import { useState } from 'react'
 import { buttonClass } from './ui'
@@ -12,26 +13,6 @@ interface Plan {
   features: string[]
   limits: Record<string, number | null>
   extraLocationPrice: number | null
-}
-
-const FEATURE_LABELS: Record<string, string> = {
-  wallet_passes: 'Tarjeta en Apple y Google Wallet',
-  custom_branding: 'Colores propios',
-  custom_stamp_icons: 'Icono de sello propio',
-  premium_card_display: 'Tarjeta destacada',
-  customer_contact_details: 'Correos de tus clientes',
-  birthday_automation: 'Cumpleaños automáticos',
-  customer_messages: 'Mensajes a clientes',
-  custom_segments: 'Segmentos propios',
-  campaigns: 'Campañas',
-  surveys: 'Encuestas',
-  google_review_requests: 'Pedir reseñas en Google',
-  full_analytics: 'Analítica completa',
-  csv_export: 'Exportar a CSV',
-  team_accounts: 'Cuentas para tu equipo',
-  kiosk_mode: 'Modo kiosko',
-  multi_location: 'Varias sedes',
-  priority_support: 'Soporte prioritario',
 }
 
 export function PlanPicker({

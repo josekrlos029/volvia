@@ -28,7 +28,7 @@ const content: PassContent = {
   stampStyle: 'circle',
   cardUrl: 'http://localhost:3002/c/abc123def456ghi789',
   places: [],
-  offerMessage: null,
+  offer: null,
   latestMessage: null,
   customerName: '',
   about: '',
@@ -38,6 +38,16 @@ const content: PassContent = {
   locale: 'es',
   updatedAt: new Date('2026-10-10T15:00:00Z'),
 }
+
+/** A text-only offer, as a campaign with no visual override produces. */
+const offerOf = (message: string): NonNullable<PassContent['offer']> => ({
+  message,
+  headerLabel: null,
+  text: null,
+  banner: null,
+  hideStamps: false,
+  endsAt: null,
+})
 
 const pngSize = (png: Buffer) => [png.readUInt32BE(16), png.readUInt32BE(20)]
 
@@ -89,7 +99,7 @@ describe('lockup', () => {
     expect(plain).toContain('fill="#D9A566"')
 
     const logo = { mime: 'image/png' as const, dataUri: 'data:image/png;base64,AAAA' }
-    const branded = lockupSvg(content, 135, 50, { logo, stampIcon: null })
+    const branded = lockupSvg(content, 135, 50, { logo, stampIcon: null, banner: null })
     expect(branded).toContain('href="data:image/png;base64,AAAA"')
   })
 })
@@ -106,7 +116,7 @@ describe('google images', () => {
     const base = imageVersion(content)
     expect(imageVersion({ ...content, stampsCount: 5 })).not.toBe(base)
     expect(imageVersion({ ...content, labelColor: '#E4572E' })).not.toBe(base)
-    expect(imageVersion({ ...content, offerMessage: 'Hoy sellos dobles' })).toBe(base)
+    expect(imageVersion({ ...content, offer: offerOf('Hoy sellos dobles') })).toBe(base)
     expect(imageVersion({ ...content, updatedAt: new Date() })).toBe(base)
     // What the back of the pass says is text, not pixels: it must not roll the URLs.
     expect(

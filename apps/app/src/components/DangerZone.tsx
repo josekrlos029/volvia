@@ -25,8 +25,9 @@ export function DangerZone({ businessName }: { businessName: string }) {
     <Panel title="Cerrar el negocio">
       <p className="text-[14px] leading-relaxed text-[var(--color-ink-muted)]">
         Tu página pública y tus tarjetas dejan de funcionar al momento, y tus clientes ya no podrán
-        abrir las suyas. Guardamos los datos un tiempo por si fue un error: escríbenos y los
-        recuperamos.
+        abrir las suyas. Tienes siete días para recuperarlo todo tal cual estaba, desde el correo
+        que te enviamos o entrando con tu cuenta. Pasado ese plazo, borramos definitivamente el
+        negocio, tus empleados, tus clientes y sus tarjetas.
       </p>
 
       {!open ? (
@@ -64,7 +65,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
                 setError(null)
                 try {
                   await api.post('/v1/org/close', { confirmName: typed.trim() })
-                  router.push('/login')
+                  router.push('/closed')
                   router.refresh()
                 } catch {
                   setWorking(false)

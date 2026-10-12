@@ -10,6 +10,28 @@ export type CampaignOffer =
   | { kind: 'instant_reward'; title: string }
   | { kind: 'message_only' }
 
+/** A banner that takes the strip over while a campaign runs. */
+export type CampaignBanner = { kind: 'preset'; value: string } | { kind: 'image'; url: string }
+
+/**
+ * How a campaign or an automation changes the look of the pass while it is live.
+ * Every field is optional: an empty object means "only the offer line".
+ */
+export type CampaignPassOverride = {
+  /** Replaces the business name in the pass header. Not applied while a reward waits. */
+  header?: string | null
+  /** Replaces the reward description line on the card. */
+  text?: string | null
+  banner?: CampaignBanner | null
+  /** A stamp style for the duration, or `hidden` to tuck the grid behind the banner. */
+  stampStyle?: string | null
+  /** The first stamp or redemption ends the offer for that customer. */
+  endsOnFirstStamp?: boolean
+}
+
+export type PassOfferSource = 'campaign' | 'birthday'
+export type PassOfferEndedReason = 'stamp' | 'redeem' | 'expired' | 'campaign_ended' | 'cancelled'
+
 export type CampaignAudience = {
   segment: string
   cardIds: string[]
@@ -46,4 +68,6 @@ export type AutomationConfig = {
   }
   sendEmail: boolean
   sendPush: boolean
+  /** Rows written before the pass could be overridden do not carry it. */
+  passOverride?: CampaignPassOverride
 }

@@ -133,6 +133,8 @@ export async function createCard(
         terms: input.data.terms,
         inactivityExpiryDays: input.data.inactivityExpiryDays,
         collectBirthday: input.data.collectBirthday,
+        collectPhone: input.data.collectPhone,
+        phoneRequired: input.data.collectPhone && input.data.phoneRequired,
         initialStamps: input.data.initialStamps,
         messages: cardMessagesSchema.parse(input.data.messages ?? {}),
         signupQuestionIds: input.data.signupQuestionIds,
@@ -244,6 +246,10 @@ export async function updateCard(
             ? current.inactivityExpiryDays
             : input.data.inactivityExpiryDays,
         collectBirthday: input.data.collectBirthday ?? current.collectBirthday,
+        collectPhone: input.data.collectPhone ?? current.collectPhone,
+        phoneRequired:
+          (input.data.collectPhone ?? current.collectPhone) &&
+          (input.data.phoneRequired ?? current.phoneRequired),
         initialStamps: input.data.initialStamps ?? current.initialStamps,
         messages: input.data.messages
           ? cardMessagesSchema.parse({ ...current.messages, ...input.data.messages })

@@ -15,6 +15,7 @@ import {
 import { AppError } from '../../lib/errors'
 import { OUTBOX_KINDS, enqueue } from '../../lib/outbox'
 import { orgDay, orgHour } from '../../lib/time'
+import { bumpCampaignStats, endOffersForCard } from '../engagement/offers'
 
 export interface RedeemCommand {
   orgId: string
@@ -130,6 +131,12 @@ export async function redeemReward(db: Database, command: RedeemCommand): Promis
             updatedAt: now,
           },
         })
+    }
+
+    // Redeeming ends the offers that wait for a visit; the update below reverts the pass.
+    const endedOffers = await endOffersForCard(tx, row.customerCard.id, 'redeem')
+    for (const ended of endedOffers) {
+      if (ended.campaignId) await bumpCampaignStats(tx, ended.campaignId, { redeemed: 1 })
     }
 
     await enqueue(

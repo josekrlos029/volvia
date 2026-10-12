@@ -57,6 +57,34 @@
       "when": 1791647836174,
       "tag": "0007_tranquil_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791745581990,
+      "tag": "0008_pass_offers",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791746905615,
+      "tag": "0009_signup_phone",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791747301024,
+      "tag": "0010_page_modules",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791747717203,
+      "tag": "0011_org_purge",
+      "breakpoints": true
     }
   ]
 }

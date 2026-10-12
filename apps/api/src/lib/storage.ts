@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import {
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from '@volvia/shared'
 import { env } from '../env'
@@ -16,11 +21,13 @@ export interface UploadTarget {
 export interface StorageAdapter {
   createUploadTarget(input: {
     orgId: string
-    kind: 'logo' | 'banner' | 'cover' | 'stamp'
+    kind: 'logo' | 'banner' | 'cover' | 'stamp' | 'page'
     contentType: string
     contentLength: number
   }): Promise<UploadTarget>
   publicUrlFor(key: string): string
+  /** Removes everything under a key prefix, e.g. a closed business's uploads. Returns the count. */
+  deletePrefix(prefix: string): Promise<number>
 }
 
 function assertUploadable(contentType: string, contentLength: number): void {
@@ -50,7 +57,7 @@ class S3Storage implements StorageAdapter {
 
   async createUploadTarget(input: {
     orgId: string
-    kind: 'logo' | 'banner' | 'cover' | 'stamp'
+    kind: 'logo' | 'banner' | 'cover' | 'stamp' | 'page'
     contentType: string
     contentLength: number
   }): Promise<UploadTarget> {
@@ -77,6 +84,32 @@ class S3Storage implements StorageAdapter {
     const base = env.STORAGE_PUBLIC_URL.replace(/\/$/, '')
     return `${base}/${key}`
   }
+
+  async deletePrefix(prefix: string): Promise<number> {
+    let deleted = 0
+    let token: string | undefined
+    do {
+      const page = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: env.STORAGE_BUCKET,
+          Prefix: prefix,
+          ContinuationToken: token,
+        }),
+      )
+      const keys = (page.Contents ?? []).flatMap((object) => (object.Key ? [object.Key] : []))
+      if (keys.length > 0) {
+        await this.client.send(
+          new DeleteObjectsCommand({
+            Bucket: env.STORAGE_BUCKET,
+            Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
+          }),
+        )
+        deleted += keys.length
+      }
+      token = page.IsTruncated ? page.NextContinuationToken : undefined
+    } while (token)
+    return deleted
+  }
 }
 
 /** Used by tests so they never need object storage running. */
@@ -99,6 +132,10 @@ class MemoryStorage implements StorageAdapter {
 
   publicUrlFor(key: string): string {
     return `memory://${key}`
+  }
+
+  async deletePrefix(): Promise<number> {
+    return 0
   }
 }
 

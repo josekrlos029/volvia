@@ -3,7 +3,10 @@ import {
   and,
   count,
   eq,
+  gt,
+  inArray,
   invites,
+  isNotNull,
   isNull,
   locations,
   memberships,
@@ -521,34 +524,141 @@ export async function listProfileQuestions(db: Database, orgId: string) {
     .orderBy(profileQuestions.position)
 }
 
+/**
+ * Saves the business's questions as one list.
+ *
+ * A question that comes back with its id is updated in place, so the cards that ask
+ * it (`stamp_cards.signupQuestionIds`) and the answers already given keep pointing at
+ * it. Only questions left out of the list are deactivated, never deleted: existing
+ * answers reference them. Returns the active list in order, ids included.
+ */
 export async function replaceProfileQuestions(
   db: Database,
   orgId: string,
   questions: ProfileQuestionInput[],
 ) {
   return db.transaction(async (tx) => {
-    // Deactivate rather than delete: existing answers reference these questions.
-    await tx
-      .update(profileQuestions)
-      .set({ isActive: false })
-      .where(eq(profileQuestions.orgId, orgId))
+    const existing = await tx
+      .select({ id: profileQuestions.id })
+      .from(profileQuestions)
+      .where(and(eq(profileQuestions.orgId, orgId), eq(profileQuestions.isActive, true)))
+    const known = new Set(existing.map((row) => row.id))
+    const kept = new Set<string>()
 
-    if (questions.length === 0) return []
+    for (const [index, question] of questions.entries()) {
+      const values = {
+        prompt: question.prompt,
+        type: question.type,
+        options: question.options,
+        isRequired: question.isRequired,
+        askOn: question.askOn,
+        position: index,
+        isActive: true,
+      }
+      if (question.id && known.has(question.id)) {
+        await tx
+          .update(profileQuestions)
+          .set(values)
+          .where(and(eq(profileQuestions.id, question.id), eq(profileQuestions.orgId, orgId)))
+        kept.add(question.id)
+      } else {
+        const [created] = await tx
+          .insert(profileQuestions)
+          .values({ orgId, ...values })
+          .returning({ id: profileQuestions.id })
+        if (created) kept.add(created.id)
+      }
+    }
+
+    const dropped = existing.filter((row) => !kept.has(row.id)).map((row) => row.id)
+    if (dropped.length > 0) {
+      await tx
+        .update(profileQuestions)
+        .set({ isActive: false })
+        .where(and(eq(profileQuestions.orgId, orgId), inArray(profileQuestions.id, dropped)))
+    }
 
     return tx
-      .insert(profileQuestions)
-      .values(
-        questions.map((question, index) => ({
-          orgId,
-          prompt: question.prompt,
-          type: question.type,
-          options: question.options,
-          isRequired: question.isRequired,
-          askOn: question.askOn,
-          position: index,
-          isActive: true,
-        })),
-      )
-      .returning()
+      .select()
+      .from(profileQuestions)
+      .where(and(eq(profileQuestions.orgId, orgId), eq(profileQuestions.isActive, true)))
+      .orderBy(profileQuestions.position)
   })
+}
+
+/** How long a closed business can be brought back before it is erased. */
+export const ORG_RESTORE_WINDOW_DAYS = 7
+
+/**
+ * Closes the business: it vanishes from every query, and a date is set for the
+ * records to be erased. Until that date the owner can undo it. Returns the owner so
+ * the caller can tell them.
+ */
+export async function closeOrg(db: Database, orgId: string) {
+  const now = new Date()
+  const purgeAt = new Date(now.getTime() + ORG_RESTORE_WINDOW_DAYS * 86_400_000)
+  const [org] = await db
+    .update(organizations)
+    .set({ deletedAt: now, purgeAt, updatedAt: now })
+    .where(and(eq(organizations.id, orgId), isNull(organizations.deletedAt)))
+    .returning()
+  if (!org) throw new AppError('ORG_NOT_FOUND', { message: 'organization not found' })
+
+  const [owner] = await db
+    .select({ email: users.email, name: users.name, locale: users.locale })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.orgId, orgId), eq(memberships.role, 'owner')))
+    .limit(1)
+  return { org, owner: owner ?? null }
+}
+
+/** The closed businesses this person owns that can still be restored. */
+export async function listRestorableOrgs(db: Database, userId: string) {
+  return db
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      slug: organizations.slug,
+      deletedAt: organizations.deletedAt,
+      purgeAt: organizations.purgeAt,
+    })
+    .from(memberships)
+    .innerJoin(organizations, eq(organizations.id, memberships.orgId))
+    .where(
+      and(
+        eq(memberships.userId, userId),
+        eq(memberships.role, 'owner'),
+        isNotNull(organizations.deletedAt),
+        gt(organizations.purgeAt, new Date()),
+      ),
+    )
+}
+
+/** Brings a closed business back exactly as it was, if its window has not run out. */
+export async function restoreOrg(db: Database, input: { orgId: string; userId: string }) {
+  const [candidate] = await db
+    .select({ id: organizations.id, purgeAt: organizations.purgeAt })
+    .from(memberships)
+    .innerJoin(organizations, eq(organizations.id, memberships.orgId))
+    .where(
+      and(
+        eq(memberships.userId, input.userId),
+        eq(memberships.orgId, input.orgId),
+        eq(memberships.role, 'owner'),
+        isNotNull(organizations.deletedAt),
+      ),
+    )
+    .limit(1)
+  if (!candidate) throw new AppError('ORG_NOT_FOUND', { message: 'no closed business to restore' })
+  if (!candidate.purgeAt || candidate.purgeAt.getTime() <= Date.now()) {
+    throw new AppError('CONFLICT', { message: 'the restore window has passed' })
+  }
+
+  const [restored] = await db
+    .update(organizations)
+    .set({ deletedAt: null, purgeAt: null, updatedAt: new Date() })
+    .where(eq(organizations.id, candidate.id))
+    .returning()
+  return restored!
 }

@@ -164,7 +164,13 @@ function backFields(content: PassContent): Field[] {
     ...(content.customerName
       ? [{ key: 'customer', label: strings.cardOf, value: content.customerName }]
       : []),
-    { key: 'rewardDetails', label: content.cardName, value: content.rewardDescription },
+    // A campaign may put its own words where the reward description goes.
+    {
+      key: 'rewardDetails',
+      label: content.cardName,
+      value: content.offer?.text || content.rewardDescription,
+      changeMessage: '%@',
+    },
     // Always present, even before the first message: the phone only alerts when a
     // field it already knew changes value, so the key has to exist from install.
     {
@@ -206,6 +212,10 @@ export function buildPassJson(
   const hasReward = content.pendingRewardCount > 0
   const remaining = stampsRemaining(content)
   const relevantText = nearbyText(content)
+  // A campaign may rename the header ("SELLOS DOBLES"), but a reward waiting to be
+  // claimed is the more important news, so the business name stays while one is.
+  const headerLabel =
+    !hasReward && content.offer?.headerLabel ? content.offer.headerLabel : content.organizationName
 
   return {
     formatVersion: 1,
@@ -229,7 +239,7 @@ export function buildPassJson(
       headerFields: [
         {
           key: 'progress',
-          label: content.organizationName,
+          label: headerLabel,
           value: `${content.stampsCount}/${content.stampsRequired}`,
           // Each stamp changes this value, which is what makes the phone show a banner.
           // Silenced while a reward is pending: the reward field announces that one,
@@ -267,8 +277,8 @@ export function buildPassJson(
                 },
               ]
             : []),
-        ...(content.offerMessage
-          ? [{ key: 'offer', label: '★', value: content.offerMessage, changeMessage: '%@' }]
+        ...(content.offer
+          ? [{ key: 'offer', label: '★', value: content.offer.message, changeMessage: '%@' }]
           : []),
       ],
       backFields: backFields(content),

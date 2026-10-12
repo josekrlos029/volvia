@@ -77,6 +77,7 @@ export async function loadOverview(
     stamps: sql<number>`coalesce(sum(${analyticsDaily.stamps}), 0)::int`,
     unlocked: sql<number>`coalesce(sum(${analyticsDaily.rewardsUnlocked}), 0)::int`,
     redeemed: sql<number>`coalesce(sum(${analyticsDaily.rewardsRedeemed}), 0)::int`,
+    pageViews: sql<number>`coalesce(sum(${analyticsDaily.pageViews}), 0)::int`,
   }
 
   const [[current], [previous], [totals], [repeat], [activeCards], [cadence]] = await Promise.all([
@@ -160,6 +161,7 @@ export async function loadOverview(
       customersTotal === 0 ? 0 : Math.round(((current?.stamps ?? 0) / customersTotal) * 10) / 10,
     medianDaysBetweenVisits: medianRow?.median ? Math.round(medianRow.median * 10) / 10 : null,
     activeCards: activeCards?.value ?? 0,
+    pageViews: current?.pageViews ?? 0,
   }
 }
 

@@ -26,6 +26,8 @@ interface JoinPage {
     }
     terms: string
     collectBirthday: boolean
+    collectPhone?: boolean
+    phoneRequired?: boolean
   }
   rewards: Array<{ atStamp: number; title: string; description: string }>
   locale: string
@@ -114,6 +116,8 @@ export default async function JoinPageRoute({ params }: { params: Promise<{ join
         joinSlug={joinSlug}
         locale={page.locale}
         collectBirthday={page.card.collectBirthday}
+        collectPhone={page.card.collectPhone ?? false}
+        phoneRequired={page.card.phoneRequired ?? false}
         questions={page.questions}
         accentColor={page.card.design.accentColor}
       />

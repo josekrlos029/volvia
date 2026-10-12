@@ -26,6 +26,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '/generador-qr-resenas',
     '/privacidad',
     '/terminos',
+    '/dpa',
+    '/subencargados',
+    '/uso-aceptable',
   ]
 
   const pages = LOCALES.flatMap((locale) =>

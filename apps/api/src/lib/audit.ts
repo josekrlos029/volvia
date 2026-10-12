@@ -60,4 +60,6 @@ export const AUDIT_ACTIONS = {
   segmentDeleted: 'segment.deleted',
   planChanged: 'plan.changed',
   orgDeleted: 'org.deleted',
+  orgRestored: 'org.restored',
+  orgPurged: 'org.purged',
 } as const

@@ -11,6 +11,7 @@ import { redisKeys } from '../../lib/redis'
 import { rateLimits } from '../../plugins/security'
 import { typed } from '../../types'
 import { joinCard } from '../loyalty/service'
+import { recordPageView } from '../page/service'
 import { loadBusinessPage, loadJoinPage, loadPublicCardState } from './service'
 
 /** Public reads are cached briefly; every write path deletes the key explicitly. */
@@ -218,6 +219,26 @@ export async function publicRoutes(fastify: FastifyInstance): Promise<void> {
       await app.redis.set(key, JSON.stringify(page), 'EX', PAGE_CACHE_SECONDS)
       reply.header('cache-control', `public, max-age=${PAGE_CACHE_SECONDS}`)
       return page
+    },
+  )
+
+  /**
+   * The page pings this once it has rendered, so the dashboard can say how many people
+   * opened it. One count per visitor and day; nothing about the visitor is kept.
+   */
+  app.post(
+    '/business/:slug/view',
+    {
+      config: { rateLimit: rateLimits.publicRead },
+      schema: { params: z.object({ slug: z.string().min(2).max(64) }), tags: ['public'] },
+    },
+    async (request, reply) => {
+      await recordPageView(app.db, app.redis, {
+        slug: request.params.slug,
+        ip: request.ip,
+        userAgent: String(request.headers['user-agent'] ?? ''),
+      })
+      return reply.code(204).send()
     },
   )
 }

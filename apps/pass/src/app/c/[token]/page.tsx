@@ -33,7 +33,17 @@ interface CardState {
     code: string
     expiresAt: string | null
   }>
-  activeOffer: { title: string; description: string; endsAt: string } | null
+  activeOffer: {
+    title: string
+    description: string
+    endsAt: string | null
+    headerLabel: string | null
+    bannerUrl: string | null
+    bannerPreset: string | null
+    hideStamps: boolean
+    stampStyle: string | null
+    endsOnFirstStamp: boolean
+  } | null
   walletPasses: { appleUrl: string | null; googleUrl: string | null }
   lastStampAt: string | null
   message: string | null
@@ -83,6 +93,8 @@ export default async function CardPage({
           cycleLabel={state.cycleIndex > 0 ? copy.card.cycle(state.cycleIndex) : null}
           animateLast={query.stamped === '1'}
           message={state.message}
+          offer={state.activeOffer}
+          hasPendingReward={state.pendingRewards.length > 0}
         />
 
         <RewardBanner

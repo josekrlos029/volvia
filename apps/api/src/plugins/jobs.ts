@@ -25,6 +25,7 @@ export const jobsPlugin = fp(async (app: FastifyInstance) => {
     redis: app.redis,
     logger: app.log,
     mailer: app.mailer,
+    storage: app.storage,
   })
   const enabled = env.JOBS_SECRET.length > 0
 

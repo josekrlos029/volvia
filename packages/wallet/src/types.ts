@@ -42,8 +42,8 @@ export interface PassContent {
    * to it is derived from the card state, so it is never stored here.
    */
   places: Array<{ latitude: number; longitude: number }>
-  /** Free-form message shown when a campaign or birthday offer is active. */
-  offerMessage: string | null
+  /** A campaign or birthday offer live on this card, already worded for this customer. */
+  offer: PassOffer | null
   /**
    * The last message the business sent to this card. Its change is what makes the
    * phone show a notification, so the text is already rendered for this customer.
@@ -65,6 +65,19 @@ export interface PassContent {
   promoImageUrl: string | null
   locale: 'es' | 'en'
   updatedAt: Date
+}
+
+/** What an offer does to the pass while it runs, beyond its one line of text. */
+export interface PassOffer {
+  message: string
+  /** Replaces the business name in the header. Ignored while a reward waits. */
+  headerLabel: string | null
+  /** Replaces the reward description on the back of the pass. */
+  text: string | null
+  banner: { kind: 'preset'; value: string } | { kind: 'image'; url: string } | null
+  /** The stamp grid tucks behind the banner; only a small progress pill remains. */
+  hideStamps: boolean
+  endsAt: Date | null
 }
 
 export type PassLinkKind = 'web' | 'phone' | 'email' | 'maps'

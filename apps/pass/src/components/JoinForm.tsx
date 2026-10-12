@@ -20,6 +20,8 @@ interface JoinFormProps {
   /** Only the locale crosses the server/client boundary; the copy is imported here. */
   locale: string
   collectBirthday: boolean
+  collectPhone?: boolean
+  phoneRequired?: boolean
   questions: Question[]
   accentColor: string
 }
@@ -27,13 +29,19 @@ interface JoinFormProps {
 interface FormErrors {
   firstName?: string
   email?: string
+  phone?: string
   form?: string
 }
+
+/** Digits with optional +, spaces, dashes and brackets, as people type a number. */
+const PHONE_PATTERN = /^\+?[0-9(][0-9 ()./-]{5,24}$/
 
 export function JoinForm({
   joinSlug,
   locale,
   collectBirthday,
+  collectPhone = false,
+  phoneRequired = false,
   questions,
   accentColor,
 }: JoinFormProps) {
@@ -48,12 +56,17 @@ export function JoinForm({
 
     const firstName = String(form.get('firstName') ?? '').trim()
     const email = String(form.get('email') ?? '').trim()
+    const phone = String(form.get('phone') ?? '').trim()
 
     // Validate before the round trip so the customer is not waiting to be told
     // their name is missing.
     const nextErrors: FormErrors = {}
     if (!firstName) nextErrors.firstName = copy.join.required
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) nextErrors.email = copy.join.invalidEmail
+    if (collectPhone && phoneRequired && !phone) nextErrors.phone = copy.join.required
+    if (collectPhone && phone && !PHONE_PATTERN.test(phone)) {
+      nextErrors.phone = copy.join.invalidPhone
+    }
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors)
       return
@@ -79,6 +92,7 @@ export function JoinForm({
           firstName,
           email,
           birthday: month && day ? { month, day } : null,
+          phone: collectPhone && phone ? phone : null,
           marketingConsent: form.get('consent') === 'on',
           answers,
         }),
@@ -135,6 +149,28 @@ export function JoinForm({
           required
         />
       </Field>
+
+      {collectPhone ? (
+        <Field
+          label={copy.join.phone}
+          htmlFor="phone"
+          help={phoneRequired ? undefined : copy.join.phoneHelp}
+          error={errors.phone}
+        >
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            enterKeyHint="next"
+            placeholder={copy.join.phonePlaceholder}
+            className={inputClass}
+            aria-invalid={Boolean(errors.phone)}
+            required={phoneRequired}
+          />
+        </Field>
+      ) : null}
 
       {collectBirthday ? (
         <Field label={copy.join.birthday} htmlFor="birthdayDay" help={copy.join.birthdayHelp}>

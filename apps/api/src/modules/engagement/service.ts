@@ -77,6 +77,7 @@ export async function createCampaign(
       sendPush: input.data.sendPush,
       activeWeekdays: input.data.activeWeekdays,
       activeHours: input.data.activeHours,
+      passOverride: input.data.passOverride,
       // A campaign whose window already began starts immediately on launch.
       status: input.data.startsAt <= now ? 'scheduled' : 'scheduled',
     })
@@ -118,13 +119,23 @@ export async function launchCampaign(db: Database, orgId: string, campaignId: st
 }
 
 export async function cancelCampaign(db: Database, orgId: string, campaignId: string) {
-  const [updated] = await db
-    .update(campaigns)
-    .set({ status: 'cancelled', finishedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(campaigns.id, campaignId), eq(campaigns.orgId, orgId)))
-    .returning()
-  if (!updated) throw new AppError('NOT_FOUND', { message: 'campaign not found' })
-  return updated
+  return db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(campaigns)
+      .set({ status: 'cancelled', finishedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(campaigns.id, campaignId), eq(campaigns.orgId, orgId)))
+      .returning()
+    if (!updated) throw new AppError('NOT_FOUND', { message: 'campaign not found' })
+
+    // Cancelling goes through the same end job as running out of time, so the offers
+    // close and the passes that showed them are refreshed by one code path.
+    await tx.insert(outbox).values({
+      orgId,
+      kind: OUTBOX_KINDS.campaignEnd,
+      payload: { campaignId },
+    })
+    return updated
+  })
 }
 
 export async function previewAudience(
@@ -390,6 +401,7 @@ export async function upsertAutomation(db: Database, orgId: string, data: Automa
     offer: data.offer,
     sendEmail: data.sendEmail,
     sendPush: data.sendPush,
+    passOverride: data.passOverride,
   }
 
   if (existing) {

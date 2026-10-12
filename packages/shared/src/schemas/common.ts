@@ -25,6 +25,21 @@ export const hexColorSchema = z
 
 export const localeSchema = z.enum(LOCALES)
 
+/**
+ * A phone number as people type it: digits with optional +, spaces, dashes and
+ * brackets. Stored normalised to digits with a leading + when one was given, so
+ * "300 123 4567" and "3001234567" are the same customer.
+ */
+export const phoneSchema = z
+  .string()
+  .trim()
+  .regex(/^\+?[0-9(][0-9 ()./-]{5,24}$/, 'phone_invalid')
+  .transform((value) => {
+    const digits = value.replace(/[^0-9]/g, '')
+    return value.startsWith('+') ? `+${digits}` : digits
+  })
+  .pipe(z.string().min(7).max(16))
+
 /** IANA timezone; validated against the runtime's tz database rather than a static list. */
 export const timezoneSchema = z
   .string()
