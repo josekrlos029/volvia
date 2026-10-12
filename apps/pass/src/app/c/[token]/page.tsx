@@ -1,10 +1,11 @@
-import { type CardDesign, LoyaltyCard } from '@/components/LoyaltyCard'
+import { RefreshOnReturn, StampedToast } from '@/components/CardLive'
 import { RewardBanner } from '@/components/RewardBanner'
 import { Shell, VolviaMark } from '@/components/Shell'
 import { type PendingSurvey, SurveyCard } from '@/components/SurveyCard'
 import { WalletButtons } from '@/components/WalletButtons'
 import { api } from '@/lib/api'
 import { t } from '@/lib/i18n'
+import { LoyaltyCard, type LoyaltyCardDesign } from '@volvia/ui/components/LoyaltyCard'
 import { notFound } from 'next/navigation'
 
 interface CardState {
@@ -19,7 +20,7 @@ interface CardState {
     id: string
     name: string
     stampsRequired: number
-    design: Record<string, string>
+    design: Record<string, unknown>
     terms: string
   }
   stampsCount: number
@@ -76,20 +77,24 @@ export default async function CardPage({
   // The customer's locale is not in the URL; the business decides it.
   const locale = 'es'
   const copy = t(locale)
-  const design = state.card.design as unknown as CardDesign
+  const design = state.card.design as unknown as LoyaltyCardDesign
 
   const justArrived = query.welcome === '1' || query.stamped === '1'
 
   return (
     <Shell>
+      <RefreshOnReturn />
+      <StampedToast show={query.stamped === '1'} label={copy.card.stamped} />
       <div className="flex flex-col gap-5">
         <LoyaltyCard
+          titleAs="h1"
           businessName={state.business.name}
           cardName={state.card.name}
           design={{ ...design, logoUrl: design.logoUrl ?? state.business.logoUrl }}
           filled={state.stampsCount}
           total={state.card.stampsRequired}
           rewardPositions={state.rewards.map((reward) => reward.atStamp)}
+          nextReward={state.nextReward}
           cycleLabel={state.cycleIndex > 0 ? copy.card.cycle(state.cycleIndex) : null}
           animateLast={query.stamped === '1'}
           message={state.message}
@@ -125,9 +130,11 @@ export default async function CardPage({
               <p className="mt-1.5 text-[16px] font-medium leading-snug">
                 {state.nextReward.title}
               </p>
-              <p className="mt-1 text-[14px] text-[var(--color-ink-muted)]">
-                {copy.card.progress(state.stampsCount, state.nextReward.atStamp)}
-              </p>
+              {state.nextReward.description ? (
+                <p className="mt-1 text-[14px] text-[var(--color-ink-muted)]">
+                  {state.nextReward.description}
+                </p>
+              ) : null}
             </>
           ) : (
             <p className="text-[15px] font-medium">{copy.card.complete}</p>
@@ -154,11 +161,6 @@ export default async function CardPage({
           />
         ) : null}
 
-        <WalletButtons
-          appleUrl={state.walletPasses.appleUrl}
-          googleUrl={state.walletPasses.googleUrl}
-          locale={locale}
-        />
         <p className="text-center text-[13px] text-[var(--color-ink-muted)]">
           {copy.card.saveHint}
         </p>
@@ -204,6 +206,14 @@ export default async function CardPage({
       </div>
 
       <VolviaMark />
+
+      {/* Fixed to the bottom so saving the card never means scrolling past it. */}
+      <WalletButtons
+        appleUrl={state.walletPasses.appleUrl}
+        googleUrl={state.walletPasses.googleUrl}
+        locale={locale}
+        sticky
+      />
     </Shell>
   )
 }

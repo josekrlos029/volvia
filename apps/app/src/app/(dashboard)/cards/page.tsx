@@ -2,6 +2,7 @@ import { Badge, EmptyState, Panel, buttonClass } from '@/components/ui'
 import { formatNumber } from '@/lib/format'
 import { apiFetch, getSession } from '@/lib/session'
 import { roleAtLeast } from '@volvia/shared'
+import { LoyaltyCard, type LoyaltyCardDesign } from '@volvia/ui/components/LoyaltyCard'
 import Link from 'next/link'
 
 interface CardRow {
@@ -12,11 +13,15 @@ interface CardRow {
   holders: number
   joinUrl: string
   rewards: Array<{ atStamp: number; title: string }>
-  design: { backgroundColor: string; accentColor: string }
+  design: LoyaltyCardDesign
 }
 
 export default async function CardsPage() {
-  const [cards, session] = await Promise.all([apiFetch<CardRow[]>('/v1/cards'), getSession()])
+  const [cards, session, org] = await Promise.all([
+    apiFetch<CardRow[]>('/v1/cards'),
+    getSession(),
+    apiFetch<{ name: string; logoUrl: string | null }>('/v1/org'),
+  ])
   const isAdmin = session ? roleAtLeast(session.role, 'admin') : false
 
   return (
@@ -85,21 +90,23 @@ export default async function CardsPage() {
                   </Badge>
                 </div>
 
-                {/* A miniature of the real card, so the list is scannable by look. */}
-                <div
-                  className="flex items-center gap-1.5 rounded-[9px] p-3"
-                  style={{ background: card.design.backgroundColor }}
-                  aria-hidden="true"
-                >
-                  {Array.from({ length: Math.min(card.stampsRequired, 10) }, (_, index) => (
-                    <span
-                      key={`slot-${index + 1}`}
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{
-                        background: index < 3 ? card.design.accentColor : 'rgba(255,255,255,0.16)',
-                      }}
-                    />
-                  ))}
+                {/* The real card, reduced and a third full, so the list is scannable by look. */}
+                <div aria-hidden="true" className="pointer-events-none w-full max-w-[280px]">
+                  <LoyaltyCard
+                    compact
+                    titleAs="h3"
+                    businessName={org.name}
+                    cardName={card.name}
+                    design={{ ...card.design, logoUrl: card.design.logoUrl ?? org.logoUrl }}
+                    filled={Math.ceil(card.stampsRequired / 3)}
+                    total={card.stampsRequired}
+                    rewardPositions={card.rewards.map((reward) => reward.atStamp)}
+                    nextReward={
+                      card.rewards.find(
+                        (reward) => reward.atStamp > Math.ceil(card.stampsRequired / 3),
+                      ) ?? null
+                    }
+                  />
                 </div>
 
                 <ul className="flex flex-col gap-1 text-[13px] text-[var(--color-ink-muted)]">

@@ -4,6 +4,13 @@ import { Shell } from '@/components/Shell'
 import { WifiCard } from '@/components/WifiCard'
 import { api } from '@/lib/api'
 import { t } from '@/lib/i18n'
+import { readableOn } from '@volvia/shared'
+import {
+  LOYALTY_CARD_LABELS_EN,
+  LOYALTY_CARD_LABELS_ES,
+  LoyaltyCard,
+  type LoyaltyCardDesign,
+} from '@volvia/ui/components/LoyaltyCard'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -43,7 +50,7 @@ interface BusinessPage {
   cards: Array<{
     name: string
     stampsRequired: number
-    design: Record<string, string>
+    design: Record<string, unknown>
     joinUrl: string
     rewards: Array<{ atStamp: number; title: string }>
   }>
@@ -108,9 +115,7 @@ export default async function BusinessPageRoute({ params }: { params: Promise<{ 
   const locale = page.business.locale === 'en' ? 'en' : 'es'
   const copy = t(locale)
   const primaryCard = page.cards[0]
-  const cardDesign = primaryCard?.design as unknown as
-    | { backgroundColor: string; accentColor: string }
-    | undefined
+  const cardDesign = primaryCard?.design as unknown as LoyaltyCardDesign | undefined
   const accent = page.business.accentColor || page.business.brandColor
 
   const whatsappLink = page.business.socialLinks.find((link) => link.platform === 'whatsapp')
@@ -212,19 +217,44 @@ export default async function BusinessPageRoute({ params }: { params: Promise<{ 
           </nav>
         ) : null}
 
-        {primaryCard ? (
-          <section
-            className="mb-6 rounded-[16px] p-5 text-white"
-            style={{ background: cardDesign?.backgroundColor ?? '#14171A' }}
-          >
-            <h2 className="text-[18px] font-semibold leading-tight">{primaryCard.name}</h2>
-            <p className="mt-1.5 text-[14px] leading-snug opacity-80">
-              {copy.business.stampsToReward(primaryCard.stampsRequired)}
-            </p>
+        {primaryCard && cardDesign ? (
+          <section className="mb-6 flex flex-col gap-4" aria-label={primaryCard.name}>
+            {/* The real card, empty: what the customer gets the moment they join. */}
+            <LoyaltyCard
+              businessName={page.business.name}
+              cardName={primaryCard.name}
+              design={{ ...cardDesign, logoUrl: cardDesign.logoUrl ?? page.business.logoUrl }}
+              filled={0}
+              total={primaryCard.stampsRequired}
+              rewardPositions={primaryCard.rewards.map((reward) => reward.atStamp)}
+              nextReward={primaryCard.rewards[0] ?? null}
+              labels={locale === 'en' ? LOYALTY_CARD_LABELS_EN : LOYALTY_CARD_LABELS_ES}
+            />
+            {primaryCard.rewards.length > 0 ? (
+              <ul className="flex flex-col gap-2">
+                {primaryCard.rewards.map((reward) => (
+                  <li key={reward.atStamp} className="flex items-baseline gap-3 text-[15px]">
+                    <span
+                      className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[12px] font-semibold tabular-nums"
+                      style={{
+                        background: cardDesign.accentColor,
+                        color: readableOn(cardDesign.accentColor, ['#0F172A', '#FFFFFF']),
+                      }}
+                    >
+                      {reward.atStamp}
+                    </span>
+                    <span className="font-medium leading-snug">{reward.title}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <a
               href={primaryCard.joinUrl}
-              className="mt-4 block rounded-[10px] px-4 py-3.5 text-center text-[16px] font-semibold text-[#14171A] transition-transform duration-150 active:scale-[0.985]"
-              style={{ background: cardDesign?.accentColor ?? accent }}
+              className="block rounded-[10px] px-4 py-3.5 text-center text-[16px] font-semibold transition-transform duration-150 active:scale-[0.985]"
+              style={{
+                background: cardDesign.accentColor,
+                color: readableOn(cardDesign.accentColor, ['#0F172A', '#FFFFFF']),
+              }}
             >
               {page.business.ctaLabel || copy.business.cardCta}
             </a>

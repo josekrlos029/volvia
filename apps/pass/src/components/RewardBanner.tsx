@@ -93,7 +93,7 @@ function Confetti() {
     left: `${8 + index * 7.5}%`,
     delay: `${(index % 5) * 120}ms`,
     duration: `${1_600 + (index % 4) * 280}ms`,
-    color: ['#16624A', '#14171A', '#FFFFFF', '#B3261E'][index % 4]!,
+    color: ['#1E3A8A', '#7C3AED', '#FB923C', '#FFFFFF'][index % 4]!,
   }))
 
   return (

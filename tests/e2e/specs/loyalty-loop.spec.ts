@@ -31,7 +31,7 @@ test.describe('loyalty loop', () => {
     // Landing on the card means the signup completed and the token is valid.
     await page.waitForURL(/\/c\/[A-Za-z0-9_-]{16,}/)
     const token = page.url().split('/c/')[1]!.split('?')[0]!
-    await expect(page.getByText('0 / 4')).toBeVisible()
+    await expect(page.getByText('0/4')).toBeVisible()
 
     // Stamp 1: nothing unlocked yet.
     const first = await request.post(`${urls.api}/v1/stamp`, {

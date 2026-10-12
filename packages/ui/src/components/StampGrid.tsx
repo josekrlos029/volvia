@@ -1,6 +1,7 @@
-import type { StampStyle } from '@volvia/shared'
-import { STAMP_RADIUS, hexWithAlpha } from '@volvia/ui'
+import type { StampIcon, StampStyle } from '@volvia/shared'
+import { CHECK_ICON_PATH, GIFT_ICON_PATH, STAMP_ICON_PATHS, readableOn } from '@volvia/shared'
 import type { CSSProperties } from 'react'
+import { STAMP_RADIUS, hexWithAlpha } from '../card-surface'
 
 /**
  * Picks a column count that fills every row.
@@ -8,7 +9,7 @@ import type { CSSProperties } from 'react'
  * An 8-stamp card laid out 5-then-3 leaves an orphan row that reads as a mistake, so
  * we prefer a divisor of the total and only fall back when there is no clean one.
  */
-function balancedColumns(total: number): number {
+export function balancedColumns(total: number): number {
   if (total <= 6) return total
   for (const candidate of [6, 5, 4, 3]) {
     if (total % candidate === 0) return candidate
@@ -21,13 +22,18 @@ interface StampGridProps {
   total: number
   /** Positions (1-based) that unlock a reward, marked so progress has landmarks. */
   rewardPositions: number[]
+  backgroundColor: string
   accentColor: string
   emptyColor: string
   foregroundColor: string
   /** Shape of a single slot, chosen by the business. */
   stampStyle?: StampStyle
+  /** What a filled slot shows: the business's own glyph, emoji or image. */
+  stampIcon?: StampIcon
   /** The most recently earned stamp animates in once, on load. */
   animateLast?: boolean
+  /** Tighter gaps for thumbnails. */
+  dense?: boolean
 }
 
 /**
@@ -41,18 +47,27 @@ export function StampGrid({
   filled,
   total,
   rewardPositions,
+  backgroundColor,
   accentColor,
   emptyColor,
   foregroundColor,
   stampStyle = 'circle',
+  stampIcon,
   animateLast = false,
+  dense = false,
 }: StampGridProps) {
   const columns = balancedColumns(total)
   const radius = STAMP_RADIUS[stampStyle]
+  // The mark inside a filled slot sits on the accent, so it takes whichever of the
+  // card's own colours reads best there rather than a fixed dark ink.
+  const markColor = readableOn(accentColor, [backgroundColor, foregroundColor])
+  // Empty slots are drawn in a colour the business picked for the background; when it
+  // is too close to the background to read, the foreground stands in for the labels.
+  const emptyInk = readableOn(backgroundColor, [emptyColor, foregroundColor])
 
   return (
     <ul
-      className="grid gap-2.5"
+      className={dense ? 'grid gap-1.5' : 'grid gap-2.5'}
       style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
       aria-label={`${filled} de ${total} sellos`}
     >
@@ -65,14 +80,13 @@ export function StampGrid({
         const rings = [
           // A badge carries its own ring in the accent colour, whatever its state.
           stampStyle === 'badge' ? `0 0 0 2px ${hexWithAlpha(accentColor, 0.55)}` : null,
-          // Reward slots get a ring so the target is visible before it is reached.
-          isReward && !isFilled ? `0 0 0 2px ${emptyColor}` : null,
+          // Reward slots get a ring in the accent so the target is visible before it is reached.
+          isReward && !isFilled ? `0 0 0 2px ${hexWithAlpha(accentColor, 0.7)}` : null,
         ].filter(Boolean)
 
         const style: CSSProperties = {
           background: isFilled ? accentColor : 'transparent',
           borderColor: isFilled ? accentColor : emptyColor,
-          color: isFilled ? '#14171A' : emptyColor,
           borderRadius: radius,
           boxShadow: rings.length > 0 ? rings.join(', ') : undefined,
         }
@@ -82,17 +96,18 @@ export function StampGrid({
             <div
               style={style}
               className={[
-                'flex h-full w-full items-center justify-center border-2',
-                'text-[13px] font-semibold tabular-nums transition-colors duration-200',
+                'flex h-full w-full items-center justify-center overflow-hidden border-2',
+                'font-semibold tabular-nums transition-colors duration-200',
+                dense ? 'text-[10px]' : 'text-[13px]',
                 isLatest ? 'stamp-land' : '',
               ].join(' ')}
             >
               {isFilled ? (
-                <CheckMark color="#14171A" />
+                <FilledMark icon={stampIcon} color={markColor} />
               ) : isReward ? (
-                <GiftMark color={emptyColor} />
-              ) : (
-                <span style={{ color: emptyColor, opacity: 0.65 }}>{position}</span>
+                <Glyph path={GIFT_ICON_PATH} color={accentColor} size="52%" />
+              ) : dense ? null : (
+                <span style={{ color: emptyInk, opacity: 0.6 }}>{position}</span>
               )}
             </div>
           </li>
@@ -102,30 +117,31 @@ export function StampGrid({
   )
 }
 
-/** Inline marks rather than an icon font: these render inside a business's own colours. */
-function CheckMark({ color }: { color: string }) {
-  return (
-    <svg viewBox="0 0 20 20" className="h-[55%] w-[55%]" aria-hidden="true">
-      <path
-        d="M4 10.5 8 14.5 16 6"
-        fill="none"
-        stroke={color}
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
+function FilledMark({ icon, color }: { icon: StampIcon | undefined; color: string }) {
+  if (!icon) return <Glyph path={CHECK_ICON_PATH} color={color} size="55%" />
+  if (icon.kind === 'emoji') {
+    return (
+      <span aria-hidden="true" className="text-[1.25em] leading-none">
+        {icon.value}
+      </span>
+    )
+  }
+  if (icon.kind === 'image') {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={icon.value} alt="" className="h-[62%] w-[62%] object-contain" />
+  }
+  return <Glyph path={STAMP_ICON_PATHS[icon.value]} color={color} size="58%" />
 }
 
-function GiftMark({ color }: { color: string }) {
+/** Inline strokes rather than an icon font: these render inside a business's own colours. */
+function Glyph({ path, color, size }: { path: string; color: string; size: string }) {
   return (
-    <svg viewBox="0 0 20 20" className="h-[50%] w-[50%]" aria-hidden="true">
+    <svg viewBox="0 0 24 24" style={{ width: size, height: size }} aria-hidden="true">
       <path
-        d="M3 8.5h14v8.5H3zM3 8.5h14M10 8.5V17M10 8.5c-1.5-3-5.5-3.5-5.5-1.2C4.5 8.5 7.5 8.6 10 8.5zm0 0c1.5-3 5.5-3.5 5.5-1.2 0 1.2-3 1.3-5.5 1.2z"
+        d={path}
         fill="none"
         stroke={color}
-        strokeWidth="1.5"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

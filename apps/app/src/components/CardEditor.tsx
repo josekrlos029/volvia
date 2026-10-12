@@ -103,6 +103,7 @@ function defaultBanner(
 }
 
 const PALETTES = [
+  { name: 'Volvia', background: '#1E3A8A', accent: '#FB923C', empty: '#3A56A6' },
   { name: 'Carbón', background: '#14171A', accent: '#E9A23B', empty: '#31363A' },
   { name: 'Bosque', background: '#123227', accent: '#7FD1A8', empty: '#2A4A3E' },
   { name: 'Vino', background: '#2A1216', accent: '#E9A23B', empty: '#472328' },
@@ -883,6 +884,7 @@ export function CardEditor({
           cardName={value.name}
           stampsRequired={value.stampsRequired}
           rewardPositions={rewardPositions}
+          rewards={value.rewards}
           initialStamps={value.initialStamps}
           message={previewMessage}
         />

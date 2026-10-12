@@ -12,7 +12,7 @@ test.describe('phone surfaces', () => {
     const customer = await joinCard(request, card.joinSlug)
 
     await page.goto(`${urls.pass}/c/${customer.token}`)
-    await expect(page.getByText('0 / 4')).toBeVisible()
+    await expect(page.getByText('0/4')).toBeVisible()
 
     // Nothing may overflow horizontally on a phone.
     const overflows = await page.evaluate(

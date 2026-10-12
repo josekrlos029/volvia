@@ -35,10 +35,10 @@ export default async function NewCardPage() {
           name: '',
           stampsRequired: 8,
           design: {
-            backgroundColor: '#14171A',
+            backgroundColor: '#1E3A8A',
             foregroundColor: '#FFFFFF',
-            accentColor: '#E9A23B',
-            emptyStampColor: '#31363A',
+            accentColor: '#FB923C',
+            emptyStampColor: '#3A56A6',
             stampStyle: 'circle',
             banner: { kind: 'solid' },
             bannerPattern: 'none',

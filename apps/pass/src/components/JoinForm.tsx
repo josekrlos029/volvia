@@ -2,6 +2,7 @@
 
 import { browserApiUrl } from '@/lib/api'
 import { t } from '@/lib/i18n'
+import { readableOn } from '@volvia/shared'
 import { ApiError } from '@volvia/shared/client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -255,9 +256,9 @@ export function JoinForm({
       <button
         type="submit"
         disabled={submitting}
-        style={{ background: accentColor }}
+        style={{ background: accentColor, color: readableOn(accentColor, ['#0F172A', '#FFFFFF']) }}
         className={[
-          'w-full rounded-[10px] px-4 py-3.5 text-[16px] font-semibold text-[#14171A]',
+          'w-full rounded-[10px] px-4 py-3.5 text-[16px] font-semibold',
           'transition-transform duration-150 active:scale-[0.985]',
           'disabled:cursor-progress disabled:opacity-70',
         ].join(' ')}

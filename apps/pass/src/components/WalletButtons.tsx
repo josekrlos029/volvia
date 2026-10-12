@@ -7,15 +7,18 @@ interface WalletButtonsProps {
   appleUrl: string | null
   googleUrl: string | null
   locale: string
+  /** Pinned to the bottom of the screen, clear of the home indicator. */
+  sticky?: boolean
 }
 
 /**
  * Wallet buttons, ordered by platform.
  *
  * An iPhone user should not have to read past a Google button to find theirs, so the
- * matching platform is shown first and the other stays available but secondary.
+ * matching platform is shown first and the other stays available but secondary. Pinned
+ * to the bottom, only the matching one shows: a bar of two buttons covers too much card.
  */
-export function WalletButtons({ appleUrl, googleUrl, locale }: WalletButtonsProps) {
+export function WalletButtons({ appleUrl, googleUrl, locale, sticky = false }: WalletButtonsProps) {
   const copy = t(locale)
   const [platform, setPlatform] = useState<'apple' | 'google' | 'unknown'>('unknown')
 
@@ -51,7 +54,20 @@ export function WalletButtons({ appleUrl, googleUrl, locale }: WalletButtonsProp
 
   const ordered = platform === 'google' ? [google, apple] : [apple, google]
 
-  return <div className="flex flex-col gap-2.5">{ordered.filter(Boolean)}</div>
+  if (!sticky) return <div className="flex flex-col gap-2.5">{ordered.filter(Boolean)}</div>
+
+  const shown =
+    platform === 'apple' && apple ? [apple] : platform === 'google' && google ? [google] : ordered
+
+  return (
+    <>
+      {/* Room at the end of the page so the bar never covers the last section. */}
+      <div aria-hidden="true" className={shown.filter(Boolean).length > 1 ? 'h-36' : 'h-20'} />
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-line)] bg-[var(--color-surface-muted)]/90 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 backdrop-blur-md">
+        <div className="mx-auto flex max-w-md flex-col gap-2">{shown.filter(Boolean)}</div>
+      </div>
+    </>
+  )
 }
 
 function AppleGlyph() {

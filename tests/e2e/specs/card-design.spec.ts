@@ -24,7 +24,7 @@ test.describe('a card that starts with a head start', () => {
     const customer = await joinCard(request, card.joinSlug)
 
     await page.goto(`${urls.pass}/c/${customer.token}`)
-    await expect(page.getByText('2 / 6')).toBeVisible()
+    await expect(page.getByText('2/6')).toBeVisible()
   })
 
   test('never hands over the reward itself', async ({ request }) => {

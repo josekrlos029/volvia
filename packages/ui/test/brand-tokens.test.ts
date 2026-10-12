@@ -19,6 +19,8 @@ describe('brand tokens', () => {
     ['color-primary', brand.colors.primary],
     ['color-primary-hover', brand.colors.primaryHover],
     ['color-primary-soft', brand.colors.primarySoft],
+    ['color-secondary', brand.colors.secondary],
+    ['color-secondary-soft', brand.colors.secondarySoft],
     ['color-accent', brand.colors.accent],
     ['color-accent-soft', brand.colors.accentSoft],
     ['color-ink', brand.colors.ink],

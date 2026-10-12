@@ -1,22 +1,27 @@
 /* Volvia design tokens. Values mirror `src/brand.ts` — a unit test fails if they drift. */
 @import "tailwindcss";
 
+/* The shared components live in a workspace package Tailwind would not otherwise scan. */
+@source "../components";
+
 @theme {
-  --color-primary: #16624a;
-  --color-primary-hover: #114f3b;
-  --color-primary-soft: #e7f1ed;
-  --color-accent: #e9a23b;
-  --color-accent-soft: #fbf1e0;
-  --color-ink: #10120f;
-  --color-ink-muted: #565b57;
-  --color-line: #e2e6e2;
+  --color-primary: #1e3a8a;
+  --color-primary-hover: #172e6e;
+  --color-primary-soft: #eaeffb;
+  --color-secondary: #7c3aed;
+  --color-secondary-soft: #f3edfd;
+  --color-accent: #fb923c;
+  --color-accent-soft: #fff1e5;
+  --color-ink: #0f172a;
+  --color-ink-muted: #475569;
+  --color-line: #e2e8f0;
   --color-surface: #ffffff;
-  --color-surface-muted: #f6f8f6;
-  --color-inverse-surface: #14171a;
-  --color-success: #166b45;
-  --color-warning: #9a6206;
+  --color-surface-muted: #f8fafc;
+  --color-inverse-surface: #0f172a;
+  --color-success: #15803d;
+  --color-warning: #9a4a06;
   --color-danger: #b3261e;
-  --color-info: #175e9e;
+  --color-info: #1d4ed8;
 
   --radius-sm: 6px;
   --radius-md: 10px;

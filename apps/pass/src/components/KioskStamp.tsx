@@ -109,7 +109,7 @@ export function KioskStamp({ nonce }: { nonce: string }) {
         ) : null}
 
         <a
-          href={`/c/${cardToken}`}
+          href={`/c/${cardToken}?stamped=1`}
           className="mt-6 rounded-[10px] bg-[var(--color-primary)] px-5 py-3 text-[16px] font-semibold text-white"
         >
           Ver mi tarjeta

@@ -1,10 +1,10 @@
 /**
  * Volvia brand tokens — the single place the brand is defined.
  *
- * PLACEHOLDER PALETTE: the real assets and colours arrive in a later session.
- * Swapping them means editing this file and `styles/theme.css` (a test keeps the
- * two in sync), nothing else. Everything downstream — the marketing site, the
- * dashboard, the customer card, wallet passes and OG images — reads from here.
+ * The palette is the one in `/assets`: navy, violet and orange on an off-white ground.
+ * Changing it means editing this file and `styles/theme.css` (a test keeps the two in
+ * sync), nothing else. Everything downstream — the dashboard, the customer card, wallet
+ * passes and OG images — reads from here; the marketing site layers its own skin on top.
  */
 
 export const brand = {
@@ -18,35 +18,34 @@ export const brand = {
   supportEmail: 'hola@somosvolvia.com',
 
   colors: {
-    /**
-     * Primary: a deep green rather than the SaaS-default violet. Volvia is about
-     * customers coming back, and green reads as growth and steadiness to a shop
-     * owner in a way that a tech-purple does not.
-     */
-    primary: '#16624A',
-    primaryHover: '#114F3B',
-    primarySoft: '#E7F1ED',
-    /** Accent: the stamp itself. Warm gold, because a stamp should feel earned. */
-    accent: '#E9A23B',
-    accentSoft: '#FBF1E0',
-    ink: '#10120F',
-    inkMuted: '#565B57',
-    line: '#E2E6E2',
+    /** Primary: the navy of the Volvia mark. Buttons, links, focus rings. */
+    primary: '#1E3A8A',
+    primaryHover: '#172E6E',
+    primarySoft: '#EAEFFB',
+    /** Secondary: the violet of the mark, for highlights that are not actions. */
+    secondary: '#7C3AED',
+    secondarySoft: '#F3EDFD',
+    /** Accent: the stamp itself. Orange, because a stamp should feel earned. */
+    accent: '#FB923C',
+    accentSoft: '#FFF1E5',
+    ink: '#0F172A',
+    inkMuted: '#475569',
+    line: '#E2E8F0',
     surface: '#FFFFFF',
-    surfaceMuted: '#F6F8F6',
-    inverseSurface: '#14171A',
-    success: '#166B45',
-    warning: '#9A6206',
+    surfaceMuted: '#F8FAFC',
+    inverseSurface: '#0F172A',
+    success: '#15803D',
+    warning: '#9A4A06',
     danger: '#B3261E',
-    info: '#175E9E',
+    info: '#1D4ED8',
   },
 
   /** Defaults applied to a brand-new stamp card before the business customises it. */
   cardDefaults: {
-    backgroundColor: '#14171A',
+    backgroundColor: '#1E3A8A',
     foregroundColor: '#FFFFFF',
-    accentColor: '#E9A23B',
-    emptyStampColor: '#31363A',
+    accentColor: '#FB923C',
+    emptyStampColor: '#3A56A6',
   },
 
   radius: { sm: '6px', md: '10px', lg: '16px', xl: '24px', full: '9999px' },

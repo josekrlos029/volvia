@@ -52,6 +52,7 @@ export const copy = {
       offerTitle: 'Promoción activa',
       complete: 'Tarjeta completa',
       cycle: (n: number) => `Vuelta ${n + 1}`,
+      stamped: '¡Sello sumado!',
     },
     survey: {
       title: 'Cuéntanos cómo nos fue',
@@ -173,6 +174,7 @@ export const copy = {
       offerTitle: 'Running offer',
       complete: 'Card complete',
       cycle: (n: number) => `Round ${n + 1}`,
+      stamped: 'Stamp added!',
     },
     survey: {
       title: 'Tell us how it went',
