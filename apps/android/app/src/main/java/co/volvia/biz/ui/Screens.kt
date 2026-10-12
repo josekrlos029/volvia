@@ -212,6 +212,10 @@ fun ScanOutcomeCard(
     onRedeem: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    outcome.card?.let { card ->
+        BrandedOutcomeCard(outcome, card, onRedeem, onDismiss)
+        return
+    }
     val colors = MaterialTheme.colorScheme
     Surface(
         shape = RoundedCornerShape(18.dp),

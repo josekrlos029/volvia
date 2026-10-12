@@ -244,6 +244,9 @@ function SuccessCard({ result }: { result: StampResult }) {
   if (!design) return <PlainSuccessCard result={result} />
 
   const onAccent = readableOn(design.accentColor, [design.backgroundColor, design.foregroundColor])
+  // Completing the card starts a new cycle at 0 on the server; an empty grid next to
+  // "¡Recompensa completada!" reads like the stamp was lost, so show it full.
+  const shown = hasReward && result.stampsCount === 0 ? result.stampsRequired : result.stampsCount
 
   // In the business's own colours, so the person at the counter sees at a glance that
   // the stamp landed on the right card.
@@ -278,7 +281,7 @@ function SuccessCard({ result }: { result: StampResult }) {
           </p>
         </div>
         <ProgressRing
-          filled={result.stampsCount}
+          filled={shown}
           total={result.stampsRequired}
           color={design.accentColor}
           track={hexWithAlpha(design.foregroundColor, 0.18)}
@@ -288,7 +291,7 @@ function SuccessCard({ result }: { result: StampResult }) {
       <div className="px-4 pb-4">
         <StampGrid
           dense
-          filled={result.stampsCount}
+          filled={shown}
           total={result.stampsRequired}
           rewardPositions={design.rewardPositions}
           backgroundColor={design.backgroundColor}
@@ -302,8 +305,7 @@ function SuccessCard({ result }: { result: StampResult }) {
 
         {!hasReward && design.nextReward ? (
           <p className="mt-3 text-[14px] opacity-85">
-            Le faltan {design.nextReward.atStamp - result.stampsCount} para{' '}
-            {design.nextReward.title}
+            Le faltan {design.nextReward.atStamp - shown} para {design.nextReward.title}
           </p>
         ) : null}
 

@@ -94,7 +94,20 @@ enum SimulatorFixtures {
             unlockedRewards: unlocked,
             pendingRewards: pending,
             customer: StampCustomer(id: "sim-customer", firstName: "Camila", isNew: false),
-            replayed: false
+            replayed: false,
+            design: StampResultDesign(
+                businessName: "Café Raíces",
+                cardName: "Club Raíces",
+                logoUrl: nil,
+                backgroundColor: "#2B1D14",
+                foregroundColor: "#FFFFFF",
+                accentColor: "#D9A35F",
+                emptyStampColor: "#4A3A2E",
+                stampStyle: "circle",
+                stampIcon: StampIcon(kind: "preset", value: "coffee"),
+                rewardPositions: [8],
+                nextReward: unlocked.isEmpty ? NextReward(atStamp: 8, title: "Café gratis") : nil
+            )
         )
     }
 }

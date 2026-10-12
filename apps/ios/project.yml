@@ -14,8 +14,8 @@ settings:
     # provisioning profile on the first archive; nothing is checked in.
     DEVELOPMENT_TEAM: V69VG5K7D8
     # Bump these per release. CURRENT_PROJECT_VERSION must grow with every upload.
-    MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "1.1"
+    CURRENT_PROJECT_VERSION: "2"
     # Google Sign-In. The client ID of type "iOS" for bundle co.volvia.biz from Google
     # Cloud → Credentials, and the same ID reversed (com.googleusercontent.apps.123-abc)
     # as the URL scheme Google redirects back to. Empty hides the Google button.

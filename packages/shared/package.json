@@ -11,7 +11,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "native-icons": "tsx scripts/native-stamp-icons.ts"
   },
   "dependencies": {
     "zod": "^3.24.1"

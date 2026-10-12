@@ -16,21 +16,20 @@ data class ScanOutcomeUi(
     val rewardCode: String? = null,
     /** Unlocked now (prominent) versus earned earlier and still waiting (secondary). */
     val rewardIsNew: Boolean = false,
+    /** The card's own look; null for a queued scan, a refusal, or an old replayed result. */
+    val card: CardLook? = null,
 ) {
     companion object {
         fun stamped(result: StampResult): ScanOutcomeUi {
             val unlocked = result.unlockedRewards.firstOrNull()
             val waiting = result.pendingRewards.firstOrNull()
+            // Completing the card starts a new cycle at 0 on the server; "0 de 10" next to
+            // "¡Ganó…!" reads like the stamp was lost, so show the full card instead.
+            val shown = if (unlocked != null && result.stampsCount == 0) result.stampsRequired else result.stampsCount
 
             return ScanOutcomeUi(
                 title = result.customer.firstName,
-                // Completing the card starts a new cycle at 0 on the server; "0 de 10" next to
-                // "¡Ganó…!" reads like the stamp was lost, so show the full card instead.
-                body = if (unlocked != null && result.stampsCount == 0) {
-                    "${result.stampsRequired} de ${result.stampsRequired} sellos"
-                } else {
-                    "${result.stampsCount} de ${result.stampsRequired} sellos"
-                },
+                body = "$shown de ${result.stampsRequired} sellos",
                 rewardGrantId = unlocked?.grantId ?: waiting?.grantId,
                 rewardTitle = when {
                     unlocked != null -> "¡Ganó ${unlocked.title}!"
@@ -39,6 +38,7 @@ data class ScanOutcomeUi(
                 },
                 rewardCode = unlocked?.code,
                 rewardIsNew = unlocked != null,
+                card = result.design?.let { CardLook.from(it, shown, result.stampsRequired, unlocked != null) },
             )
         }
 
@@ -48,5 +48,69 @@ data class ScanOutcomeUi(
         )
 
         fun failed(message: String) = ScanOutcomeUi(title = "No se pudo sellar", body = message)
+    }
+}
+
+/**
+ * The stamped card, in the business's colours, ready to draw.
+ *
+ * Colours are already resolved to ARGB and the mark colours chosen by contrast, so the
+ * composable only paints and the decisions stay testable here.
+ */
+data class CardLook(
+    val businessName: String,
+    val cardName: String,
+    val logoUrl: String?,
+    val background: Long,
+    val foreground: Long,
+    val accent: Long,
+    val empty: Long,
+    /** The mark inside a filled slot, and text on the accent. */
+    val onAccent: Long,
+    val stampStyle: String,
+    /** A preset glyph name (`coffee`, `ice-cream`…), or null when the card uses an emoji or picture. */
+    val glyph: String?,
+    val emoji: String?,
+    val imageUrl: String?,
+    val filled: Int,
+    val total: Int,
+    val rewardPositions: List<Int>,
+    /** "Le faltan 3 para Café gratis"; null once the scan unlocked something. */
+    val remainingLine: String?,
+) {
+    /** Columns that fill every row, the same choice as the web grid. */
+    val columns: Int
+        get() = if (total <= 6) total else listOf(6, 5, 4, 3).firstOrNull { total % it == 0 } ?: 5
+
+    companion object {
+        fun from(design: StampResultDesign, filled: Int, total: Int, unlocked: Boolean): CardLook {
+            val background = CardColors.argb(design.backgroundColor)
+            val foreground = CardColors.argb(design.foregroundColor)
+            val accent = CardColors.argb(design.accentColor)
+            val next = design.nextReward
+            val remaining = next?.let { it.atStamp - filled }
+            return CardLook(
+                businessName = design.businessName,
+                cardName = design.cardName,
+                logoUrl = design.logoUrl,
+                background = background,
+                foreground = foreground,
+                accent = accent,
+                empty = CardColors.argb(design.emptyStampColor),
+                onAccent = CardColors.readableOn(accent, listOf(background, foreground)),
+                stampStyle = design.stampStyle,
+                glyph = design.stampIcon.value.takeIf { design.stampIcon.kind == "preset" },
+                emoji = design.stampIcon.value.takeIf { design.stampIcon.kind == "emoji" },
+                imageUrl = design.stampIcon.value.takeIf { design.stampIcon.kind == "image" },
+                filled = filled,
+                total = total,
+                rewardPositions = design.rewardPositions,
+                remainingLine = if (!unlocked && next != null && remaining != null && remaining > 0) {
+                    "Le ${if (remaining == 1) "falta 1" else "faltan $remaining"} para ${next.title}"
+                } else {
+                    null
+                },
+            )
+        }
     }
 }

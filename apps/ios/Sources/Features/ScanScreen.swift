@@ -80,6 +80,15 @@ struct ScanOutcomeCard: View {
     let onDismiss: () -> Void
 
     var body: some View {
+        if case .stamped(let result) = outcome, let look = CardLook(result) {
+            BrandedOutcomeCard(result: result, look: look, onDismiss: onDismiss)
+        } else {
+            plain
+        }
+    }
+
+    /// Queued, refused, or a replay of a scan from before the API sent the card's look.
+    private var plain: some View {
         VStack(alignment: .leading, spacing: 12) {
             switch outcome {
             case .stamped(let result):

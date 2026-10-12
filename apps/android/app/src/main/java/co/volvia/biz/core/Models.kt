@@ -58,6 +58,31 @@ data class StampResult(
     val pendingRewards: List<PendingReward> = emptyList(),
     val customer: StampCustomer,
     val replayed: Boolean = false,
+    /** Absent on a replay of a scan the server recorded before it sent the card's look. */
+    val design: StampResultDesign? = null,
+)
+
+/** A stamp glyph: one of the presets, an emoji, or an uploaded picture's URL. */
+@Serializable
+data class StampIcon(val kind: String, val value: String)
+
+@Serializable
+data class NextReward(val atStamp: Int, val title: String)
+
+/** How the stamped card looks, so the result can be shown in the business's colours. */
+@Serializable
+data class StampResultDesign(
+    val businessName: String,
+    val cardName: String,
+    val logoUrl: String? = null,
+    val backgroundColor: String,
+    val foregroundColor: String,
+    val accentColor: String,
+    val emptyStampColor: String,
+    val stampStyle: String = "circle",
+    val stampIcon: StampIcon = StampIcon("preset", "star"),
+    val rewardPositions: List<Int> = emptyList(),
+    val nextReward: NextReward? = null,
 )
 
 @Serializable

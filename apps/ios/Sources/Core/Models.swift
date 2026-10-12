@@ -57,6 +57,34 @@ struct StampResult: Codable, Sendable, Hashable {
     let pendingRewards: [PendingReward]
     let customer: StampCustomer
     let replayed: Bool
+    /// Absent on a replay of a scan the server recorded before it sent the card's look.
+    var design: StampResultDesign? = nil
+}
+
+/// A stamp glyph: one of the presets, an emoji, or an uploaded picture's URL.
+struct StampIcon: Codable, Sendable, Hashable {
+    let kind: String
+    let value: String
+}
+
+struct NextReward: Codable, Sendable, Hashable {
+    let atStamp: Int
+    let title: String
+}
+
+/// How the stamped card looks, so the result can be shown in the business's colours.
+struct StampResultDesign: Codable, Sendable, Hashable {
+    let businessName: String
+    let cardName: String
+    let logoUrl: String?
+    let backgroundColor: String
+    let foregroundColor: String
+    let accentColor: String
+    let emptyStampColor: String
+    let stampStyle: String
+    let stampIcon: StampIcon
+    let rewardPositions: [Int]
+    let nextReward: NextReward?
 }
 
 struct RedeemResult: Codable, Sendable, Hashable {
