@@ -19,8 +19,8 @@ settings:
     # Google Sign-In. The client ID of type "iOS" for bundle co.volvia.biz from Google
     # Cloud → Credentials, and the same ID reversed (com.googleusercontent.apps.123-abc)
     # as the URL scheme Google redirects back to. Empty hides the Google button.
-    GOOGLE_IOS_CLIENT_ID: ""
-    GOOGLE_IOS_URL_SCHEME: ""
+    GOOGLE_IOS_CLIENT_ID: "298986937091-m5fgucjafh0kqvgtr0v0ife6t6qkorvh.apps.googleusercontent.com"
+    GOOGLE_IOS_URL_SCHEME: "com.googleusercontent.apps.298986937091-m5fgucjafh0kqvgtr0v0ife6t6qkorvh"
   configs:
     Debug:
       # The simulator reaches the Mac as localhost. Override per run with the
