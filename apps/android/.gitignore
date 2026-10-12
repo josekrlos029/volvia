@@ -4,3 +4,8 @@ build/
 app/build/
 *.iml
 .idea/
+
+# Signing: the upload key never goes in git.
+*.jks
+*.keystore
+keystore.properties

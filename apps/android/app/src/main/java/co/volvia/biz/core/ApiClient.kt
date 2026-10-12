@@ -25,7 +25,7 @@ interface TokenSource {
 }
 
 /**
- * The four endpoints this app needs, and nothing else.
+ * The endpoints this app needs, and nothing else.
  *
  * One silent token refresh per request, exactly like the web client: a staff member in
  * the middle of a queue should never be asked to sign in again because an access token
@@ -43,6 +43,14 @@ class ApiClient(
         post(
             "/v1/auth/login",
             json.encodeToString(LoginRequest(email, password)),
+            authenticated = false,
+        ).let { json.decodeFromString(it) }
+
+    /** A Google ID token from Credential Manager. Never creates an account (`allowSignup: false`). */
+    suspend fun logInWithGoogle(idToken: String): TokenPair =
+        post(
+            "/v1/auth/google/native",
+            json.encodeToString(GoogleLoginRequest(idToken)),
             authenticated = false,
         ).let { json.decodeFromString(it) }
 

@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="launcher_background">#16624A</color>
+    <!-- The real Volvia palette, same as the iOS app (apps/ios/store/lib.mjs). -->
+    <color name="volvia_navy">#1E3A8A</color>
+    <color name="volvia_violet">#7C3AED</color>
+    <color name="volvia_orange">#FB923C</color>
+    <color name="volvia_off_white">#F8FAFC</color>
+    <color name="volvia_ink">#0F172A</color>
+    <color name="window_background">@color/volvia_off_white</color>
 </resources>

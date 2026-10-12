@@ -12,6 +12,10 @@ data class ScanOutcomeUi(
     val body: String,
     val rewardGrantId: String? = null,
     val rewardTitle: String? = null,
+    /** Shown under a reward unlocked by this very scan, so staff can match it on the till. */
+    val rewardCode: String? = null,
+    /** Unlocked now (prominent) versus earned earlier and still waiting (secondary). */
+    val rewardIsNew: Boolean = false,
 ) {
     companion object {
         fun stamped(result: StampResult): ScanOutcomeUi {
@@ -20,13 +24,21 @@ data class ScanOutcomeUi(
 
             return ScanOutcomeUi(
                 title = result.customer.firstName,
-                body = "${result.stampsCount} de ${result.stampsRequired} sellos",
+                // Completing the card starts a new cycle at 0 on the server; "0 de 10" next to
+                // "¡Ganó…!" reads like the stamp was lost, so show the full card instead.
+                body = if (unlocked != null && result.stampsCount == 0) {
+                    "${result.stampsRequired} de ${result.stampsRequired} sellos"
+                } else {
+                    "${result.stampsCount} de ${result.stampsRequired} sellos"
+                },
                 rewardGrantId = unlocked?.grantId ?: waiting?.grantId,
                 rewardTitle = when {
                     unlocked != null -> "¡Ganó ${unlocked.title}!"
                     waiting != null -> "Tiene ${waiting.title} sin recoger"
                     else -> null
                 },
+                rewardCode = unlocked?.code,
+                rewardIsNew = unlocked != null,
             )
         }
 

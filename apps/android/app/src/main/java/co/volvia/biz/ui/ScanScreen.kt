@@ -1,7 +1,12 @@
 package co.volvia.biz.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -9,65 +14,177 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import co.volvia.biz.core.ScanOutcomeUi
 import java.util.concurrent.Executors
 
+/**
+ * Debug builds only: a photo of a counter instead of the camera, for store screenshots on
+ * the emulator (whose camera is a virtual living room). The image ships only in
+ * src/debug, so release builds can't show it even if the flag were set.
+ */
+object DebugCamera {
+    var simulated by mutableStateOf(false)
+}
+
 /** The screen the app lives on. */
 @Composable
-fun ScanScreen(
-    state: UiState,
-    onScan: (String) -> Unit,
-    onRedeem: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onSignOut: () -> Unit,
-) {
+fun ScanScreen(state: UiState, model: AppViewModel) {
     val context = LocalContext.current
-    var hasCamera by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED,
-        )
-    }
+    fun granted() = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+        PackageManager.PERMISSION_GRANTED
+
+    var hasCamera by remember { mutableStateOf(granted()) }
+    var asked by remember { mutableStateOf(false) }
+    var showAccount by remember { mutableStateOf(false) }
 
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         hasCamera = it
+        asked = true
     }
 
     LaunchedEffect(Unit) {
         if (!hasCamera) request.launch(Manifest.permission.CAMERA)
     }
 
-    Box(Modifier.fillMaxSize()) {
-        if (hasCamera) {
-            CameraPreview(onCode = onScan, modifier = Modifier.fillMaxSize())
+    // The header is always dark over the camera: white status bar icons, whatever the theme.
+    val view = androidx.compose.ui.platform.LocalView.current
+    DisposableEffect(view) {
+        val window = (view.context as? android.app.Activity)?.window
+        val controller = window?.let { androidx.core.view.WindowCompat.getInsetsController(it, view) }
+        val previous = controller?.isAppearanceLightStatusBars
+        controller?.isAppearanceLightStatusBars = false
+        onDispose { previous?.let { controller.isAppearanceLightStatusBars = it } }
+    }
+
+    // Coming back from Settings with the permission granted should just work.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { hasCamera = granted() }
+
+    // A short tick on every accepted read, like iOS (system sound 1057): at a noisy counter
+    // it is how staff know the phone saw the card before the card is pulled away.
+    val tone = remember { runCatching { ToneGenerator(AudioManager.STREAM_SYSTEM, 60) }.getOrNull() }
+    DisposableEffect(Unit) { onDispose { tone?.release() } }
+
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        val simulatedPhoto = remember {
+            if (co.volvia.biz.BuildConfig.DEBUG) {
+                context.resources.getIdentifier("sim_camera", "drawable", context.packageName)
+            } else {
+                0
+            }
+        }
+        if (DebugCamera.simulated && simulatedPhoto != 0) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(simulatedPhoto),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (hasCamera) {
+            CameraPreview(
+                onCode = { code ->
+                    tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 70)
+                    model.handleScan(code)
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (asked) {
+            CameraDenied(Modifier.align(Alignment.Center))
         }
 
         Column(Modifier.fillMaxSize()) {
-            ScanHeader(state.businessName, state.pendingCount, onAccount = onSignOut)
+            ScanHeader(state.businessName, state.pendingCount, onAccount = { showAccount = true })
             Spacer(Modifier.weight(1f))
 
-            val outcome = state.outcome
-            if (outcome != null) {
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 24.dp)) {
-                    ScanOutcomeCard(outcome.toUi(), onRedeem = onRedeem, onDismiss = onDismiss)
+            // Keep the last outcome around while the card animates out.
+            var shown by remember { mutableStateOf<ScanOutcome?>(null) }
+            if (state.outcome != null) shown = state.outcome
+
+            AnimatedVisibility(
+                visible = state.outcome != null,
+                enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
+                exit = slideOutVertically(tween(220)) { it } + fadeOut(tween(220)),
+            ) {
+                shown?.let { outcome ->
+                    Box(
+                        Modifier
+                            .navigationBarsPadding()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                    ) {
+                        ScanOutcomeCard(
+                            outcome.toUi(),
+                            kind = outcome.kind(),
+                            onRedeem = model::redeem,
+                            onDismiss = model::dismissOutcome,
+                        )
+                    }
                 }
-            } else {
+            }
+
+            if (state.outcome == null && hasCamera) {
                 AimFrame(
                     Modifier
                         .align(Alignment.CenterHorizontally)
+                        .navigationBarsPadding()
                         .padding(bottom = 90.dp),
                 )
             }
         }
+    }
+
+    if (showAccount) {
+        AccountSheet(state = state, model = model, onDismiss = { showAccount = false })
+    }
+}
+
+/** Without the camera the app cannot do its one job, so say why and where to fix it. */
+@Composable
+private fun CameraDenied(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    Column(
+        modifier = modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            "Volvia Biz usa la cámara para leer el código de la tarjeta de tus clientes y sumarles un sello.",
+            color = Color.White,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+        )
+        Button(
+            onClick = {
+                context.startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
+                )
+            },
+            shape = RoundedCornerShape(12.dp),
+        ) { Text("Permitir la cámara") }
     }
 }
 
@@ -75,6 +192,12 @@ private fun ScanOutcome.toUi(): ScanOutcomeUi = when (this) {
     is ScanOutcome.Stamped -> ScanOutcomeUi.stamped(result)
     ScanOutcome.Queued -> ScanOutcomeUi.queued()
     is ScanOutcome.Failed -> ScanOutcomeUi.failed(message)
+}
+
+private fun ScanOutcome.kind(): OutcomeKind = when (this) {
+    is ScanOutcome.Stamped -> OutcomeKind.Stamped
+    ScanOutcome.Queued -> OutcomeKind.Queued
+    is ScanOutcome.Failed -> OutcomeKind.Failed
 }
 
 /**
@@ -86,9 +209,9 @@ private fun ScanOutcome.toUi(): ScanOutcomeUi = when (this) {
  */
 @Composable
 private fun CameraPreview(onCode: (String) -> Unit, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val analyzer = remember { QrAnalyzer(onCode) }
+    val latestOnCode by rememberUpdatedState(onCode)
+    val analyzer = remember { QrAnalyzer(onCode = { latestOnCode(it) }) }
     val executor = remember { Executors.newSingleThreadExecutor() }
 
     DisposableEffect(Unit) {

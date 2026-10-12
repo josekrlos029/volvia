@@ -1,0 +1,1 @@
+First release: sign-in with email or Google, card scanner, reward hand-over and an offline stamp queue.

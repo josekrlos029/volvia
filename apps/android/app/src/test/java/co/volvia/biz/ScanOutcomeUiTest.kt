@@ -42,6 +42,16 @@ class ScanOutcomeUiTest {
         )
         assertEquals("g1", ui.rewardGrantId)
         assertTrue(ui.rewardTitle!!.contains("Café gratis"))
+        assertEquals("AB12", ui.rewardCode)
+        assertTrue(ui.rewardIsNew)
+    }
+
+    @Test
+    fun `shows a full card when the reward restarts the cycle`() {
+        val ui = ScanOutcomeUi.stamped(
+            result(unlocked = listOf(UnlockedReward("g1", "Café gratis", "", "AB12"))).copy(stampsCount = 0),
+        )
+        assertEquals("10 de 10 sellos", ui.body)
     }
 
     @Test
@@ -49,6 +59,8 @@ class ScanOutcomeUiTest {
         val ui = ScanOutcomeUi.stamped(result(waiting = listOf(PendingReward("g2", "Postre", "CD34"))))
         assertEquals("g2", ui.rewardGrantId)
         assertTrue(ui.rewardTitle!!.contains("sin recoger"))
+        assertNull(ui.rewardCode)
+        assertFalse(ui.rewardIsNew)
     }
 
     @Test

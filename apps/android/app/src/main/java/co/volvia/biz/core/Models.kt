@@ -74,6 +74,9 @@ data class RedeemResult(val grantId: String, val title: String)
 data class LoginRequest(val email: String, val password: String)
 
 @Serializable
+data class GoogleLoginRequest(val idToken: String)
+
+@Serializable
 data class StampRequest(
     val cardToken: String,
     val count: Int,

@@ -1,115 +1,258 @@
 package co.volvia.biz.ui
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import co.volvia.biz.R
 import co.volvia.biz.core.ScanOutcomeUi
+import co.volvia.biz.ui.theme.VolviaColors
+import kotlinx.coroutines.launch
 
-/** Signing in on a shared phone, at a counter, probably in a hurry. */
+private val FieldShape = RoundedCornerShape(9.dp)
+
+/**
+ * Signing in on a shared phone, at a counter, probably in a hurry. Same order as iOS
+ * (apps/ios/Sources/Features/LoginView.swift): Google first, then email and password.
+ * There is no Apple button: Android has no native Sign in with Apple.
+ */
 @Composable
-fun LoginScreen(state: UiState, onSignIn: (String, String) -> Unit) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+fun LoginScreen(state: UiState, model: AppViewModel) {
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val colors = MaterialTheme.colorScheme
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Spacer(Modifier.height(40.dp))
-        Text("Volvia Biz", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        Text(
-            "Entra para empezar a sellar",
-            fontSize = 26.sp,
-            fontWeight = FontWeight.SemiBold,
-            lineHeight = 30.sp,
-        )
+        Spacer(Modifier.height(24.dp))
 
-        Spacer(Modifier.height(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            VolviaMark()
+            Spacer(Modifier.height(8.dp))
+            Text("Volvia Biz", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.onBackground)
+            Text(
+                "Entra para empezar a sellar",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = 30.sp,
+                color = colors.onBackground,
+            )
+        }
 
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Correo") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth(),
-        )
+        if (state.googleAvailable) {
+            OutlinedButton(
+                onClick = {
+                    model.googleStarted()
+                    scope.launch {
+                        when (val result = requestGoogleIdToken(context, model.googleWebClientId)) {
+                            is GoogleSignInResult.Token -> model.signInWithGoogle(result.idToken)
+                            GoogleSignInResult.Cancelled -> model.googleCancelled()
+                            is GoogleSignInResult.Failed -> model.googleFailed(result.message)
+                        }
+                    }
+                },
+                enabled = !state.isWorking,
+                shape = FieldShape,
+                border = androidx.compose.foundation.BorderStroke(1.dp, colors.outline),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.onSurface),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) {
+                GoogleMark(Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("Entrar con Google", fontSize = 17.sp, fontWeight = FontWeight.Medium)
+            }
 
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Contraseña") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth(),
-        )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HorizontalDivider(Modifier.weight(1f), color = colors.outlineVariant)
+                Text("o", fontSize = 13.sp, color = colors.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp))
+                HorizontalDivider(Modifier.weight(1f), color = colors.outlineVariant)
+            }
+        }
+
+        LabeledField("Correo") {
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                singleLine = true,
+                shape = FieldShape,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        LabeledField("Contraseña") {
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                singleLine = true,
+                shape = FieldShape,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         state.signInError?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 14.sp)
+            Text(it, color = colors.error, fontSize = 14.sp)
         }
 
         Button(
-            onClick = { onSignIn(email.trim(), password) },
+            onClick = { model.signIn(email.trim(), password) },
             enabled = !state.isWorking && email.isNotBlank() && password.isNotBlank(),
+            shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth().height(50.dp),
         ) {
-            Text(if (state.isWorking) "Entrando" else "Entrar")
+            Text(if (state.isWorking) "Entrando" else "Entrar", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
 
         Text(
             "Usa el mismo correo con el que entras al panel de Volvia.",
             fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = colors.onSurfaceVariant,
         )
     }
 }
+
+@Composable
+private fun LabeledField(label: String, field: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
+        field()
+    }
+}
+
+/** The brand "V", white on a navy tile: the app icon, small. */
+@Composable
+fun VolviaMark(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(56.dp)
+            .background(VolviaColors.Navy, RoundedCornerShape(14.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_volvia_mark),
+            contentDescription = "Volvia",
+            modifier = Modifier.width(30.dp).offset(y = (-1).dp),
+        )
+    }
+}
+
+/**
+ * Google's four-colour "G", drawn rather than shipped as an image, like `GoogleMark` on
+ * iOS: four arcs and the bar.
+ */
+@Composable
+private fun GoogleMark(modifier: Modifier = Modifier) {
+    val blue = Color(0xFF4285F4)
+    val green = Color(0xFF34A853)
+    val yellow = Color(0xFFFBBC05)
+    val red = Color(0xFFEA4335)
+    Canvas(modifier) {
+        val stroke = size.width * 0.2f
+        val inset = stroke / 2
+        val arc = Size(size.width - stroke, size.height - stroke)
+        val topLeft = Offset(inset, inset)
+        val style = Stroke(width = stroke)
+        drawArc(red, startAngle = 200f, sweepAngle = 115f, useCenter = false, topLeft = topLeft, size = arc, style = style)
+        drawArc(yellow, startAngle = 145f, sweepAngle = 55f, useCenter = false, topLeft = topLeft, size = arc, style = style)
+        drawArc(green, startAngle = 45f, sweepAngle = 100f, useCenter = false, topLeft = topLeft, size = arc, style = style)
+        drawArc(blue, startAngle = 0f, sweepAngle = 45f, useCenter = false, topLeft = topLeft, size = arc, style = style)
+        drawRect(
+            blue,
+            topLeft = Offset(size.width / 2, size.height / 2 - stroke / 2),
+            size = Size(size.width / 2, stroke),
+        )
+    }
+}
+
+enum class OutcomeKind { Stamped, Queued, Failed }
 
 /** What happened, in the words a person would use, large enough to read at arm's length. */
 @Composable
 fun ScanOutcomeCard(
     outcome: ScanOutcomeUi,
+    kind: OutcomeKind,
     onRedeem: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val colors = MaterialTheme.colorScheme
     Surface(
         shape = RoundedCornerShape(18.dp),
-        tonalElevation = 3.dp,
+        color = colors.surface.copy(alpha = 0.96f),
+        shadowElevation = 8.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(outcome.title, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                outcome.body,
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(outcome.title, fontSize = if (kind == OutcomeKind.Failed) 22.sp else 24.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    outcome.body,
+                    fontSize = if (kind == OutcomeKind.Stamped) 17.sp else 15.sp,
+                    color = colors.onSurfaceVariant,
+                    style = TextStyle(fontFeatureSettings = "tnum"),
+                )
+            }
 
             outcome.rewardGrantId?.let { grantId ->
-                HorizontalDivider()
-                outcome.rewardTitle?.let {
-                    Text(it, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                HorizontalDivider(color = colors.outlineVariant)
+                if (outcome.rewardIsNew) {
+                    outcome.rewardTitle?.let { Text(it, fontSize = 18.sp, fontWeight = FontWeight.SemiBold) }
+                    outcome.rewardCode?.let {
+                        Text("Código $it", fontSize = 15.sp, color = colors.onSurfaceVariant)
+                    }
+                    Button(onClick = { onRedeem(grantId) }, shape = RoundedCornerShape(12.dp)) {
+                        Text("Entregar ahora")
+                    }
+                } else {
+                    outcome.rewardTitle?.let { Text(it, fontSize = 15.sp, fontWeight = FontWeight.Medium) }
+                    OutlinedButton(onClick = { onRedeem(grantId) }, shape = RoundedCornerShape(12.dp)) {
+                        Text("Entregar ahora")
+                    }
                 }
-                Button(onClick = { onRedeem(grantId) }) { Text("Entregar ahora") }
             }
 
             TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                Text("Siguiente cliente")
+                Text("Siguiente cliente", fontSize = 15.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
@@ -121,14 +264,20 @@ fun AimFrame(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Box(
             Modifier
                 .size(228.dp)
                 .border(3.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(22.dp)),
         )
-        Text("Apunta al código del cliente", color = Color.White, fontSize = 15.sp)
+        Text(
+            "Apunta al código del cliente",
+            color = Color.White,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            style = TextStyle(shadow = Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 8f)),
+        )
     }
 }
 
@@ -138,16 +287,22 @@ fun ScanHeader(businessName: String, pendingCount: Int, onAccount: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.Black.copy(alpha = 0.45f))
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .statusBarsPadding()
+            .padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(businessName, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             if (pendingCount > 0) {
                 // The only number worth showing here: stamps taken and not yet sent.
-                Text("$pendingCount por enviar", color = Color.White, fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(Icons.Outlined.Sync, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                    Text("$pendingCount por enviar", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
             }
         }
-        TextButton(onClick = onAccount) { Text("Cuenta", color = Color.White) }
+        IconButton(onClick = onAccount) {
+            Icon(Icons.Outlined.AccountCircle, contentDescription = "Cuenta", tint = Color.White, modifier = Modifier.size(28.dp))
+        }
     }
 }

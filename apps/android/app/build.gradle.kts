@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -18,11 +20,40 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Points at the laptop's API in debug; release builds take the real host.
-        buildConfigField("String", "API_URL", "\"http://10.0.2.2:8080\"")
+        // `-Pvolvia.apiUrl=http://10.0.2.2:8081` targets the isolated e2e stack instead.
+        val debugApiUrl = providers.gradleProperty("volvia.apiUrl").orElse("http://10.0.2.2:8080").get()
+        buildConfigField("String", "API_URL", "\"$debugApiUrl\"")
+
+        // The *web* OAuth client: Credential Manager asks Google for an ID token issued to
+        // it, and the API already accepts that audience (apps/api/src/modules/auth/google.ts).
+        // Empty hides the Google button, same as iOS with an empty GIDClientID.
+        val googleWebClientId = providers.gradleProperty("volvia.googleWebClientId").orElse("").get()
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+    }
+
+    // The Play upload key lives outside git: apps/android/keystore.properties points at it
+    // (see docs/PLAY-STORE.md). Without that file release builds come out unsigned.
+    val keystoreFile = rootProject.file("keystore.properties")
+    val uploadKey = if (keystoreFile.exists()) {
+        Properties().apply { keystoreFile.inputStream().use { load(it) } }
+    } else {
+        null
+    }
+
+    signingConfigs {
+        if (uploadKey != null) {
+            create("upload") {
+                storeFile = file(uploadKey.getProperty("storeFile"))
+                storePassword = uploadKey.getProperty("storePassword")
+                keyAlias = uploadKey.getProperty("keyAlias")
+                keyPassword = uploadKey.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("upload")
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "API_URL", "\"https://api.somosvolvia.com\"")
@@ -53,8 +84,10 @@ dependencies {
     implementation(composeBom)
 
     implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
@@ -72,6 +105,11 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    // "Entrar con Google": Credential Manager hands back a Google ID token for the API.
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     // Tokens on a shared counter phone never go to plain SharedPreferences.
     implementation("androidx.security:security-crypto:1.1.0-alpha06")

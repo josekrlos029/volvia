@@ -41,6 +41,18 @@ app arranca en ese estado con datos ficticios y sin tocar la red. Nada de eso se
 para un iPhone real. Ojo: el `.env` de la raíz apunta a producción; para probar contra una
 API local usa el stack aislado de [APP-STORE.md](APP-STORE.md) §2.
 
+En Android, el build debug puede apuntar al stack aislado en vez de a la API del `:8080`
+(que escribe en producción), y simular una lectura sin cámara:
+
+```bash
+cd apps/android && ./gradlew :app:installDebug -Pvolvia.apiUrl=http://10.0.2.2:8081
+adb shell am start --activity-single-top -n co.volvia.biz/.MainActivity \
+  --es scan https://tarjeta.somosvolvia.com/c/<token>
+```
+
+La lectura simulada solo existe en debug. El HTTP en claro también: el build debug lo
+permite hacia `10.0.2.2` y `localhost`, y el release solo habla HTTPS.
+
 ## Por qué el sello se guarda antes de enviarse
 
 El mostrador no se detiene cuando se cae el wifi. Un sello se escribe primero en la cola
@@ -71,7 +83,24 @@ claro que es una herramienta para el personal de un negocio, no para el público
 
 **Google.** Una cuenta de Play Console (25 USD, pago único). La app se firma con Play App
 Signing; la clave de subida se genera una vez y no se pierde nunca, porque sin ella no se
-puede publicar una actualización. Pendiente de documentar con el mismo detalle.
+puede publicar una actualización. El paso a paso y todas las respuestas de Play Console
+están en [PLAY-STORE.md](PLAY-STORE.md).
+
+Icono adaptable, icono temático, splash, el logo del login y los gráficos de la ficha
+(icono de 512 y gráfico destacado de 1024×500) salen de `apps/android/store/icon.mjs`,
+con la misma "V" y la misma paleta que iOS. Usa el `sharp` instalado en `apps/ios/store`.
+
+"Entrar con Google" en Android usa Credential Manager con el client ID *web*
+(`volvia.googleWebClientId` en `gradle.properties`), que la API ya acepta. Además, Google
+exige un cliente OAuth de tipo Android en el mismo proyecto de Google Cloud, con el
+paquete `co.volvia.biz` y la huella SHA-1 de cada clave que firme la app: la de debug de
+cada máquina, la de subida y la de Play App Signing (está en Play Console → Integridad
+de la app). Sin ese cliente el botón abre Google y falla. Android no tiene entrada con
+Apple.
+
+El cliente Android ya existe: `298986937091-5on8u3smkaadteb00h5i7koqmgao1dnb`. El código
+no lo usa; Google lo busca por paquete y huella. Cada huella nueva, como la de Play App
+Signing cuando la tengas, necesita su propio cliente Android en ese mismo proyecto.
 
 **Para las dos.** Política de privacidad publicada —ya existe, en `/es/privacidad`—, una
 ficha que explique que es una app de uso interno, y capturas de pantalla. La revisión
