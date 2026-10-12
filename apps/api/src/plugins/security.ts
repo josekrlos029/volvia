@@ -25,6 +25,10 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
       // Same-origin, curl and wallet devices send no Origin header.
       if (!origin) return callback(null, true)
       if (env.CORS_ORIGINS.includes(origin)) return callback(null, true)
+      // Sign in with Apple returns as a top-level form POST that carries Apple's origin.
+      // It is a navigation, not a fetch, so it needs no CORS headers; it must simply
+      // not be refused. `false` here means "no CORS headers", not "reject".
+      if (origin === 'https://appleid.apple.com') return callback(null, false)
       callback(new Error('origin not allowed'), false)
     },
     credentials: true,
