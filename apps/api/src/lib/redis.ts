@@ -26,6 +26,7 @@ export const redisKeys = {
   idempotency: (scope: string, key: string) => `idem:${scope}:${key}`,
   kioskNonce: (nonce: string) => `kiosk:nonce:${nonce}`,
   kioskSession: (sessionId: string) => `kiosk:sess:${sessionId}`,
+  kioskLastStamp: (sessionId: string) => `kiosk:last:${sessionId}`,
   cardState: (token: string) => `card:${token}`,
   orgOverview: (orgId: string, range: string) => `analytics:${orgId}:${range}`,
   businessPage: (slug: string) => `bizpage:${slug}`,

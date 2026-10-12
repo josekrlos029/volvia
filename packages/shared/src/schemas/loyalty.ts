@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { MAX_STAMPS_PER_SCAN } from '../constants'
+import { STAMP_STYLES, stampIconSchema } from './card'
 import { publicTokenSchema } from './common'
 import { surveyQuestionSchema } from './engagement'
 
@@ -31,6 +32,27 @@ export const stampSchema = z.object({
 })
 export type StampInput = z.infer<typeof stampSchema>
 
+/**
+ * How the stamped card looks, so the staff app can show the result in the business's
+ * own colours and the person at the counter sees at a glance it was the right card.
+ */
+export const stampResultDesignSchema = z.object({
+  businessName: z.string(),
+  cardName: z.string(),
+  logoUrl: z.string().nullable(),
+  backgroundColor: z.string(),
+  foregroundColor: z.string(),
+  accentColor: z.string(),
+  emptyStampColor: z.string(),
+  stampStyle: z.enum(STAMP_STYLES),
+  stampIcon: stampIconSchema,
+  /** Positions (1-based) that unlock a reward. */
+  rewardPositions: z.array(z.number().int()),
+  /** The reward the customer is now working towards, if any is left this round. */
+  nextReward: z.object({ atStamp: z.number().int(), title: z.string() }).nullable(),
+})
+export type StampResultDesign = z.infer<typeof stampResultDesignSchema>
+
 export const stampResultSchema = z.object({
   customerCardId: z.string().uuid(),
   stampsAdded: z.number().int(),
@@ -54,6 +76,8 @@ export const stampResultSchema = z.object({
   customer: z.object({ id: z.string().uuid(), firstName: z.string(), isNew: z.boolean() }),
   /** True when the request replayed a previously-applied idempotency key. */
   replayed: z.boolean(),
+  /** Absent on a replay of a scan recorded before this field existed. */
+  design: stampResultDesignSchema.optional(),
 })
 export type StampResult = z.infer<typeof stampResultSchema>
 

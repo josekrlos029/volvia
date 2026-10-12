@@ -91,6 +91,37 @@ export async function readKioskSession(
   return { orgId: parsed.orgId, cardId: parsed.cardId, locationId: parsed.locationId }
 }
 
+/** What the kiosk screen learns about the last stamp made through it: no customer data. */
+export interface KioskLastStamp {
+  at: number
+  rewardUnlocked: boolean
+}
+
+/**
+ * Remembered for a couple of minutes so the screen, polling, can flash "¡Sello sumado!"
+ * and swap the spent QR for a fresh one straight away instead of at the next rotation.
+ */
+export async function recordKioskStamp(
+  redis: RedisClient,
+  sessionId: string,
+  stamp: KioskLastStamp,
+): Promise<void> {
+  await redis.set(redisKeys.kioskLastStamp(sessionId), JSON.stringify(stamp), 'EX', 120)
+}
+
+export async function readKioskLastStamp(
+  redis: RedisClient,
+  sessionId: string,
+): Promise<KioskLastStamp | null> {
+  const raw = await redis.get(redisKeys.kioskLastStamp(sessionId))
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as KioskLastStamp
+  } catch {
+    return null
+  }
+}
+
 export async function closeKioskSession(redis: RedisClient, sessionId: string): Promise<void> {
-  await redis.del(redisKeys.kioskSession(sessionId))
+  await redis.del(redisKeys.kioskSession(sessionId), redisKeys.kioskLastStamp(sessionId))
 }

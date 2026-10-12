@@ -28,6 +28,7 @@ interface CardDetail {
 
 interface Org {
   name: string
+  logoUrl: string | null
   category: string
   entitlements: { features: Record<string, boolean> }
 }
@@ -87,8 +88,10 @@ export default async function CardDetailPage({ params }: { params: Promise<{ car
           <CardEditor
             cardId={card.id}
             businessName={org.name}
+            fallbackLogoUrl={org.logoUrl}
             category={org.category}
             canCustomiseBranding={org.entitlements.features.custom_branding ?? false}
+            canUploadStampIcon={org.entitlements.features.custom_stamp_icons ?? false}
             canUseKiosk={org.entitlements.features.kiosk_mode ?? false}
             profileQuestions={profileQuestions}
             lengthLocked={card.status === 'active' && holders > 0}

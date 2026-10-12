@@ -62,3 +62,32 @@
     }
   }
 }
+
+/* Shared by the card in every app: the customer page, the scanner, the kiosk. */
+@layer components {
+  /* A stamp landing should feel physical: a quick press, then settle. */
+  @keyframes stamp-land {
+    0% {
+      transform: scale(0.4) rotate(-14deg);
+      opacity: 0;
+    }
+    55% {
+      transform: scale(1.18) rotate(4deg);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1) rotate(0deg);
+      opacity: 1;
+    }
+  }
+
+  .stamp-land {
+    animation: stamp-land 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stamp-land {
+      animation: none;
+    }
+  }
+}

@@ -46,8 +46,28 @@
     animation: shimmer 1.4s infinite;
   }
 
+  /* The kiosk's "¡Sello sumado!": in fast, held, out. */
+  @keyframes kiosk-flash {
+    0% {
+      opacity: 0;
+      transform: scale(1.04);
+    }
+    12%,
+    80% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  .kiosk-flash {
+    animation: kiosk-flash 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .skeleton::after {
+    .skeleton::after,
+    .kiosk-flash {
       animation: none;
     }
   }

@@ -9,7 +9,10 @@ import {
   pendingScans,
   removeScan,
 } from '@/lib/scan-queue'
+import { type StampResultDesign, readableOn } from '@volvia/shared'
 import { ApiError } from '@volvia/shared/client'
+import { hexWithAlpha } from '@volvia/ui'
+import { StampGrid } from '@volvia/ui/components/StampGrid'
 import { BrowserQRCodeReader } from '@zxing/browser'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -21,6 +24,8 @@ interface StampResult {
   pendingRewards: Array<{ grantId: string; title: string; code: string }>
   customer: { firstName: string }
   replayed: boolean
+  /** Missing only on a replay of a scan recorded before the API sent it. */
+  design?: StampResultDesign
 }
 
 type Status =
@@ -235,12 +240,153 @@ export function Scanner() {
 
 function SuccessCard({ result }: { result: StampResult }) {
   const hasReward = result.unlockedRewards.length > 0
+  const design = result.design
+  if (!design) return <PlainSuccessCard result={result} />
+
+  const onAccent = readableOn(design.accentColor, [design.backgroundColor, design.foregroundColor])
+
+  // In the business's own colours, so the person at the counter sees at a glance that
+  // the stamp landed on the right card.
+  return (
+    <div
+      className="overflow-hidden rounded-[16px]"
+      style={{ background: design.backgroundColor, color: design.foregroundColor }}
+    >
+      <div className="flex items-center gap-3 p-4">
+        {design.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={design.logoUrl}
+            alt=""
+            className="h-10 w-10 shrink-0 rounded-full bg-white object-cover"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[15px] font-semibold"
+            style={{ background: design.accentColor, color: onAccent }}
+          >
+            {design.businessName.slice(0, 1).toUpperCase()}
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-medium uppercase tracking-[0.14em] opacity-70">
+            {design.cardName}
+          </p>
+          <p className="truncate text-[18px] font-semibold leading-tight">
+            {hasReward ? '¡Recompensa completada!' : 'Sello añadido'} · {result.customer.firstName}
+          </p>
+        </div>
+        <ProgressRing
+          filled={result.stampsCount}
+          total={result.stampsRequired}
+          color={design.accentColor}
+          track={hexWithAlpha(design.foregroundColor, 0.18)}
+        />
+      </div>
+
+      <div className="px-4 pb-4">
+        <StampGrid
+          dense
+          filled={result.stampsCount}
+          total={result.stampsRequired}
+          rewardPositions={design.rewardPositions}
+          backgroundColor={design.backgroundColor}
+          accentColor={design.accentColor}
+          emptyColor={design.emptyStampColor}
+          foregroundColor={design.foregroundColor}
+          stampStyle={design.stampStyle}
+          stampIcon={design.stampIcon}
+          animateLast
+        />
+
+        {!hasReward && design.nextReward ? (
+          <p className="mt-3 text-[14px] opacity-85">
+            Le faltan {design.nextReward.atStamp - result.stampsCount} para{' '}
+            {design.nextReward.title}
+          </p>
+        ) : null}
+
+        {hasReward ? (
+          <ul className="mt-3 flex flex-col gap-2">
+            {result.unlockedRewards.map((reward) => (
+              <li
+                key={reward.grantId}
+                className="rounded-[12px] p-3"
+                style={{ background: design.accentColor, color: onAccent }}
+              >
+                <p className="text-[15px] font-semibold">{reward.title}</p>
+                <p className="font-[family-name:var(--font-geist-mono)] mt-1 text-[20px] font-semibold tracking-[0.16em]">
+                  {reward.code}
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {!hasReward && result.pendingRewards.length > 0 ? (
+          <p className="mt-2 text-[14px] opacity-85">
+            Tiene {result.pendingRewards.length} recompensa
+            {result.pendingRewards.length === 1 ? '' : 's'} sin reclamar.
+          </p>
+        ) : null}
+
+        {result.replayed ? (
+          <p className="mt-2 text-[13px] opacity-75">Este escaneo ya se había registrado.</p>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/** How far through the card the customer is, as a ring with the count inside. */
+function ProgressRing({
+  filled,
+  total,
+  color,
+  track,
+}: {
+  filled: number
+  total: number
+  color: string
+  track: string
+}) {
+  const radius = 20
+  const circumference = 2 * Math.PI * radius
+  const fraction = total > 0 ? Math.min(1, filled / total) : 0
+
+  return (
+    <span className="relative grid h-14 w-14 shrink-0 place-items-center">
+      <svg viewBox="0 0 48 48" className="absolute inset-0 -rotate-90" aria-hidden="true">
+        <circle cx="24" cy="24" r={radius} fill="none" stroke={track} strokeWidth="4" />
+        <circle
+          cx="24"
+          cy="24"
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - fraction)}
+        />
+      </svg>
+      <span className="tabular text-[13px] font-semibold">
+        {filled}/{total}
+      </span>
+    </span>
+  )
+}
+
+/** The result without the card's look, for a replay of a scan from before it was sent. */
+function PlainSuccessCard({ result }: { result: StampResult }) {
+  const hasReward = result.unlockedRewards.length > 0
 
   return (
     <div
       className={[
         'rounded-[14px] p-4',
-        hasReward ? 'bg-[#E9A23B] text-[#14171A]' : 'bg-[#173D2E] text-[#C8EBD8]',
+        hasReward ? 'bg-[#FB923C] text-[#0F172A]' : 'bg-[#1E3A8A] text-white',
       ].join(' ')}
     >
       <p className="text-[18px] font-semibold leading-tight">
@@ -261,13 +407,6 @@ function SuccessCard({ result }: { result: StampResult }) {
             </li>
           ))}
         </ul>
-      ) : null}
-
-      {!hasReward && result.pendingRewards.length > 0 ? (
-        <p className="mt-2 text-[14px] opacity-85">
-          Tiene {result.pendingRewards.length} recompensa
-          {result.pendingRewards.length === 1 ? '' : 's'} sin reclamar.
-        </p>
       ) : null}
 
       {result.replayed ? (

@@ -39,7 +39,15 @@ test.describe('loyalty loop', () => {
       data: { cardToken: token, count: 1, idempotencyKey: idempotencyKey() },
     })
     expect(first.ok()).toBeTruthy()
-    expect((await first.json()).unlockedRewards).toHaveLength(0)
+    const firstBody = await first.json()
+    expect(firstBody.unlockedRewards).toHaveLength(0)
+    // The staff apps draw the result in the card's own look.
+    expect(firstBody.design).toMatchObject({
+      rewardPositions: [2, 4],
+      nextReward: { atStamp: 2, title: 'Postre gratis' },
+      stampIcon: { kind: 'preset' },
+    })
+    expect(firstBody.design.accentColor).toMatch(/^#[0-9A-Fa-f]{6}$/)
 
     // Stamp 2 crosses the intermediate reward.
     const second = await request.post(`${urls.api}/v1/stamp`, {
@@ -49,6 +57,7 @@ test.describe('loyalty loop', () => {
     const secondBody = await second.json()
     expect(secondBody.stampsCount).toBe(2)
     expect(secondBody.unlockedRewards[0].title).toBe('Postre gratis')
+    expect(secondBody.design.nextReward).toMatchObject({ atStamp: 4, title: 'Plato gratis' })
 
     // Stamps 3 and 4 complete the card, which resets and starts a new cycle.
     await request.post(`${urls.api}/v1/stamp`, {

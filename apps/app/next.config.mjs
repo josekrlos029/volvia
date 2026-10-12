@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@volvia/ui', '@volvia/shared'],
+  transpilePackages: ['@volvia/ui', '@volvia/shared', '@volvia/wallet'],
   images: {
     remotePatterns: [
       { protocol: 'http', hostname: 'localhost' },

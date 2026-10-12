@@ -15,6 +15,7 @@ import {
   stampCards,
   stampEvents,
 } from '@volvia/db'
+import { cardDesignSchema } from '@volvia/shared'
 import type { JoinCardInput, StampResult, StampSource } from '@volvia/shared'
 import { AppError } from '../../lib/errors'
 import { OUTBOX_KINDS, enqueue } from '../../lib/outbox'
@@ -500,6 +501,9 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
       )
       .orderBy(desc(rewardGrants.grantedAt))
 
+    const design = cardDesignSchema.parse(row.card.design ?? {})
+    const nextReward = cardRewards.find((reward) => reward.atStamp > crossing.finalCount) ?? null
+
     return {
       customerCardId: row.customerCard.id,
       stampsAdded: granted,
@@ -522,6 +526,19 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
         isNew: row.customerCard.lifetimeStamps === 0,
       },
       replayed: false,
+      design: {
+        businessName: row.org.name,
+        cardName: row.card.name,
+        logoUrl: design.logoUrl ?? row.org.logoUrl ?? null,
+        backgroundColor: design.backgroundColor,
+        foregroundColor: design.foregroundColor,
+        accentColor: design.accentColor,
+        emptyStampColor: design.emptyStampColor,
+        stampStyle: design.stampStyle,
+        stampIcon: design.stampIcon,
+        rewardPositions: cardRewards.map((reward) => reward.atStamp),
+        nextReward: nextReward ? { atStamp: nextReward.atStamp, title: nextReward.title } : null,
+      },
     }
   })
 }

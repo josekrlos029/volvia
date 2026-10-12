@@ -6,7 +6,10 @@ import {
   type CardMessages,
   MAX_CARD_MESSAGE_VARIANTS,
   MAX_INITIAL_STAMPS,
+  STAMP_ICON_PATHS,
+  STAMP_PRESETS,
   STAMP_STYLES,
+  type StampPreset,
   pickCardMessage,
 } from '@volvia/shared'
 import { ApiError } from '@volvia/shared/client'
@@ -16,6 +19,7 @@ import { useMemo, useState } from 'react'
 import { CardPreview, type PreviewDesign } from './CardPreview'
 import { ImageUpload } from './ImageUpload'
 import { type ProfileQuestion, SignupFormEditor } from './SignupFormEditor'
+import { WalletPreview } from './WalletPreview'
 import { buttonClass } from './ui'
 
 interface Reward {
@@ -41,11 +45,15 @@ export interface CardEditorValue {
 
 interface CardEditorProps {
   businessName: string
+  /** The business's own logo, which the card shows when it has none of its own. */
+  fallbackLogoUrl?: string | null
   /** The kind of business, which picks the suggested signup fields. */
   category?: string
   initial: CardEditorValue
   cardId?: string
   canCustomiseBranding: boolean
+  /** Uploading an own stamp picture is a plan feature of its own. */
+  canUploadStampIcon?: boolean
   canUseKiosk: boolean
   /** The business's own signup questions, shared across its cards. */
   profileQuestions: ProfileQuestion[]
@@ -54,6 +62,46 @@ interface CardEditorProps {
 }
 
 const STAMP_CHOICES = [4, 5, 6, 8, 9, 10, 12]
+
+type PreviewSurface = 'phone' | 'apple' | 'google'
+type PreviewState = 'empty' | 'half' | 'full'
+
+const PREVIEW_SURFACES: Array<{ value: PreviewSurface; label: string }> = [
+  { value: 'phone', label: 'Teléfono' },
+  { value: 'apple', label: 'Apple Wallet' },
+  { value: 'google', label: 'Google Wallet' },
+]
+
+const PREVIEW_STATES: Array<{ value: PreviewState; label: string }> = [
+  { value: 'empty', label: 'Vacía' },
+  { value: 'half', label: 'A mitad' },
+  { value: 'full', label: 'Completa' },
+]
+
+const COLOR_FIELDS: Array<{
+  key: 'backgroundColor' | 'foregroundColor' | 'accentColor' | 'emptyStampColor'
+  label: string
+}> = [
+  { key: 'backgroundColor', label: 'Fondo' },
+  { key: 'foregroundColor', label: 'Texto' },
+  { key: 'accentColor', label: 'Sello' },
+  { key: 'emptyStampColor', label: 'Vacío' },
+]
+
+const STAMP_PRESET_LABELS: Record<StampPreset, string> = {
+  coffee: 'Café',
+  burger: 'Hamburguesa',
+  pizza: 'Pizza',
+  'ice-cream': 'Helado',
+  scissors: 'Tijeras',
+  nail: 'Esmalte',
+  dumbbell: 'Pesa',
+  paw: 'Huella',
+  car: 'Carro',
+  heart: 'Corazón',
+  star: 'Estrella',
+  leaf: 'Hoja',
+}
 
 /** None, or a head start small enough that the reward is still earned. */
 const HEAD_START_CHOICES = Array.from({ length: MAX_INITIAL_STAMPS + 1 }, (_, value) => value)
@@ -113,16 +161,21 @@ const PALETTES = [
 
 export function CardEditor({
   businessName,
+  fallbackLogoUrl = null,
   category,
   initial,
   cardId,
   canCustomiseBranding,
+  canUploadStampIcon = false,
   canUseKiosk,
   profileQuestions,
   lengthLocked,
 }: CardEditorProps) {
   const router = useRouter()
   const [value, setValue] = useState<CardEditorValue>(initial)
+  const [surface, setSurface] = useState<PreviewSurface>('phone')
+  const [previewState, setPreviewState] = useState<PreviewState>('half')
+  const previewDesign = { ...value.design, logoUrl: value.design.logoUrl ?? fallbackLogoUrl }
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -131,9 +184,18 @@ export function CardEditor({
     [value.rewards],
   )
 
-  // The preview shows a half-filled card, so it shows the line that moment would get.
+  // How full the preview card is: the selector lets the business check contrast on an
+  // empty card and on a finished one, not just the default half-filled.
+  const previewFilled =
+    previewState === 'empty'
+      ? value.initialStamps
+      : previewState === 'full'
+        ? value.stampsRequired
+        : Math.max(value.initialStamps, Math.floor(value.stampsRequired / 2))
+
+  // The preview shows the line that moment would get.
   const previewMessage = useMemo(() => {
-    const shown = Math.max(value.initialStamps, Math.floor(value.stampsRequired / 2))
+    const shown = previewFilled
     return pickCardMessage(
       {
         variants: value.messages.variants.filter((line) => line.trim().length > 0),
@@ -143,7 +205,7 @@ export function CardEditor({
       },
       shown,
     )
-  }, [value.messages, value.initialStamps, value.stampsRequired])
+  }, [value.messages, previewFilled])
 
   function update(patch: Partial<CardEditorValue>) {
     setValue((current) => ({ ...current, ...patch }))
@@ -458,6 +520,103 @@ export function CardEditor({
                 </button>
               ))}
             </div>
+          </Labelled>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {COLOR_FIELDS.map((field) => (
+              <Labelled key={field.key} label={field.label} htmlFor={`color-${field.key}`}>
+                <input
+                  id={`color-${field.key}`}
+                  type="color"
+                  disabled={!canCustomiseBranding}
+                  value={value.design[field.key]}
+                  onChange={(event) =>
+                    updateDesign({ [field.key]: event.target.value.toUpperCase() })
+                  }
+                  className={[
+                    'h-10 w-full rounded-[9px] border border-[var(--color-line)]',
+                    canCustomiseBranding ? '' : 'cursor-not-allowed opacity-50',
+                  ].join(' ')}
+                />
+              </Labelled>
+            ))}
+          </div>
+
+          <Labelled
+            label="Logo del negocio"
+            htmlFor="card-logo"
+            help="Va en la esquina de la tarjeta y en la cabecera de los pases. Sin uno propio, la tarjeta usa el logo del negocio."
+          >
+            <ImageUpload
+              kind="logo"
+              aspect="square"
+              value={value.design.logoUrl ?? null}
+              onChange={(url) => updateDesign({ logoUrl: url })}
+              label="Subir logo"
+            />
+          </Labelled>
+
+          <Labelled
+            label="Icono del sello"
+            htmlFor="stamp-icon"
+            help="Lo que se dibuja en cada sello ganado, aquí y en los pases."
+          >
+            <div className="flex flex-wrap gap-2">
+              {STAMP_PRESETS.map((preset) => {
+                const active =
+                  value.design.stampIcon?.kind === 'preset' &&
+                  value.design.stampIcon.value === preset
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => updateDesign({ stampIcon: { kind: 'preset', value: preset } })}
+                    aria-label={STAMP_PRESET_LABELS[preset]}
+                    aria-pressed={active}
+                    title={STAMP_PRESET_LABELS[preset]}
+                    className={[
+                      'grid h-11 w-11 place-items-center rounded-[9px] border transition-colors',
+                      active
+                        ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/25'
+                        : 'border-[var(--color-line)] bg-white',
+                    ].join(' ')}
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                      <path
+                        d={STAMP_ICON_PATHS[preset]}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                )
+              })}
+            </div>
+            {canUploadStampIcon ? (
+              <ImageUpload
+                kind="stamp"
+                aspect="square"
+                value={
+                  value.design.stampIcon?.kind === 'image' ? value.design.stampIcon.value : null
+                }
+                onChange={(url) =>
+                  updateDesign({
+                    stampIcon: url
+                      ? { kind: 'image', value: url }
+                      : { kind: 'preset', value: 'star' },
+                  })
+                }
+                label="Subir un icono propio"
+                help="PNG con fondo transparente, cuadrado. Se ve mejor con trazos gruesos."
+              />
+            ) : (
+              <p className="text-[13px] text-[var(--color-ink-muted)]">
+                Un icono propio llega con el plan Negocio.
+              </p>
+            )}
           </Labelled>
 
           <Labelled
@@ -874,20 +1033,39 @@ export function CardEditor({
       </div>
 
       {/* The preview follows the form on desktop so a colour change is visible instantly. */}
-      <aside className="lg:sticky lg:top-8">
-        <p className="mb-2 text-[13px] font-medium text-[var(--color-ink-muted)]">
+      <aside className="flex flex-col gap-3 lg:sticky lg:top-8">
+        <p className="text-[13px] font-medium text-[var(--color-ink-muted)]">
           Así la ve tu cliente
         </p>
-        <CardPreview
-          design={value.design}
-          businessName={businessName}
-          cardName={value.name}
-          stampsRequired={value.stampsRequired}
-          rewardPositions={rewardPositions}
-          rewards={value.rewards}
-          initialStamps={value.initialStamps}
-          message={previewMessage}
+        <Segmented label="Dónde" options={PREVIEW_SURFACES} value={surface} onChange={setSurface} />
+        <Segmented
+          label="Estado"
+          options={PREVIEW_STATES}
+          value={previewState}
+          onChange={setPreviewState}
         />
+        {surface === 'phone' ? (
+          <CardPreview
+            design={previewDesign}
+            businessName={businessName}
+            cardName={value.name}
+            stampsRequired={value.stampsRequired}
+            rewardPositions={rewardPositions}
+            rewards={value.rewards}
+            filled={previewFilled}
+            message={previewMessage}
+          />
+        ) : (
+          <WalletPreview
+            platform={surface}
+            design={previewDesign}
+            businessName={businessName}
+            cardName={value.name}
+            stampsRequired={value.stampsRequired}
+            filled={previewFilled}
+            rewards={value.rewards}
+          />
+        )}
       </aside>
     </div>
   )
@@ -913,6 +1091,40 @@ function Section({
       </header>
       <div className="flex flex-col gap-4">{children}</div>
     </section>
+  )
+}
+
+function Segmented<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string
+  options: Array<{ value: T; label: string }>
+  value: T
+  onChange: (next: T) => void
+}) {
+  return (
+    <fieldset className="flex rounded-[10px] border border-[var(--color-line)] bg-white p-1">
+      <legend className="sr-only">{label}</legend>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={[
+            'flex-1 rounded-[7px] px-2 py-1.5 text-[13px] font-medium transition-colors',
+            value === option.value
+              ? 'bg-[var(--color-primary)] text-white'
+              : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]',
+          ].join(' ')}
+        >
+          {option.label}
+        </button>
+      ))}
+    </fieldset>
   )
 }
 

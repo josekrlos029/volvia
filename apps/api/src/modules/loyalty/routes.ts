@@ -20,7 +20,9 @@ import {
   consumeNonce,
   issueNonce,
   openKioskSession,
+  readKioskLastStamp,
   readKioskSession,
+  recordKioskStamp,
 } from './kiosk'
 import { adjustStamps, recentActivity, redeemReward } from './redeem'
 import { applyStamp } from './service'
@@ -251,6 +253,24 @@ export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
   )
 
   /**
+   * Polled every few seconds by the kiosk screen. Says when the last stamp went
+   * through it, so the screen celebrates and shows a new code without waiting.
+   */
+  app.post(
+    '/kiosk/status',
+    {
+      schema: {
+        body: z.object({ sessionId: z.string().uuid(), secret: z.string().min(16) }),
+        tags: ['kiosk'],
+      },
+    },
+    async (request) => {
+      await readKioskSession(app.redis, request.body.sessionId, request.body.secret)
+      return { lastStamp: await readKioskLastStamp(app.redis, request.body.sessionId) }
+    },
+  )
+
+  /**
    * The customer's phone posts this after scanning the kiosk QR. No staff account is
    * involved, so the nonce is the only credential — and it dies on first use.
    */
@@ -286,6 +306,10 @@ export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
         })
         await outcome.commit(result)
         await app.redis.del(redisKeys.cardState(request.body.cardToken))
+        await recordKioskStamp(app.redis, payload.sessionId, {
+          at: Date.now(),
+          rewardUnlocked: result.unlockedRewards.length > 0,
+        })
         stampCounter.labels('kiosk', 'ok').inc()
         return reply.status(201).send(result)
       } catch (error) {

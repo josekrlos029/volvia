@@ -43,6 +43,7 @@ export function CardPreview({
   rewardPositions,
   rewards = [],
   initialStamps = 0,
+  filled: filledOverride,
   message,
   offer = null,
 }: {
@@ -54,11 +55,16 @@ export function CardPreview({
   /** Titles for the "te faltan" line; positions alone still draw the reward slots. */
   rewards?: Array<{ atStamp: number; title: string }>
   initialStamps?: number
+  /** A specific state to show, from the editor's selector; half-filled when absent. */
+  filled?: number
   message?: string | null
   /** A live campaign laid over the card: header, banner, hidden or restyled stamps. */
   offer?: PreviewOffer | null
 }) {
-  const filled = Math.min(Math.max(initialStamps, Math.floor(stampsRequired / 2)), stampsRequired)
+  const filled = Math.min(
+    filledOverride ?? Math.max(initialStamps, Math.floor(stampsRequired / 2)),
+    stampsRequired,
+  )
   const nextReward =
     [...rewards].sort((a, b) => a.atStamp - b.atStamp).find((reward) => reward.atStamp > filled) ??
     null

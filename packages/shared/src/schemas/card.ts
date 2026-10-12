@@ -83,13 +83,13 @@ export type CardBanner = z.infer<typeof bannerSchema>
 
 export const cardDesignSchema = z.object({
   layout: z.enum(CARD_LAYOUTS).default('classic'),
-  backgroundColor: hexColorSchema.default('#14171A'),
+  backgroundColor: hexColorSchema.default('#1E3A8A'),
   foregroundColor: hexColorSchema.default('#FFFFFF'),
-  accentColor: hexColorSchema.default('#E9A23B'),
+  accentColor: hexColorSchema.default('#FB923C'),
   stampIcon: stampIconSchema.default({ kind: 'preset', value: 'star' }),
   stampStyle: z.enum(STAMP_STYLES).default('circle'),
   /** Colour of a slot that has not been earned yet. */
-  emptyStampColor: hexColorSchema.default('#31363A'),
+  emptyStampColor: hexColorSchema.default('#3A56A6'),
   logoUrl: z.string().url().max(500).nullable().default(null),
   bannerUrl: z.string().url().max(500).nullable().default(null),
   banner: bannerSchema.default({ kind: 'solid' }),

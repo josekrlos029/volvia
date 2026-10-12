@@ -168,6 +168,9 @@ importers:
       '@volvia/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@volvia/wallet':
+        specifier: workspace:*
+        version: link:../../packages/wallet
       '@zxing/browser':
         specifier: ^0.1.5
         version: 0.1.5(@zxing/library@0.21.3)

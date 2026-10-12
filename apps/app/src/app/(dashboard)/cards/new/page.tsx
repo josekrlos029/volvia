@@ -4,6 +4,7 @@ import { apiFetch, requireRole } from '@/lib/session'
 
 interface Org {
   name: string
+  logoUrl: string | null
   category: string
   entitlements: { features: Record<string, boolean> }
 }
@@ -26,8 +27,10 @@ export default async function NewCardPage() {
 
       <CardEditor
         businessName={org.name}
+        fallbackLogoUrl={org.logoUrl}
         category={org.category}
         canCustomiseBranding={org.entitlements.features.custom_branding ?? false}
+        canUploadStampIcon={org.entitlements.features.custom_stamp_icons ?? false}
         canUseKiosk={org.entitlements.features.kiosk_mode ?? false}
         profileQuestions={profileQuestions}
         lengthLocked={false}
@@ -40,6 +43,8 @@ export default async function NewCardPage() {
             accentColor: '#FB923C',
             emptyStampColor: '#3A56A6',
             stampStyle: 'circle',
+            stampIcon: { kind: 'preset', value: 'star' },
+            logoUrl: null,
             banner: { kind: 'solid' },
             bannerPattern: 'none',
             bannerPatternOpacity: 12,

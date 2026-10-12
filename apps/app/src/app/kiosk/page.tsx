@@ -1,5 +1,6 @@
 import { Kiosk } from '@/components/Kiosk'
 import { apiFetch, requireRole } from '@/lib/session'
+import type { LoyaltyCardDesign } from '@volvia/ui/components/LoyaltyCard'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
@@ -9,6 +10,9 @@ interface Card {
   id: string
   name: string
   status: string
+  stampsRequired: number
+  design: LoyaltyCardDesign
+  rewards: Array<{ atStamp: number; title: string }>
   rules: { kioskEnabled: boolean }
 }
 
@@ -24,7 +28,7 @@ export default async function KioskPage({
   const [cards, locations, org] = await Promise.all([
     apiFetch<Card[]>('/v1/cards'),
     apiFetch<Array<{ id: string; name: string }>>('/v1/org/locations'),
-    apiFetch<{ name: string }>('/v1/org'),
+    apiFetch<{ name: string; logoUrl: string | null }>('/v1/org'),
   ])
 
   const eligible = cards.filter((card) => card.status === 'active' && card.rules.kioskEnabled)
@@ -56,6 +60,9 @@ export default async function KioskPage({
       locationId={locationId}
       businessName={org.name}
       cardName={card.name}
+      design={{ ...card.design, logoUrl: card.design.logoUrl ?? org.logoUrl }}
+      stampsRequired={card.stampsRequired}
+      rewards={card.rewards}
       passUrl={process.env.NEXT_PUBLIC_PASS_URL ?? 'http://localhost:3002'}
     />
   )
