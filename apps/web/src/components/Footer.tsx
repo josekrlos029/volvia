@@ -2,6 +2,7 @@ import type { Locale, SiteCopy } from '@/lib/i18n'
 import { industries } from '@/lib/industries'
 import Image from 'next/image'
 import Link from 'next/link'
+import { InstagramLink } from './InstagramLink'
 
 /** The pages people arrive on from a search, kept one click from everywhere. */
 const RESOURCES = [
@@ -28,6 +29,7 @@ export function Footer({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
               ? 'Tarjetas de fidelización digitales para negocios locales.'
               : 'Digital loyalty cards for local businesses.'}
           </p>
+          <InstagramLink className="mt-5 text-[14px] text-[var(--color-ink)] hover:text-[var(--color-primary)]" />
         </div>
 
         <nav aria-label={copy.footer.product}>

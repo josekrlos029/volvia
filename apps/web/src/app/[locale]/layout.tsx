@@ -1,5 +1,6 @@
 import { Footer } from '@/components/Footer'
 import { Header } from '@/components/Header'
+import { INSTAGRAM_URL } from '@/components/InstagramLink'
 import { LOCALES, copyFor, isLocale } from '@/lib/i18n'
 import { GeistMono } from 'geist/font/mono'
 import type { Metadata } from 'next'
@@ -72,6 +73,7 @@ export default async function LocaleLayout({
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
     url: `${webUrl}/${locale}`,
+    sameAs: [INSTAGRAM_URL],
     inLanguage: locale,
     description:
       locale === 'es'

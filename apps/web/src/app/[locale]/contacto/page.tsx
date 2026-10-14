@@ -1,4 +1,5 @@
 import { ContactForm } from '@/components/ContactForm'
+import { InstagramLink } from '@/components/InstagramLink'
 import { Section, SectionTitle } from '@/components/Section'
 import { LOCALES, isLocale } from '@/lib/i18n'
 import { CONTACT_TOPICS } from '@volvia/shared'
@@ -94,6 +95,18 @@ export default async function ContactPage({
                   ? 'Escríbenos desde el mismo correo con el que entras a tu panel. Así encontramos tu negocio sin pedirte diez datos.'
                   : 'Write from the same email you sign in with. That way we find your business without asking you for ten details.'}
               </p>
+            </div>
+
+            <div>
+              <h2 className="text-[16px]">
+                {isSpanish ? 'También en Instagram' : 'Also on Instagram'}
+              </h2>
+              <p className="mt-2 max-w-[48ch] text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
+                {isSpanish
+                  ? 'Ahí enseñamos negocios que ya usan Volvia y novedades del producto. También puedes escribirnos por mensaje directo.'
+                  : 'We show shops already using Volvia and product news there. You can also message us directly.'}
+              </p>
+              <InstagramLink className="mt-3 text-[15px] text-[var(--color-primary)] underline-offset-4 hover:underline" />
             </div>
 
             <div>

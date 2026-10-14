@@ -1,3 +1,4 @@
+import { InstagramLink } from '@/components/InstagramLink'
 import { PhoneCard } from '@/components/PhoneCard'
 import { Section, SectionTitle } from '@/components/Section'
 import { type Benefit, BenefitTabs } from '@/components/home/BenefitTabs'
@@ -533,9 +534,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </p>
             <h2 className="t-display mt-6 max-w-[14ch]">{copy.finalCta.title}</h2>
             <p className="t-subheading mt-6 max-w-[40ch] text-white/80">{copy.finalCta.body}</p>
-            <a href={`${appUrl}/signup`} className="btn-inverse mt-8">
-              {copy.finalCta.cta}
-            </a>
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
+              <a href={`${appUrl}/signup`} className="btn-inverse">
+                {copy.finalCta.cta}
+              </a>
+              <InstagramLink className="text-[15px] text-white/80 hover:text-white" />
+            </div>
           </div>
           <div className="mx-auto w-full max-w-[260px] rotate-[4deg]">
             <PhoneCard
