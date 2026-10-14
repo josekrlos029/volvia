@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GOOGLE_IMAGE_SIZES, imageVersion, renderGoogleImage } from '../src/images'
+import { fillsSquare, renderPng } from '../src/render/raster'
 import { lockupSvg, stripSvg, tileSvg } from '../src/render/svg'
 import type { PassContent } from '../src/types'
 
@@ -101,6 +102,22 @@ describe('lockup', () => {
     const logo = { mime: 'image/png' as const, dataUri: 'data:image/png;base64,AAAA' }
     const branded = lockupSvg(content, 135, 50, { logo, stampIcon: null, banner: null })
     expect(branded).toContain('href="data:image/png;base64,AAAA"')
+  })
+
+  it('lets a badge-shaped logo fill its tile instead of framing it a second time', () => {
+    const png = (w: number, h: number, body: string) =>
+      `data:image/png;base64,${renderPng(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${body}</svg>`, w).toString('base64')}`
+    const badge = png(100, 100, '<rect width="100" height="100" rx="18" fill="#111"/>')
+    const floating = png(100, 100, '<circle cx="50" cy="50" r="30" fill="#111"/>')
+    const wide = png(300, 100, '<rect width="300" height="100" fill="#111"/>')
+    expect(fillsSquare(badge)).toBe(true)
+    expect(fillsSquare(floating)).toBe(false)
+    expect(fillsSquare(wide)).toBe(false)
+
+    const logo = { mime: 'image/png' as const, dataUri: badge, fillsFrame: true }
+    const svg = lockupSvg(content, 135, 50, { logo, stampIcon: null, banner: null })
+    expect(svg).toContain('<clipPath')
+    expect(svg).not.toContain('fill-opacity="0.1"')
   })
 })
 

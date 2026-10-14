@@ -229,6 +229,12 @@ function businessTile(
   size: number,
   radius: number,
 ): string {
+  if (artwork.logo?.fillsFrame) {
+    // A badge-shaped logo already brings its own ground: it takes the whole tile,
+    // clipped to the tile's corners, instead of a second frame around it.
+    const clip = `logo-clip-${fmt(x)}-${fmt(y)}`.replace(/\./g, '_')
+    return `<clipPath id="${clip}"><rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(size)}" height="${fmt(size)}" rx="${fmt(radius)}"/></clipPath><g clip-path="url(#${clip})">${imageAt(artwork.logo, x, y, size, 0)}</g>`
+  }
   if (artwork.logo) {
     return `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(size)}" height="${fmt(size)}" rx="${fmt(radius)}" fill="${content.foregroundColor}" fill-opacity="0.1"/>${imageAt(artwork.logo, x, y, size, size * 0.12)}`
   }

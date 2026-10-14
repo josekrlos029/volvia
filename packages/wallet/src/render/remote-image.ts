@@ -1,3 +1,5 @@
+import { fillsSquare } from './raster'
+
 /**
  * Fetches a business's uploaded artwork so it can be embedded in the pass images.
  *
@@ -8,6 +10,8 @@
 export interface RemoteImage {
   mime: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/svg+xml'
   dataUri: string
+  /** Square and painted to its edges, so it fills a tile rather than sitting inside one. */
+  fillsFrame?: boolean
 }
 
 interface CacheEntry {
@@ -76,7 +80,8 @@ async function fetchImage(
     if (bytes.length === 0 || bytes.length > maxBytes) return null
     const mime = sniffMime(bytes, response.headers.get('content-type') ?? '')
     if (!mime) return null
-    return { mime, dataUri: `data:${mime};base64,${bytes.toString('base64')}` }
+    const dataUri = `data:${mime};base64,${bytes.toString('base64')}`
+    return { mime, dataUri, fillsFrame: fillsSquare(dataUri) }
   } catch {
     return null
   } finally {
