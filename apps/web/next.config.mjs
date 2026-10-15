@@ -14,7 +14,15 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         ],
       },
+      {
+        // Unlisted pages shared by link (proposals, demos): never in search results.
+        source: '/p/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' }],
+      },
     ]
+  },
+  async rewrites() {
+    return [{ source: '/p/:slug', destination: '/p/:slug.html' }]
   },
 }
 

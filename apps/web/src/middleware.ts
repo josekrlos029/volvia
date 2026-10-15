@@ -26,6 +26,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Static assets and the SEO routes are served as they are.
-  matcher: ['/((?!_next|api|favicon.ico|robots.txt|sitemap.xml|.*\\..*).*)'],
+  // Static assets, the SEO routes and the unlisted pages under /p are served as they are.
+  matcher: ['/((?!_next|api|p/|favicon.ico|robots.txt|sitemap.xml|.*\\..*).*)'],
 }
