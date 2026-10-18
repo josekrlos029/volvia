@@ -1,6 +1,8 @@
-import { Footer } from '@/components/Footer'
+import { CONTACT_EMAIL } from '@/components/EmailLink'
+import { Footer, JOOK_URL } from '@/components/Footer'
 import { Header } from '@/components/Header'
 import { INSTAGRAM_URL } from '@/components/InstagramLink'
+import { PHONE_E164, WhatsAppFloat } from '@/components/WhatsAppLink'
 import { LOCALES, copyFor, isLocale } from '@/lib/i18n'
 import { GeistMono } from 'geist/font/mono'
 import type { Metadata } from 'next'
@@ -74,6 +76,13 @@ export default async function LocaleLayout({
     operatingSystem: 'Web',
     url: `${webUrl}/${locale}`,
     sameAs: [INSTAGRAM_URL],
+    publisher: {
+      '@type': 'Organization',
+      name: 'Jook Agencia',
+      url: JOOK_URL,
+      telephone: PHONE_E164,
+      email: CONTACT_EMAIL,
+    },
     inLanguage: locale,
     description:
       locale === 'es'
@@ -98,6 +107,7 @@ export default async function LocaleLayout({
         <Header locale={locale} copy={copy} />
         <div className="flex-1">{children}</div>
         <Footer locale={locale} copy={copy} />
+        <WhatsAppFloat locale={locale} />
       </body>
     </html>
   )

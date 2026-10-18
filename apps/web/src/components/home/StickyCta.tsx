@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 
 /**
  * A floating sign-up pill that appears once the hero's own buttons have scrolled away,
- * so the next step is always one tap off without a banner covering the content.
+ * so the next step is always one tap off without a banner covering the content. It sits
+ * left of the WhatsApp button, which owns the corner on every page.
  */
 export function StickyCta({ href, label }: { href: string; label: string }) {
   const [visible, setVisible] = useState(false)
@@ -25,7 +26,7 @@ export function StickyCta({ href, label }: { href: string; label: string }) {
       href={href}
       inert={!visible}
       className={[
-        'btn-primary fixed bottom-5 right-5 z-40 shadow-[var(--shadow-nav)] transition-[opacity,transform] duration-300',
+        'btn-primary fixed bottom-6 right-[88px] z-40 shadow-[var(--shadow-nav)] transition-[opacity,transform] duration-300',
         'mb-[env(safe-area-inset-bottom)]',
         visible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0',
       ].join(' ')}

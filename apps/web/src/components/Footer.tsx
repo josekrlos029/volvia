@@ -2,7 +2,11 @@ import type { Locale, SiteCopy } from '@/lib/i18n'
 import { industries } from '@/lib/industries'
 import Image from 'next/image'
 import Link from 'next/link'
+import { EmailLink } from './EmailLink'
 import { InstagramLink } from './InstagramLink'
+import { WhatsAppLink } from './WhatsAppLink'
+
+export const JOOK_URL = 'https://jookagencia.com'
 
 /** The pages people arrive on from a search, kept one click from everywhere. */
 const RESOURCES = [
@@ -29,7 +33,14 @@ export function Footer({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
               ? 'Tarjetas de fidelización digitales para negocios locales.'
               : 'Digital loyalty cards for local businesses.'}
           </p>
-          <InstagramLink className="mt-5 text-[14px] text-[var(--color-ink)] hover:text-[var(--color-primary)]" />
+          <div className="mt-5 flex flex-col items-start gap-2.5">
+            <InstagramLink className="text-[14px] text-[var(--color-ink)] hover:text-[var(--color-primary)]" />
+            <WhatsAppLink
+              locale={locale}
+              className="text-[14px] text-[var(--color-ink)] hover:text-[var(--color-primary)]"
+            />
+            <EmailLink className="text-[14px] text-[var(--color-ink)] hover:text-[var(--color-primary)]" />
+          </div>
         </div>
 
         <nav aria-label={copy.footer.product}>
@@ -135,9 +146,22 @@ export function Footer({ locale, copy }: { locale: Locale; copy: SiteCopy }) {
       </div>
 
       <div className="border-t border-[var(--color-line)]">
-        <p className="mx-auto max-w-[1200px] px-5 py-5 text-[13px] text-[var(--color-ink-muted)] lg:px-8">
-          © {new Date().getFullYear()} Volvia. {copy.footer.rights}
-        </p>
+        <div className="mx-auto flex max-w-[1200px] flex-wrap justify-between gap-x-6 gap-y-2 px-5 py-5 text-[13px] text-[var(--color-ink-muted)] lg:px-8">
+          <p>
+            © {new Date().getFullYear()} Volvia. {copy.footer.rights}
+          </p>
+          <p>
+            {locale === 'es' ? 'Volvia es un producto de ' : 'Volvia is a product of '}
+            <a
+              href={JOOK_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--color-ink)] hover:text-[var(--color-primary)]"
+            >
+              Jook Agencia
+            </a>
+          </p>
+        </div>
       </div>
     </footer>
   )

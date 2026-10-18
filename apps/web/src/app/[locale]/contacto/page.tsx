@@ -1,6 +1,8 @@
 import { ContactForm } from '@/components/ContactForm'
+import { EmailLink } from '@/components/EmailLink'
 import { InstagramLink } from '@/components/InstagramLink'
 import { Section, SectionTitle } from '@/components/Section'
+import { WhatsAppLink } from '@/components/WhatsAppLink'
 import { LOCALES, isLocale } from '@/lib/i18n'
 import { CONTACT_TOPICS } from '@volvia/shared'
 import type { Metadata } from 'next'
@@ -107,6 +109,24 @@ export default async function ContactPage({
                   : 'We show shops already using Volvia and product news there. You can also message us directly.'}
               </p>
               <InstagramLink className="mt-3 text-[15px] text-[var(--color-primary)] underline-offset-4 hover:underline" />
+            </div>
+
+            <div>
+              <h2 className="text-[16px]">
+                {isSpanish ? 'Por WhatsApp o correo' : 'On WhatsApp or by email'}
+              </h2>
+              <p className="mt-2 max-w-[48ch] text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
+                {isSpanish
+                  ? 'Volvia es un producto de Jook Agencia. Si prefieres no usar el formulario, escríbenos directo.'
+                  : 'Volvia is a product of Jook Agencia. If you would rather skip the form, write to us directly.'}
+              </p>
+              <div className="mt-3 flex flex-col items-start gap-2">
+                <WhatsAppLink
+                  locale={locale}
+                  className="text-[15px] text-[var(--color-primary)] underline-offset-4 hover:underline"
+                />
+                <EmailLink className="text-[15px] text-[var(--color-primary)] underline-offset-4 hover:underline" />
+              </div>
             </div>
 
             <div>

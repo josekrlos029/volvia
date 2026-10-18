@@ -1,6 +1,7 @@
 import { InstagramLink } from '@/components/InstagramLink'
 import { PhoneCard } from '@/components/PhoneCard'
 import { Section, SectionTitle } from '@/components/Section'
+import { WhatsAppLink } from '@/components/WhatsAppLink'
 import { type Benefit, BenefitTabs } from '@/components/home/BenefitTabs'
 import { CountUp } from '@/components/home/CountUp'
 import { Marquee } from '@/components/home/Marquee'
@@ -539,6 +540,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 {copy.finalCta.cta}
               </a>
               <InstagramLink className="text-[15px] text-white/80 hover:text-white" />
+              <WhatsAppLink
+                locale={locale}
+                className="text-[15px] text-white/80 hover:text-white"
+              />
             </div>
           </div>
           <div className="mx-auto w-full max-w-[260px] rotate-[4deg]">
