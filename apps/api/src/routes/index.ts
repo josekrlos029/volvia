@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { adminRoutes } from '../modules/admin/routes'
 import { analyticsRoutes } from '../modules/analytics/routes'
+import { deviceAuthRoutes } from '../modules/auth/device'
 import { authRoutes } from '../modules/auth/routes'
 import { billingRoutes, billingWebhookRoutes } from '../modules/billing/routes'
 import { cardRoutes } from '../modules/cards/routes'
@@ -11,6 +12,7 @@ import { messageRoutes } from '../modules/messages/routes'
 import { orgRoutes, publicInviteRoutes } from '../modules/orgs/routes'
 import { pageRoutes } from '../modules/page/routes'
 import { publicRoutes } from '../modules/public/routes'
+import { remoteRoutes } from '../modules/remote/routes'
 import { segmentRoutes } from '../modules/segments/routes'
 import { walletRoutes } from '../modules/wallet/routes'
 import { healthRoutes } from './health'
@@ -22,6 +24,7 @@ import { healthRoutes } from './health'
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(healthRoutes)
   await app.register(authRoutes, { prefix: '/v1/auth' })
+  await app.register(deviceAuthRoutes, { prefix: '/v1/auth/device' })
   await app.register(cardRoutes, { prefix: '/v1/cards' })
   await app.register(loyaltyRoutes, { prefix: '/v1' })
   await app.register(engagementRoutes, { prefix: '/v1' })
@@ -31,6 +34,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(orgRoutes, { prefix: '/v1/org' })
   await app.register(pageRoutes, { prefix: '/v1/page' })
   await app.register(customerRoutes, { prefix: '/v1/customers' })
+  await app.register(remoteRoutes, { prefix: '/v1/remote' })
   await app.register(segmentRoutes, { prefix: '/v1/segments' })
   await app.register(messageRoutes, { prefix: '/v1/messages' })
   await app.register(analyticsRoutes, { prefix: '/v1/analytics' })

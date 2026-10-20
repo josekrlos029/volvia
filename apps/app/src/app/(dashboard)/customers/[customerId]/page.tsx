@@ -9,6 +9,7 @@ interface CustomerDetail {
     firstName: string
     email: string
     phone: string | null
+    documentNumber: string | null
     birthdayMonth: number | null
     birthdayDay: number | null
     marketingConsent: boolean
@@ -43,6 +44,7 @@ interface CustomerDetail {
     source: string
     occurredAt: string
     resultingCount: number
+    note: string | null
   }>
   masked: boolean
 }
@@ -54,6 +56,7 @@ const SOURCE_LABELS: Record<string, string> = {
   import: 'Importación',
   campaign: 'Campaña',
   signup_bonus: 'Bono de bienvenida',
+  remote: 'A distancia',
 }
 
 const MONTHS = [
@@ -92,7 +95,8 @@ export default async function CustomerDetailPage({
         <h1 className="mt-1 text-[22px] font-semibold tracking-[-0.01em]">{customer.firstName}</h1>
         <p className="mt-1 text-[14px] text-[var(--color-ink-muted)]">
           {customer.email}
-          {customer.phone ? ` · ${customer.phone}` : ''} · Cliente desde{' '}
+          {customer.phone ? ` · ${customer.phone}` : ''}
+          {customer.documentNumber ? ` · CC ${customer.documentNumber}` : ''} · Cliente desde{' '}
           {formatDate(customer.joinedAt, 'long')}
         </p>
       </header>
@@ -219,6 +223,7 @@ export default async function CustomerDetailPage({
                   </p>
                   <p className="text-[13px] text-[var(--color-ink-muted)]">
                     {SOURCE_LABELS[event.source] ?? event.source}
+                    {event.note ? ` · ${event.note}` : ''}
                   </p>
                 </div>
                 <span className="tabular shrink-0 text-[13px] text-[var(--color-ink-muted)]">

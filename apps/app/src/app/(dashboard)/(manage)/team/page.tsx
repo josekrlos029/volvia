@@ -1,4 +1,5 @@
 import { InviteForm } from '@/components/InviteForm'
+import { RemoteStampingSettings } from '@/components/RemoteStampingSettings'
 import { Badge, EmptyState, Panel } from '@/components/ui'
 import { formatDate, formatRelative } from '@/lib/format'
 import { apiFetch } from '@/lib/session'
@@ -26,7 +27,10 @@ const ROLE_LABELS: Record<string, string> = {
 export default async function TeamPage() {
   const [team, org] = await Promise.all([
     apiFetch<TeamResponse>('/v1/org/members'),
-    apiFetch<{ entitlements: { features: Record<string, boolean> } }>('/v1/org'),
+    apiFetch<{
+      entitlements: { features: Record<string, boolean> }
+      settings: { remoteStamping: boolean; remoteStampingRequireOrder: boolean }
+    }>('/v1/org'),
   ])
 
   const canInvite = org.entitlements.features.team_accounts ?? false
@@ -78,6 +82,13 @@ export default async function TeamPage() {
           </ul>
         </Panel>
       ) : null}
+
+      <Panel title="Sellos a distancia">
+        <RemoteStampingSettings
+          enabled={org.settings.remoteStamping}
+          requireOrder={org.settings.remoteStampingRequireOrder}
+        />
+      </Panel>
 
       <Panel title="Invitar">
         {canInvite ? (

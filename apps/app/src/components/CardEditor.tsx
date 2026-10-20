@@ -38,6 +38,8 @@ export interface CardEditorValue {
   collectBirthday: boolean
   collectPhone: boolean
   phoneRequired: boolean
+  collectDocument: boolean
+  documentRequired: boolean
   initialStamps: number
   messages: CardMessages
   rules: { cooldownMinutes: number; dailyCap: number; kioskEnabled: boolean }
@@ -296,6 +298,8 @@ export function CardEditor({
       collectBirthday: value.collectBirthday,
       collectPhone: value.collectPhone,
       phoneRequired: value.phoneRequired,
+      collectDocument: value.collectDocument,
+      documentRequired: value.documentRequired,
       initialStamps: value.initialStamps,
       messages: {
         variants: value.messages.variants.map((line) => line.trim()).filter(Boolean),
@@ -999,6 +1003,8 @@ export function CardEditor({
             collectBirthday={value.collectBirthday}
             collectPhone={value.collectPhone}
             phoneRequired={value.phoneRequired}
+            collectDocument={value.collectDocument}
+            documentRequired={value.documentRequired}
             category={category}
             onChange={update}
           />

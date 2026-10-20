@@ -3,6 +3,7 @@ packages:
   # not by pnpm. Listing the JS ones explicitly keeps them out of the workspace.
   - "apps/api"
   - "apps/app"
+  - "apps/extension"
   - "apps/pass"
   - "apps/web"
   - "packages/*"

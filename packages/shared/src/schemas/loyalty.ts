@@ -12,6 +12,8 @@ export const STAMP_SOURCES = [
   'import',
   'campaign',
   'signup_bonus',
+  /** Staff stamping a delivery customer they never saw, from the browser extension. */
+  'remote',
 ] as const
 export type StampSource = (typeof STAMP_SOURCES)[number]
 
@@ -29,6 +31,11 @@ export const stampSchema = z.object({
   /** Set when the scan happened offline, so analytics use the real moment. */
   occurredAt: z.coerce.date().optional(),
   note: z.string().trim().max(200).optional(),
+  /**
+   * `remote` when the customer is not at the counter (a delivery order stamped from the
+   * browser extension). Only allowed when the business turned remote stamping on.
+   */
+  channel: z.enum(['remote']).optional(),
 })
 export type StampInput = z.infer<typeof stampSchema>
 

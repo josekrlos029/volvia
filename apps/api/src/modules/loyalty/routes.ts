@@ -15,6 +15,7 @@ import { redisKeys } from '../../lib/redis'
 import { stampCounter } from '../../plugins/observability'
 import { rateLimits } from '../../plugins/security'
 import { typed } from '../../types'
+import { assertRemoteStamping } from '../remote/service'
 import {
   closeKioskSession,
   consumeNonce,
@@ -45,6 +46,18 @@ export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const org = request.org!
       const scope = `stamp:${org.orgId}`
+      const source = request.body.channel === 'remote' ? 'remote' : 'staff_scan'
+
+      // Checked before the idempotency reservation so a refusal leaves nothing behind.
+      if (source === 'remote') {
+        const remote = await assertRemoteStamping(app.db, org.orgId)
+        if (remote.requireOrder && !request.body.note) {
+          throw new AppError('VALIDATION_FAILED', {
+            message: 'order number required',
+            details: [{ path: 'note', message: 'order_required' }],
+          })
+        }
+      }
 
       const outcome = await withIdempotency<Awaited<ReturnType<typeof applyStamp>>>(
         app.redis,
@@ -53,7 +66,7 @@ export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
       )
 
       if (outcome.status === 'replayed') {
-        stampCounter.labels('staff_scan', 'replayed').inc()
+        stampCounter.labels(source, 'replayed').inc()
         return { ...outcome.result, replayed: true }
       }
       if (outcome.status === 'in_flight') {
@@ -70,7 +83,7 @@ export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
           count: request.body.count,
           locationId,
           actorUserId: request.auth!.userId,
-          source: 'staff_scan',
+          source,
           idempotencyKey: request.body.idempotencyKey,
           occurredAt: request.body.occurredAt,
           purchaseAmount: request.body.purchaseAmount,
@@ -80,7 +93,7 @@ export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
         await outcome.commit(result)
         // The public card view is cached for speed; the customer must see the new stamp.
         await app.redis.del(redisKeys.cardState(request.body.cardToken))
-        stampCounter.labels('staff_scan', 'ok').inc()
+        stampCounter.labels(source, 'ok').inc()
 
         await audit(app.db, {
           orgId: org.orgId,
@@ -88,7 +101,7 @@ export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
           action: AUDIT_ACTIONS.stampAdded,
           targetType: 'customer_card',
           targetId: result.customerCardId,
-          meta: { stamps: result.stampsAdded, rewards: result.unlockedRewards.length },
+          meta: { stamps: result.stampsAdded, rewards: result.unlockedRewards.length, source },
           ip: request.ip,
         })
 
@@ -96,7 +109,7 @@ export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
       } catch (error) {
         // Never leave a poisoned key behind: the staff member must be able to retry.
         await outcome.release()
-        stampCounter.labels('staff_scan', 'rejected').inc()
+        stampCounter.labels(source, 'rejected').inc()
         throw error
       }
     },

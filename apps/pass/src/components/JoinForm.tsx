@@ -23,6 +23,8 @@ interface JoinFormProps {
   collectBirthday: boolean
   collectPhone?: boolean
   phoneRequired?: boolean
+  collectDocument?: boolean
+  documentRequired?: boolean
   questions: Question[]
   accentColor: string
 }
@@ -31,11 +33,15 @@ interface FormErrors {
   firstName?: string
   email?: string
   phone?: string
+  documentNumber?: string
   form?: string
 }
 
 /** Digits with optional +, spaces, dashes and brackets, as people type a number. */
 const PHONE_PATTERN = /^\+?[0-9(][0-9 ()./-]{5,24}$/
+
+/** Same rule as the API: 5-20 letters or digits once dots, spaces and dashes are gone. */
+const DOCUMENT_PATTERN = /^[0-9A-Za-z]{5,20}$/
 
 export function JoinForm({
   joinSlug,
@@ -43,6 +49,8 @@ export function JoinForm({
   collectBirthday,
   collectPhone = false,
   phoneRequired = false,
+  collectDocument = false,
+  documentRequired = false,
   questions,
   accentColor,
 }: JoinFormProps) {
@@ -58,6 +66,7 @@ export function JoinForm({
     const firstName = String(form.get('firstName') ?? '').trim()
     const email = String(form.get('email') ?? '').trim()
     const phone = String(form.get('phone') ?? '').trim()
+    const documentNumber = String(form.get('documentNumber') ?? '').replace(/[\s.-]/g, '')
 
     // Validate before the round trip so the customer is not waiting to be told
     // their name is missing.
@@ -67,6 +76,12 @@ export function JoinForm({
     if (collectPhone && phoneRequired && !phone) nextErrors.phone = copy.join.required
     if (collectPhone && phone && !PHONE_PATTERN.test(phone)) {
       nextErrors.phone = copy.join.invalidPhone
+    }
+    if (collectDocument && documentRequired && !documentNumber) {
+      nextErrors.documentNumber = copy.join.required
+    }
+    if (collectDocument && documentNumber && !DOCUMENT_PATTERN.test(documentNumber)) {
+      nextErrors.documentNumber = copy.join.invalidDocument
     }
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors)
@@ -94,6 +109,7 @@ export function JoinForm({
           email,
           birthday: month && day ? { month, day } : null,
           phone: collectPhone && phone ? phone : null,
+          documentNumber: collectDocument && documentNumber ? documentNumber : null,
           marketingConsent: form.get('consent') === 'on',
           answers,
         }),
@@ -169,6 +185,28 @@ export function JoinForm({
             className={inputClass}
             aria-invalid={Boolean(errors.phone)}
             required={phoneRequired}
+          />
+        </Field>
+      ) : null}
+
+      {collectDocument ? (
+        <Field
+          label={copy.join.document}
+          htmlFor="documentNumber"
+          help={`${documentRequired ? '' : `${copy.join.documentHelp} `}${copy.join.documentPrivacy}`}
+          error={errors.documentNumber}
+        >
+          <input
+            id="documentNumber"
+            name="documentNumber"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            enterKeyHint="next"
+            placeholder={copy.join.documentPlaceholder}
+            className={inputClass}
+            aria-invalid={Boolean(errors.documentNumber)}
+            required={documentRequired}
           />
         </Field>
       ) : null}

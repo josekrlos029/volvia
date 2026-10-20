@@ -82,6 +82,7 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
             ...detail.customer,
             email: maskEmail(detail.customer.email),
             phone: maskPhone(detail.customer.phone),
+            documentNumber: maskPhone(detail.customer.documentNumber),
           },
           masked: true,
         }

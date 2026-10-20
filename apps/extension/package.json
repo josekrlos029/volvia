@@ -1,0 +1,36 @@
+{
+  "name": "@volvia/extension",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:safari": "wxt -b safari --mv3",
+    "build": "wxt build",
+    "build:safari": "wxt build -b safari --mv3",
+    "zip": "wxt zip",
+    "typecheck": "wxt prepare && tsc --noEmit",
+    "test": "vitest run",
+    "postinstall": "wxt prepare",
+    "safari:project": "pnpm build:safari && xcrun safari-web-extension-converter .output/safari-mv3 --project-location safari --app-name 'Volvia Biz' --bundle-identifier co.volvia.biz.safari --macos-only --no-open --copy-resources --force"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "^2.1.7",
+    "@volvia/shared": "workspace:*",
+    "@volvia/ui": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "5.2.0",
+    "@volvia/config": "workspace:*",
+    "tailwindcss": "4.3.3",
+    "typescript": "^5.7.2",
+    "vite": "7.3.6",
+    "vitest": "^2.1.8",
+    "wxt": "0.21.4"
+  }
+}

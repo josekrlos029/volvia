@@ -3,6 +3,7 @@ import { MAX_PROFILE_QUESTIONS, MAX_SELECTED_CUSTOMERS } from '../constants'
 import { COMMUNITY_SEGMENTS, SUGGESTED_SEGMENT_KEYS } from '../segments'
 import {
   birthdaySchema,
+  documentNumberSchema,
   emailSchema,
   localeSchema,
   paginationSchema,
@@ -21,6 +22,12 @@ export const joinCardSchema = z.object({
     .nullable()
     .default(null)
     .transform((value) => (value ? value : null)),
+  /** The cédula, asked only when the card collects it; empty means "left blank". */
+  documentNumber: z
+    .union([documentNumberSchema, z.literal('')])
+    .nullable()
+    .default(null)
+    .transform((value) => (value ? value : null)),
   marketingConsent: z.boolean().default(false),
   locale: localeSchema.optional(),
   /** Answers to the card's optional signup questions, keyed by question id. */
@@ -35,6 +42,7 @@ export const updateCustomerSchema = z.object({
   email: emailSchema.optional(),
   birthday: birthdaySchema.nullable().optional(),
   phone: phoneSchema.nullable().optional(),
+  documentNumber: documentNumberSchema.nullable().optional(),
   marketingConsent: z.boolean().optional(),
   notes: z.string().trim().max(1000).optional(),
 })

@@ -26,6 +26,8 @@ export const customers = pgTable(
     firstName: text().notNull(),
     email: text().notNull(),
     phone: text(),
+    /** The cédula, normalised to digits and capitals. Not unique: typos happen. */
+    documentNumber: text(),
     /** Birthday without a year — we never ask for age. */
     birthdayMonth: integer(),
     birthdayDay: integer(),
@@ -49,6 +51,9 @@ export const customers = pgTable(
     index('customers_org_phone_idx')
       .on(table.orgId, table.phone)
       .where(sql`${table.phone} is not null`),
+    index('customers_org_document_idx')
+      .on(table.orgId, table.documentNumber)
+      .where(sql`${table.documentNumber} is not null`),
   ],
 )
 

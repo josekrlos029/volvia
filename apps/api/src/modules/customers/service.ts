@@ -241,6 +241,8 @@ export async function getCustomer(db: Database, orgId: string, customerId: strin
         source: stampEvents.source,
         occurredAt: stampEvents.occurredAt,
         resultingCount: stampEvents.resultingCount,
+        /** The order number on a remote stamp, or the campaign that multiplied it. */
+        note: stampEvents.note,
       })
       .from(stampEvents)
       .innerJoin(customerCards, eq(customerCards.id, stampEvents.customerCardId))

@@ -42,8 +42,9 @@ export function evaluateStamp(attempt: StampAttempt): StampDecision {
   }
 
   // Manual adjustments and imports are deliberate acts by the business, so they
-  // bypass the anti-fraud rules that exist to police the counter.
-  const enforced = source === 'staff_scan' || source === 'kiosk'
+  // bypass the anti-fraud rules that exist to police the counter. A remote stamp is
+  // the counter without the customer in front of it: it needs them most.
+  const enforced = source === 'staff_scan' || source === 'kiosk' || source === 'remote'
 
   if (enforced && rules.cooldownMinutes > 0 && attempt.lastStampAt) {
     const elapsedSeconds = (now.getTime() - attempt.lastStampAt.getTime()) / 1000

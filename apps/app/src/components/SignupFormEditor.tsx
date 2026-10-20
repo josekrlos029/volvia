@@ -89,6 +89,8 @@ export function SignupFormEditor({
   collectBirthday,
   collectPhone,
   phoneRequired,
+  collectDocument = false,
+  documentRequired = false,
   category = 'other',
   onChange,
 }: {
@@ -97,6 +99,8 @@ export function SignupFormEditor({
   collectBirthday: boolean
   collectPhone: boolean
   phoneRequired: boolean
+  collectDocument?: boolean
+  documentRequired?: boolean
   /** The kind of business, which decides the suggested fields. */
   category?: string
   onChange: (patch: {
@@ -104,6 +108,8 @@ export function SignupFormEditor({
     collectBirthday?: boolean
     collectPhone?: boolean
     phoneRequired?: boolean
+    collectDocument?: boolean
+    documentRequired?: boolean
   }) => void
 }) {
   const router = useRouter()
@@ -113,7 +119,12 @@ export function SignupFormEditor({
   const [editing, setEditing] = useState(false)
 
   // Name and email are always asked; the rest is the business's choice.
-  const fieldCount = 2 + (collectBirthday ? 1 : 0) + (collectPhone ? 1 : 0) + selectedIds.length
+  const fieldCount =
+    2 +
+    (collectBirthday ? 1 : 0) +
+    (collectPhone ? 1 : 0) +
+    (collectDocument ? 1 : 0) +
+    selectedIds.length
   const meter = ease(fieldCount)
 
   // Suggestions the business has not written already, by prompt.
@@ -168,6 +179,8 @@ export function SignupFormEditor({
   function onAddField(value: string) {
     if (value === 'phone') {
       onChange({ collectPhone: true })
+    } else if (value === 'document') {
+      onChange({ collectDocument: true })
     } else if (value === 'custom') {
       setEditing(true)
       setDrafts([...drafts, { prompt: '', type: 'text', options: [], isRequired: false }])
@@ -243,6 +256,40 @@ export function SignupFormEditor({
             />
           </div>
         </li>
+        <li>
+          <div className="flex items-center justify-between gap-3 rounded-[9px] border border-[var(--color-line)] px-3.5 py-2.5">
+            <span className="min-w-0">
+              <span className="block">Cédula</span>
+              {collectDocument ? (
+                <label className="mt-1 flex items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
+                  <input
+                    type="checkbox"
+                    checked={documentRequired}
+                    onChange={(event) => onChange({ documentRequired: event.target.checked })}
+                    className="size-3.5 accent-[var(--color-primary)]"
+                  />
+                  Obligatoria
+                </label>
+              ) : (
+                <span className="block text-[13px] text-[var(--color-ink-muted)]">
+                  Para encontrar a tus clientes de domicilio sin su código.
+                </span>
+              )}
+            </span>
+            <input
+              type="checkbox"
+              checked={collectDocument}
+              onChange={(event) =>
+                onChange({
+                  collectDocument: event.target.checked,
+                  documentRequired: event.target.checked ? documentRequired : false,
+                })
+              }
+              aria-label="Pedir cédula"
+              className="size-4 shrink-0 accent-[var(--color-primary)]"
+            />
+          </div>
+        </li>
         {questions.map((question) => (
           <li key={question.id}>
             <label className="flex items-center justify-between gap-3 rounded-[9px] border border-[var(--color-line)] px-3.5 py-2.5">
@@ -287,9 +334,10 @@ export function SignupFormEditor({
               ))}
             </optgroup>
           ) : null}
-          {!collectPhone ? (
+          {!collectPhone || !collectDocument ? (
             <optgroup label="Datos básicos">
-              <option value="phone">Teléfono</option>
+              {!collectPhone ? <option value="phone">Teléfono</option> : null}
+              {!collectDocument ? <option value="document">Cédula</option> : null}
             </optgroup>
           ) : null}
           <option value="custom">Crear un campo propio…</option>

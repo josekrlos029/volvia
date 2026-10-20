@@ -29,6 +29,7 @@ export const stampSourceEnum = pgEnum('stamp_source', [
   'import',
   'campaign',
   'signup_bonus',
+  'remote',
 ])
 export const customerCardStatusEnum = pgEnum('customer_card_status', [
   'active',

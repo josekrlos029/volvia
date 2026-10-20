@@ -124,6 +124,13 @@ export const orgSettingsSchema = z.object({
   reservationsUrl: z.string().trim().url().max(500).or(z.literal('')).default(''),
   /** Whether the page offers the Google review link when the listing is connected. */
   pageShowReviews: z.boolean().default(true),
+  /**
+   * Lets the team stamp customers who are not at the counter (delivery orders), from
+   * the browser extension. Off by default: a stamp nobody witnessed is easier to abuse.
+   */
+  remoteStamping: z.boolean().default(false),
+  /** Remote stamps must carry the order number, so the owner can check them later. */
+  remoteStampingRequireOrder: z.boolean().default(false),
 })
 export type OrgSettings = z.infer<typeof orgSettingsSchema>
 

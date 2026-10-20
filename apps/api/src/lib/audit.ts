@@ -51,6 +51,7 @@ export const AUDIT_ACTIONS = {
   stampAdjusted: 'stamp.adjusted',
   rewardRedeemed: 'reward.redeemed',
   customerDeleted: 'customer.deleted',
+  customerDocumentSaved: 'customer.document_saved',
   customerExported: 'customer.exported',
   kioskOpened: 'kiosk.opened',
   kioskRevoked: 'kiosk.revoked',

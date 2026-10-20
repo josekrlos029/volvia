@@ -29,6 +29,12 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
       // It is a navigation, not a fetch, so it needs no CORS headers; it must simply
       // not be refused. `false` here means "no CORS headers", not "reject".
       if (origin === 'https://appleid.apple.com') return callback(null, false)
+      // The Volvia Biz browser extension. Browsers skip CORS for an extension that holds
+      // host permission for the API, so it needs no headers; any other extension gets
+      // none either, and so cannot read a response with the user's cookies.
+      if (/^(chrome-extension|safari-web-extension|moz-extension):\/\//.test(origin)) {
+        return callback(null, false)
+      }
       callback(new Error('origin not allowed'), false)
     },
     credentials: true,

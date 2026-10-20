@@ -40,6 +40,17 @@ export const phoneSchema = z
   })
   .pipe(z.string().min(7).max(16))
 
+/**
+ * A national ID (cédula) as people type it: dots, spaces and dashes are dropped and
+ * letters upper-cased, so "1.065.123.456" and "1065123456" are the same customer.
+ */
+export const documentNumberSchema = z
+  .string()
+  .trim()
+  .max(30)
+  .transform((value) => value.replace(/[^0-9A-Za-z]/g, '').toUpperCase())
+  .pipe(z.string().regex(/^[0-9A-Z]{5,20}$/, 'document_invalid'))
+
 /** IANA timezone; validated against the runtime's tz database rather than a static list. */
 export const timezoneSchema = z
   .string()

@@ -33,6 +33,8 @@ export const redisKeys = {
   entitlements: (orgId: string) => `ent:${orgId}`,
   cronLock: (job: string) => `lock:cron:${job}`,
   joinThrottle: (cardId: string, ip: string) => `throttle:join:${cardId}:${ip}`,
+  deviceCode: (userCode: string) => `device:code:${userCode}`,
+  devicePoll: (pollHash: string) => `device:poll:${pollHash}`,
 } as const
 
 /** Acquire a short-lived distributed lock. Returns a release function, or null if taken. */

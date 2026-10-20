@@ -31,6 +31,8 @@ export const ERROR_CODES = {
   REWARD_ALREADY_REDEEMED: 409,
   KIOSK_NONCE_INVALID: 401,
   KIOSK_NONCE_USED: 409,
+  /** The business has not turned on stamping customers who are not at the counter. */
+  REMOTE_STAMPING_DISABLED: 403,
 
   // generic
   VALIDATION_FAILED: 422,

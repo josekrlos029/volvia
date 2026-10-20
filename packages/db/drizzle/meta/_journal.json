@@ -92,6 +92,13 @@
       "when": 1791771933222,
       "tag": "0012_social_signup",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792459127068,
+      "tag": "0013_remote_stamping",
+      "breakpoints": true
     }
   ]
 }

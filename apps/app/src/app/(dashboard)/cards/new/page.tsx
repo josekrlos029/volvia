@@ -57,6 +57,8 @@ export default async function NewCardPage() {
           collectBirthday: true,
           collectPhone: false,
           phoneRequired: false,
+          collectDocument: false,
+          documentRequired: false,
           initialStamps: 0,
           messages: { variants: [], perStamp: {} },
           rules: { cooldownMinutes: 30, dailyCap: 2, kioskEnabled: false },

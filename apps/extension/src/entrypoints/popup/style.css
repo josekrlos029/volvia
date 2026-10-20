@@ -1,0 +1,37 @@
+@import "@volvia/ui/styles.css";
+
+/* Tailwind only scans what it is told to; the popup lives outside the shared package. */
+@source "../../components";
+@source "../../entrypoints";
+
+@font-face {
+  font-family: "Geist";
+  src: url("../../assets/fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("../../assets/fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --font-geist-sans: "Geist";
+  --font-geist-mono: "Geist Mono";
+}
+
+/* A fixed popup: Chrome caps it at 800×600, Safari sizes it to the content. */
+html,
+body {
+  width: 380px;
+  min-height: 520px;
+  margin: 0;
+}
+
+body {
+  background: var(--color-surface-muted);
+  font-size: 14px;
+}

@@ -16,7 +16,7 @@ import {
   stampEvents,
 } from '@volvia/db'
 import { cardDesignSchema } from '@volvia/shared'
-import type { JoinCardInput, StampResult, StampSource } from '@volvia/shared'
+import type { JoinCardInput, StampResult, StampResultDesign, StampSource } from '@volvia/shared'
 import { AppError } from '../../lib/errors'
 import { OUTBOX_KINDS, enqueue } from '../../lib/outbox'
 import { addDays, orgDay, orgHour, startOfOrgDay } from '../../lib/time'
@@ -145,6 +145,7 @@ export async function joinCard(
           birthdayMonth: input.data.birthday?.month ?? existingCustomer.birthdayMonth,
           birthdayDay: input.data.birthday?.day ?? existingCustomer.birthdayDay,
           phone: input.data.phone ?? existingCustomer.phone,
+          documentNumber: input.data.documentNumber ?? existingCustomer.documentNumber,
           marketingConsent: input.data.marketingConsent || existingCustomer.marketingConsent,
           consentAt: input.data.marketingConsent
             ? (existingCustomer.consentAt ?? now)
@@ -163,6 +164,7 @@ export async function joinCard(
           birthdayMonth: input.data.birthday?.month ?? null,
           birthdayDay: input.data.birthday?.day ?? null,
           phone: input.data.phone,
+          documentNumber: input.data.documentNumber,
           locale: input.data.locale ?? org.locale,
           marketingConsent: input.data.marketingConsent,
           consentAt: input.data.marketingConsent ? now : null,
@@ -369,7 +371,9 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
             now,
           })
     const factor =
-      command.source === 'staff_scan' || command.source === 'kiosk' ? multiplierFor(liveOffer) : 1
+      command.source === 'staff_scan' || command.source === 'kiosk' || command.source === 'remote'
+        ? multiplierFor(liveOffer)
+        : 1
     const granted = decision.granted * factor
     const note =
       command.note ?? (factor > 1 && liveOffer ? `x${factor} · ${liveOffer.headline}` : null)
@@ -501,9 +505,6 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
       )
       .orderBy(desc(rewardGrants.grantedAt))
 
-    const design = cardDesignSchema.parse(row.card.design ?? {})
-    const nextReward = cardRewards.find((reward) => reward.atStamp > crossing.finalCount) ?? null
-
     return {
       customerCardId: row.customerCard.id,
       stampsAdded: granted,
@@ -526,19 +527,39 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
         isNew: row.customerCard.lifetimeStamps === 0,
       },
       replayed: false,
-      design: {
-        businessName: row.org.name,
-        cardName: row.card.name,
-        logoUrl: design.logoUrl ?? row.org.logoUrl ?? null,
-        backgroundColor: design.backgroundColor,
-        foregroundColor: design.foregroundColor,
-        accentColor: design.accentColor,
-        emptyStampColor: design.emptyStampColor,
-        stampStyle: design.stampStyle,
-        stampIcon: design.stampIcon,
-        rewardPositions: cardRewards.map((reward) => reward.atStamp),
-        nextReward: nextReward ? { atStamp: nextReward.atStamp, title: nextReward.title } : null,
-      },
+      design: stampResultDesign({
+        org: row.org,
+        card: row.card,
+        rewards: cardRewards,
+        stampsCount: crossing.finalCount,
+      }),
     }
   })
+}
+
+/**
+ * How a card looks to the staff member who just stamped it, or is about to: the
+ * business's colours, the reward slots and what the customer is working towards.
+ */
+export function stampResultDesign(input: {
+  org: { name: string; logoUrl: string | null }
+  card: { name: string; design: unknown }
+  rewards: Array<{ atStamp: number; title: string }>
+  stampsCount: number
+}): StampResultDesign {
+  const design = cardDesignSchema.parse(input.card.design ?? {})
+  const nextReward = input.rewards.find((reward) => reward.atStamp > input.stampsCount) ?? null
+  return {
+    businessName: input.org.name,
+    cardName: input.card.name,
+    logoUrl: design.logoUrl ?? input.org.logoUrl ?? null,
+    backgroundColor: design.backgroundColor,
+    foregroundColor: design.foregroundColor,
+    accentColor: design.accentColor,
+    emptyStampColor: design.emptyStampColor,
+    stampStyle: design.stampStyle,
+    stampIcon: design.stampIcon,
+    rewardPositions: input.rewards.map((reward) => reward.atStamp),
+    nextReward: nextReward ? { atStamp: nextReward.atStamp, title: nextReward.title } : null,
+  }
 }

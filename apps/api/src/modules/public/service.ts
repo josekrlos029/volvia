@@ -324,6 +324,8 @@ export async function loadJoinPage(db: Database, joinSlug: string) {
       collectBirthday: row.card.collectBirthday,
       collectPhone: row.card.collectPhone,
       phoneRequired: row.card.phoneRequired,
+      collectDocument: row.card.collectDocument,
+      documentRequired: row.card.documentRequired,
       signupQuestionIds: row.card.signupQuestionIds,
     },
     rewards: cardRewards.map((reward) => ({

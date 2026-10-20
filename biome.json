@@ -9,6 +9,9 @@
     "ignore": [
       "**/node_modules/**",
       "**/.next/**",
+      "**/.output/**",
+      "**/.wxt/**",
+      "apps/extension/safari/**",
       "**/dist/**",
       "**/.turbo/**",
       "**/drizzle/**",

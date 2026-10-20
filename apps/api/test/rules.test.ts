@@ -161,3 +161,40 @@ describe('rewardsCrossed', () => {
     })
   })
 })
+
+describe('remote stamps', () => {
+  it('obey the cooldown like a scan at the counter', () => {
+    const decision = evaluateStamp({
+      now,
+      rules,
+      source: 'remote',
+      lastStampAt: new Date(now.getTime() - 10 * 60_000),
+      stampsToday: 1,
+      requestedCount: 1,
+    })
+    expect(decision).toMatchObject({ allowed: false, reason: 'cooldown' })
+  })
+
+  it('obey the daily cap and the per-scan maximum', () => {
+    expect(
+      evaluateStamp({
+        now,
+        rules,
+        source: 'remote',
+        lastStampAt: null,
+        stampsToday: 3,
+        requestedCount: 1,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'daily_cap' })
+    expect(
+      evaluateStamp({
+        now,
+        rules,
+        source: 'remote',
+        lastStampAt: null,
+        stampsToday: 0,
+        requestedCount: 10,
+      }),
+    ).toEqual({ allowed: true, granted: 2 })
+  })
+})

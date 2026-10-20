@@ -135,6 +135,8 @@ export async function createCard(
         collectBirthday: input.data.collectBirthday,
         collectPhone: input.data.collectPhone,
         phoneRequired: input.data.collectPhone && input.data.phoneRequired,
+        collectDocument: input.data.collectDocument,
+        documentRequired: input.data.collectDocument && input.data.documentRequired,
         initialStamps: input.data.initialStamps,
         messages: cardMessagesSchema.parse(input.data.messages ?? {}),
         signupQuestionIds: input.data.signupQuestionIds,
@@ -250,6 +252,10 @@ export async function updateCard(
         phoneRequired:
           (input.data.collectPhone ?? current.collectPhone) &&
           (input.data.phoneRequired ?? current.phoneRequired),
+        collectDocument: input.data.collectDocument ?? current.collectDocument,
+        documentRequired:
+          (input.data.collectDocument ?? current.collectDocument) &&
+          (input.data.documentRequired ?? current.documentRequired),
         initialStamps: input.data.initialStamps ?? current.initialStamps,
         messages: input.data.messages
           ? cardMessagesSchema.parse({ ...current.messages, ...input.data.messages })

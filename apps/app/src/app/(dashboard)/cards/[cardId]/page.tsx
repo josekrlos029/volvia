@@ -19,6 +19,8 @@ interface CardDetail {
   collectBirthday: boolean
   collectPhone: boolean
   phoneRequired: boolean
+  collectDocument: boolean
+  documentRequired: boolean
   initialStamps: number
   signupQuestionIds: string[]
   messages: CardMessages
@@ -108,6 +110,8 @@ export default async function CardDetailPage({ params }: { params: Promise<{ car
               collectBirthday: card.collectBirthday,
               collectPhone: card.collectPhone,
               phoneRequired: card.phoneRequired,
+              collectDocument: card.collectDocument,
+              documentRequired: card.documentRequired,
               signupQuestionIds: card.signupQuestionIds,
               initialStamps: card.initialStamps,
               messages: card.messages,

@@ -198,6 +198,9 @@ export const createCardSchema = z
     collectBirthday: z.boolean().default(true),
     collectPhone: z.boolean().default(false),
     phoneRequired: z.boolean().default(false),
+    /** The cédula, so a delivery customer can be found without their QR. */
+    collectDocument: z.boolean().default(false),
+    documentRequired: z.boolean().default(false),
     /**
      * Stamps granted the moment someone joins. A card that starts at zero feels like a
      * chore; one that starts with two feels like something already begun.
@@ -252,6 +255,8 @@ export const updateCardSchema = z.object({
   collectBirthday: z.boolean().optional(),
   collectPhone: z.boolean().optional(),
   phoneRequired: z.boolean().optional(),
+  collectDocument: z.boolean().optional(),
+  documentRequired: z.boolean().optional(),
   initialStamps: z.number().int().min(0).max(MAX_INITIAL_STAMPS).optional(),
   messages: cardMessagesSchema.partial().optional(),
   status: z.enum(CARD_STATUSES).optional(),
