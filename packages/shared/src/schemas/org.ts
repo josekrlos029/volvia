@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { parseGoogleListing } from '../google-listing'
 import { CURRENCIES } from '../plans'
 import { DEFAULT_VISIT_FREQUENCY, VISIT_FREQUENCIES } from '../segments'
 import { roleSchema } from './auth'
@@ -10,6 +11,26 @@ import {
   slugSchema,
   timezoneSchema,
 } from './common'
+
+/**
+ * A Place ID or a Google link (the "Pedir reseñas" one, or Maps). A bare number is the
+ * profile ID from the Business Profile settings, which Google's review form 404s on.
+ */
+const googleListingSchema = z
+  .string()
+  .trim()
+  .max(300)
+  .superRefine((value, ctx) => {
+    const parsed = parseGoogleListing(value)
+    if (!parsed || 'listing' in parsed) return
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        parsed.problem === 'numericId'
+          ? 'google_listing_numeric_id'
+          : 'google_listing_unrecognised',
+    })
+  })
 
 export const BUSINESS_CATEGORIES = [
   'cafe',
@@ -121,7 +142,7 @@ export const updateOrgSchema = z.object({
   contactEmail: emailSchema.nullable().optional(),
   contactPhone: z.string().trim().max(30).nullable().optional(),
   /** Shown on the public business page and used by the review-request flow. */
-  googlePlaceId: z.string().trim().max(120).nullable().optional(),
+  googlePlaceId: googleListingSchema.nullable().optional(),
 })
 export type UpdateOrgInput = z.infer<typeof updateOrgSchema>
 
@@ -131,7 +152,7 @@ const locationFieldsSchema = z.object({
   city: z.string().trim().max(80).nullable().default(null),
   timezone: timezoneSchema.optional(),
   phone: z.string().trim().max(30).nullable().default(null),
-  googlePlaceId: z.string().trim().max(120).nullable().default(null),
+  googlePlaceId: googleListingSchema.nullable().default(null),
   /** WGS84 decimal degrees. Feeds the wallet "you are near the shop" relevance. */
   latitude: z.number().min(-90).max(90).nullable().default(null),
   longitude: z.number().min(-180).max(180).nullable().default(null),

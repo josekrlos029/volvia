@@ -7,6 +7,7 @@ import {
   DEFAULT_NOTIFICATION_HOURS,
   type OrgSettings,
   VISIT_FREQUENCIES,
+  parseGoogleListing,
 } from '@volvia/shared'
 import { ApiError } from '@volvia/shared/client'
 import { useRouter } from 'next/navigation'
@@ -56,7 +57,22 @@ export function BusinessSettings({ org }: { org: Org }) {
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [error, setError] = useState<string | null>(null)
 
+  const listing = parseGoogleListing(value.googlePlaceId)
+  const listingProblem =
+    listing && 'problem' in listing
+      ? listing.problem === 'numericId'
+        ? 'Ese número es el ID del perfil y Google no lo acepta para reseñas. Pega el enlace de "Pedir reseñas" de tu ficha.'
+        : 'No reconocemos eso. Pega el enlace de "Pedir reseñas" de tu ficha de Google o su Place ID (ChIJ…).'
+      : null
+
+  // Open from the start while there is nothing to point at, so the steps are the first thing seen.
+  const [guideOpen, setGuideOpen] = useState(!org.googlePlaceId)
+
   async function save() {
+    if (listingProblem) {
+      setError(listingProblem)
+      return
+    }
     setStatus('saving')
     setError(null)
     try {
@@ -253,16 +269,27 @@ export function BusinessSettings({ org }: { org: Org }) {
         </Labelled>
 
         <Labelled
-          label="ID de tu ficha en Google"
+          label="Enlace de reseñas de Google"
           htmlFor="org-place"
-          help="Con esto podemos pedir reseñas a tus clientes felices."
+          help="Con esto pedimos reseñas a tus clientes felices."
         >
           <input
             id="org-place"
             value={value.googlePlaceId ?? ''}
             onChange={(event) => setValue({ ...value, googlePlaceId: event.target.value })}
+            aria-invalid={listingProblem ? true : undefined}
+            aria-describedby={listingProblem ? 'org-place-error' : undefined}
             className={field}
-            placeholder="ChIJ..."
+            placeholder="https://g.page/r/…/review"
+          />
+          {listingProblem ? (
+            <p id="org-place-error" className="text-[13px] leading-snug text-[var(--color-danger)]">
+              {listingProblem}
+            </p>
+          ) : null}
+          <GoogleReviewLinkGuide
+            open={guideOpen || listingProblem !== null}
+            onToggle={setGuideOpen}
           />
         </Labelled>
 
@@ -315,6 +342,67 @@ export function BusinessSettings({ org }: { org: Org }) {
         </div>
       </div>
     </Panel>
+  )
+}
+
+/**
+ * How to get a link Google's review form accepts. The profile ID that Google shows in the
+ * profile settings is only digits and looks like the right thing, so the guide warns about it.
+ */
+function GoogleReviewLinkGuide({
+  open,
+  onToggle,
+}: {
+  open: boolean
+  onToggle: (open: boolean) => void
+}) {
+  return (
+    <details
+      open={open}
+      onToggle={(event) => onToggle(event.currentTarget.open)}
+      className="rounded-[10px] border border-[var(--color-line)]"
+    >
+      <summary className="cursor-pointer px-3.5 py-2.5 text-[14px] font-medium">
+        ¿Cómo saco el enlace?
+      </summary>
+      <div className="flex flex-col gap-3 border-t border-[var(--color-line)] p-3.5 text-[13px] leading-relaxed">
+        <ol className="flex list-decimal flex-col gap-1.5 pl-5">
+          <li>
+            Entra a Google (en el computador o en la app de Google Maps) con la cuenta que
+            administra tu negocio.
+          </li>
+          <li>
+            Busca el nombre de tu negocio. Arriba aparece el panel de tu perfil; en Maps, ve a la
+            pestaña <strong>Negocio</strong>.
+          </li>
+          <li>
+            Toca <strong>Pedir reseñas</strong> (a veces dice <strong>Obtener más reseñas</strong>).
+          </li>
+          <li>
+            Copia el enlace que aparece. Empieza por <code>https://g.page/r/</code>.
+          </li>
+          <li>
+            Pégalo arriba y toca <strong>Guardar</strong>.
+          </li>
+        </ol>
+        <p className="rounded-[9px] bg-[var(--color-surface-muted)] px-3 py-2">
+          No uses el <strong>ID de perfil de empresa</strong> (solo números, como
+          5711072861332373611): Google no lo acepta para reseñas.
+        </p>
+        <p className="text-[var(--color-ink-muted)]">
+          ¿Ya tienes el Place ID (empieza por ChIJ)? También sirve. Puedes buscarlo con el{' '}
+          <a
+            href="https://developers.google.com/maps/documentation/places/web-service/place-id#find-id"
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+          >
+            buscador de Place ID de Google
+          </a>
+          .
+        </p>
+      </div>
+    </details>
   )
 }
 

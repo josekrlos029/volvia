@@ -5,7 +5,7 @@ import { PageWorkspace } from '@/components/PageWorkspace'
 import { PublicPageSettings } from '@/components/PublicPageSettings'
 import { Panel } from '@/components/ui'
 import { apiFetch } from '@/lib/session'
-import type { Currency, OrgSettings } from '@volvia/shared'
+import { type Currency, type OrgSettings, googleReviewUrl } from '@volvia/shared'
 
 interface Org {
   name: string
@@ -57,7 +57,7 @@ export default async function PagePage() {
           accentColor={org.settings.pageAccentColor}
           reservationsUrl={org.settings.reservationsUrl}
           showReviews={org.settings.pageShowReviews}
-          hasGoogleListing={Boolean(org.googlePlaceId)}
+          hasGoogleListing={googleReviewUrl(org.googlePlaceId) !== null}
           contactPhone={org.contactPhone}
         />
         <GuestWifiSettings wifi={org.settings.guestWifi} />

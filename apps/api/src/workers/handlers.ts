@@ -14,7 +14,7 @@ import {
   stampCards,
   walletPasses,
 } from '@volvia/db'
-import { type Audience, audienceSchema, renderCampaignText } from '@volvia/shared'
+import { type Audience, audienceSchema, googleReviewUrl, renderCampaignText } from '@volvia/shared'
 import { env } from '../env'
 import {
   type Mailer,
@@ -442,7 +442,7 @@ export function buildHandlers(deps: {
         .limit(1)
 
       // Only worth recording when the business actually has a Google listing.
-      if (!row?.googlePlaceId) return
+      if (!row || !googleReviewUrl(row.googlePlaceId)) return
 
       await context.db.insert(reviewRequests).values({
         orgId: row.orgId,

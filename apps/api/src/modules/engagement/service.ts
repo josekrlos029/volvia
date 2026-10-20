@@ -17,7 +17,7 @@ import {
   surveyResponses,
   surveys,
 } from '@volvia/db'
-import { REVIEW_REQUEST_COOLDOWN_DAYS, type VisitFrequency } from '@volvia/shared'
+import { REVIEW_REQUEST_COOLDOWN_DAYS, type VisitFrequency, googleReviewUrl } from '@volvia/shared'
 import type {
   AutomationInput,
   AutomationType,
@@ -272,12 +272,13 @@ export async function submitSurveyResponse(
     .limit(1)
 
   const paused = org?.settings?.reviewRequestsPaused === true
+  const reviewUrl = googleReviewUrl(org?.googlePlaceId)
 
   const happyEnough =
     survey.routeToReviewFromRating !== null &&
     rating !== null &&
     rating >= survey.routeToReviewFromRating &&
-    Boolean(org?.googlePlaceId) &&
+    reviewUrl !== null &&
     !paused
 
   // Nobody should be asked for a public review twice in the same half year, however
@@ -312,9 +313,7 @@ export async function submitSurveyResponse(
   return {
     thanks: true,
     reviewRequestId,
-    reviewUrl: shouldAskForReview
-      ? `https://search.google.com/local/writereview?placeid=${org!.googlePlaceId}`
-      : null,
+    reviewUrl: shouldAskForReview ? reviewUrl : null,
   }
 }
 
@@ -372,7 +371,7 @@ export async function reviewStats(
   ])
 
   return {
-    connected: Boolean(org?.googlePlaceId),
+    connected: googleReviewUrl(org?.googlePlaceId) !== null,
     paused: org?.settings?.reviewRequestsPaused === true,
     shown: totals?.shown ?? 0,
     opened: totals?.opened ?? 0,

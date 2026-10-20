@@ -13,6 +13,8 @@ import {
 import {
   type PublicCardState,
   cardMessagesSchema,
+  googleMapsUrl,
+  googleReviewUrl,
   orgSettingsSchema,
   pickCardMessage,
   renderCampaignText,
@@ -104,9 +106,7 @@ export async function loadPublicCardState(db: Database, token: string): Promise<
       locations: orgLocations.map((location) => ({
         name: location.name,
         address: location.address,
-        mapsUrl: location.googlePlaceId
-          ? `https://www.google.com/maps/place/?q=place_id:${location.googlePlaceId}`
-          : null,
+        mapsUrl: googleMapsUrl(location.googlePlaceId),
       })),
     },
     card: {
@@ -236,9 +236,7 @@ export async function loadBusinessPage(db: Database, slug: string) {
         address: String(org.settings?.legalAddress ?? ''),
         email: String(org.settings?.privacyEmail ?? '') || org.contactEmail || '',
       },
-      googleReviewUrl: org.googlePlaceId
-        ? `https://search.google.com/local/writereview?placeid=${org.googlePlaceId}`
-        : null,
+      googleReviewUrl: googleReviewUrl(org.googlePlaceId),
     },
     locations: orgLocations.map((location) => ({
       name: location.name,
@@ -246,9 +244,7 @@ export async function loadBusinessPage(db: Database, slug: string) {
       city: location.city,
       phone: location.phone,
       hours: location.hours,
-      mapsUrl: location.googlePlaceId
-        ? `https://www.google.com/maps/place/?q=place_id:${location.googlePlaceId}`
-        : null,
+      mapsUrl: googleMapsUrl(location.googlePlaceId),
     })),
     cards: activeCards.map((card) => ({
       name: card.name,
