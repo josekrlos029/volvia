@@ -47,6 +47,7 @@ const content: PassContent = {
     { latitude: 4.6097, longitude: -74.0817 },
   ],
   offer: null,
+  nearbyMessage: null,
   latestMessage: null,
   customerName: 'Laura',
   about: 'Hamburguesas a la parrilla desde 2014.',

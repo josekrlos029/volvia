@@ -43,6 +43,8 @@ export async function getOrg(db: Database, orgId: string) {
  */
 const PASS_DESIGN_FIELDS = ['name', 'logoUrl', 'coverUrl'] as const
 const PASS_DETAIL_FIELDS = ['socialLinks', 'contactPhone', 'contactEmail', 'about'] as const
+/** Settings the pass reads; the rest (legal, page, hours) never reach a phone. */
+const PASS_SETTINGS = ['nearbyMessage'] as const
 
 function changedAny<T extends object>(before: T, after: T, keys: readonly (keyof T)[]): boolean {
   return keys.some((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
@@ -85,7 +87,10 @@ export async function updateOrg(db: Database, orgId: string, input: UpdateOrgInp
     // changed nothing the pass uses stays silent: no outbox rows, no pushes.
     if (changedAny(before, updated, PASS_DESIGN_FIELDS)) {
       await enqueueWalletUpdatesForOrg(tx, orgId, { reason: 'design' })
-    } else if (changedAny(before, updated, PASS_DETAIL_FIELDS)) {
+    } else if (
+      changedAny(before, updated, PASS_DETAIL_FIELDS) ||
+      changedAny(before.settings, updated.settings, PASS_SETTINGS)
+    ) {
       await enqueueWalletUpdatesForOrg(tx, orgId, { reason: 'details' })
     }
     return updated

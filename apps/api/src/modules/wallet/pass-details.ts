@@ -1,5 +1,5 @@
-import type { Locale } from '@volvia/shared'
-import { socialLinkLabel } from '@volvia/shared'
+import type { CampaignTextContext, Locale } from '@volvia/shared'
+import { orgSettingsSchema, renderCampaignText, socialLinkLabel } from '@volvia/shared'
 import type { PassLink } from '@volvia/wallet'
 
 /**
@@ -34,6 +34,18 @@ export function pinsOf(rows: PassLocation[]): Array<{ latitude: number; longitud
         : [],
     )
     .slice(0, MAX_PASS_PINS)
+}
+
+/**
+ * The business's own lock-screen wording, rendered for one customer. Null when it wrote
+ * none (or its variables render to nothing), so the pass falls back to the stamp count.
+ */
+export function nearbyMessageOf(
+  settings: Record<string, unknown> | null,
+  context: CampaignTextContext,
+): string | null {
+  const { nearbyMessage } = orgSettingsSchema.parse(settings ?? {})
+  return renderCampaignText(nearbyMessage, context).trim() || null
 }
 
 /**

@@ -42,6 +42,8 @@ export interface PassContent {
    * to it is derived from the card state, so it is never stored here.
    */
   places: Array<{ latitude: number; longitude: number }>
+  /** The business's own nearby wording, rendered for this customer. Null uses the default. */
+  nearbyMessage: string | null
   /** A campaign or birthday offer live on this card, already worded for this customer. */
   offer: PassOffer | null
   /**

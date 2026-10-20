@@ -2,7 +2,9 @@
 
 import { api } from '@/lib/api-client'
 import { mapsUrl, parseCoordinates, roundCoordinate } from '@/lib/geo'
+import { VARIABLE_HELP } from '@/lib/segments'
 import { WEEKDAY_SHORT, WEEK_ORDER } from '@volvia/shared'
+import { ApiError } from '@volvia/shared/client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Panel, buttonClass } from './ui'
@@ -47,7 +49,13 @@ const field =
  * so the browser's own position is the quickest pin, and a pasted Maps link covers the
  * rest without a paid API behind it.
  */
-export function LocationsSettings({ locations }: { locations: Location[] }) {
+export function LocationsSettings({
+  locations,
+  nearbyMessage,
+}: {
+  locations: Location[]
+  nearbyMessage: string
+}) {
   return (
     <Panel title="Sedes">
       <p className="mb-4 text-[13px] leading-snug text-[var(--color-ink-muted)]">
@@ -57,12 +65,91 @@ export function LocationsSettings({ locations }: { locations: Location[] }) {
         dirección, el teléfono y el horario de la primera sede también se muestran en el reverso de
         la tarjeta en Apple Wallet y en los detalles en Google Wallet.
       </p>
+      <NearbyMessage saved={nearbyMessage} />
       <ul className="flex flex-col divide-y divide-[var(--color-line)]">
         {locations.map((location) => (
           <LocationRow key={location.id} location={location} />
         ))}
       </ul>
     </Panel>
+  )
+}
+
+/** Variables worth using near the shop; the hour would be frozen at the last pass update. */
+const NEARBY_VARIABLES = ['name', 'business', 'stamps', 'remaining'] as const
+const NEARBY_MAX = 100
+
+/** The business's own lock-screen line, in place of the stamp count. */
+function NearbyMessage({ saved }: { saved: string }) {
+  const router = useRouter()
+  const [value, setValue] = useState(saved)
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [error, setError] = useState<string | null>(null)
+
+  async function save() {
+    setStatus('saving')
+    setError(null)
+    try {
+      await api.patch('/v1/org', { settings: { nearbyMessage: value.trim() } })
+      setStatus('saved')
+      router.refresh()
+      setTimeout(() => setStatus('idle'), 2_000)
+    } catch (caught) {
+      setStatus('idle')
+      setError(caught instanceof ApiError ? caught.message : 'No pudimos guardar el mensaje.')
+    }
+  }
+
+  return (
+    <div className="mb-5 flex flex-col gap-2 rounded-[11px] border border-[var(--color-line)] p-4">
+      <label htmlFor="nearby-message" className="text-[14px] font-medium">
+        Mensaje cuando el cliente está cerca
+      </label>
+      <input
+        id="nearby-message"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        maxLength={NEARBY_MAX}
+        placeholder="Estás cerca de {{business}}. Llevas {{stamps}} sellos."
+        className="w-full rounded-[9px] border border-[var(--color-line)] bg-white px-3.5 py-2.5 text-[14px] placeholder:text-[#8A908A] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25"
+      />
+      <div className="flex flex-wrap gap-1.5">
+        {NEARBY_VARIABLES.map((name) => (
+          <button
+            key={name}
+            type="button"
+            title={VARIABLE_HELP[name]}
+            onClick={() => setValue((current) => `${current}{{${name}}}`.slice(0, NEARBY_MAX))}
+            className="rounded-full border border-[var(--color-line)] px-2.5 py-0.5 text-[12px] text-[var(--color-ink-muted)] hover:border-[var(--color-primary)]"
+          >
+            {`{{${name}}}`}
+          </button>
+        ))}
+      </div>
+      <p className="text-[13px] leading-snug text-[var(--color-ink-muted)]">
+        Se ve en el iPhone; Google Wallet muestra su propio aviso. Si el cliente tiene una
+        recompensa lista o hay una campaña activa, se muestra eso primero. Déjalo vacío para mostrar
+        los sellos que lleva. {value.length}/{NEARBY_MAX}
+      </p>
+      {error ? (
+        <p role="alert" className="text-[13px] text-[var(--color-danger)]">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={status === 'saving' || value.trim() === saved}
+          className={buttonClass('primary', 'sm')}
+        >
+          {status === 'saving' ? 'Guardando' : 'Guardar'}
+        </button>
+        {status === 'saved' ? (
+          <span className="text-[14px] text-[var(--color-success)]">Guardado</span>
+        ) : null}
+      </div>
+    </div>
   )
 }
 

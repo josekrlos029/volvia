@@ -54,6 +54,7 @@ const content: PassContent = {
   cardUrl: 'http://localhost:3002/c/abc123def456ghi789',
   places: [{ latitude: 10.46, longitude: -73.25 }],
   offer: null,
+  nearbyMessage: null,
   latestMessage: null,
   customerName: 'Laura',
   about: 'Hamburguesas a la parrilla desde 2014.',
@@ -358,6 +359,36 @@ describe('pass.json', () => {
     it('leads with the reward when one is waiting: that is the moment to walk in', () => {
       const json = buildPassJson(
         { ...content, stampsCount: 0, pendingRewardCount: 1 },
+        options,
+      ) as unknown as StoreCardPass
+      expect(json.locations[0]!.relevantText).toBe(
+        'Estás cerca de Burger Train. ¡Tienes una recompensa lista!',
+      )
+    })
+
+    it("uses the business's own wording when it wrote one", () => {
+      const json = buildPassJson(
+        { ...content, nearbyMessage: '¡Pasa por tu café! Hoy 2x1' },
+        options,
+      ) as unknown as StoreCardPass
+      expect(json.locations[0]!.relevantText).toBe('¡Pasa por tu café! Hoy 2x1')
+    })
+
+    it("prefers a live offer over the business's standing wording", () => {
+      const json = buildPassJson(
+        {
+          ...content,
+          nearbyMessage: '¡Pasa por tu café!',
+          offer: offerOf('Sellos dobles hasta el domingo'),
+        },
+        options,
+      ) as unknown as StoreCardPass
+      expect(json.locations[0]!.relevantText).toBe('Sellos dobles hasta el domingo')
+    })
+
+    it('still leads with a waiting reward over custom wording', () => {
+      const json = buildPassJson(
+        { ...content, pendingRewardCount: 1, nearbyMessage: '¡Pasa por tu café!' },
         options,
       ) as unknown as StoreCardPass
       expect(json.locations[0]!.relevantText).toBe(

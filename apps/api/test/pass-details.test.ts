@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   type PassLocation,
+  nearbyMessageOf,
   passLinksFor,
   pinsOf,
   primaryPlaceOf,
@@ -137,5 +138,21 @@ describe('passLinksFor', () => {
         locale: 'es',
       }),
     ).toEqual([])
+  })
+})
+
+describe('nearbyMessageOf', () => {
+  const context = { name: 'Ana', business: 'Café Raíces', stamps: 3, remaining: 7, hour: 9 }
+
+  it("renders the business's wording for the customer", () => {
+    expect(
+      nearbyMessageOf({ nearbyMessage: 'Hola {{name}}, te faltan {{remaining}}' }, context),
+    ).toBe('Hola Ana, te faltan 7')
+  })
+
+  it('is null when there is no wording, so the pass falls back to the stamp count', () => {
+    expect(nearbyMessageOf({}, context)).toBeNull()
+    expect(nearbyMessageOf(null, context)).toBeNull()
+    expect(nearbyMessageOf({ nearbyMessage: '{{name}}' }, { ...context, name: '' })).toBeNull()
   })
 })

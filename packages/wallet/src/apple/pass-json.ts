@@ -68,15 +68,16 @@ const STRINGS = {
 } as const
 
 /**
- * What the lock screen says next to the pass when the customer is near the shop. Built
- * from the card state rather than stored, so every rebuild (each stamp triggers one)
- * keeps it true.
+ * What the lock screen says next to the pass when the customer is near the shop. A
+ * waiting reward wins, then a live offer, then the business's own wording, then the
+ * stamp count. Rebuilt with every pass, so it never goes stale.
  */
 export function nearbyText(content: PassContent): string {
   const strings = STRINGS[content.locale]
-  return content.pendingRewardCount > 0
-    ? strings.nearbyReward(content.organizationName)
-    : strings.nearby(content.organizationName, content.stampsCount, content.stampsRequired)
+  if (content.pendingRewardCount > 0) return strings.nearbyReward(content.organizationName)
+  if (content.offer?.message) return content.offer.message
+  if (content.nearbyMessage) return content.nearbyMessage
+  return strings.nearby(content.organizationName, content.stampsCount, content.stampsRequired)
 }
 
 /** Stamps still to earn before the next reward (or the end of the card). */

@@ -40,7 +40,7 @@ import { derivePassAuthToken } from '../../lib/tokens'
 import { resolveOfferWords } from '../engagement/offer-words'
 import { loadLiveOffer } from '../engagement/offers'
 import { walletConfig } from './config'
-import { passLinksFor, pinsOf, primaryPlaceOf } from './pass-details'
+import { nearbyMessageOf, passLinksFor, pinsOf, primaryPlaceOf } from './pass-details'
 
 /**
  * Assembles everything a pass shows, from the customer's current card state.
@@ -158,6 +158,7 @@ export async function loadPassContent(
           : design.stampStyle,
       cardUrl: `${env.PASS_URL}/c/${row.customerCard.token}`,
       places,
+      nearbyMessage: nearbyMessageOf(row.org.settings, textContext),
       offer:
         liveOffer && offerWords && override
           ? {

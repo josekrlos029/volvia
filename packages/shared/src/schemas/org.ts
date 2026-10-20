@@ -96,6 +96,11 @@ export const orgSettingsSchema = z.object({
   notificationHours: notificationHoursSchema,
   /** How often a good customer is expected back. Drives the community segments. */
   visitFrequency: z.enum(VISIT_FREQUENCIES).default(DEFAULT_VISIT_FREQUENCY),
+  /**
+   * What the iPhone lock screen says next to the pass near a branch. Takes the campaign
+   * variables; empty means the stamp count. Google words its own nearby notice.
+   */
+  nearbyMessage: z.string().trim().max(100).default(''),
   /** Legal entity shown on the public page and in the privacy notice. */
   legalName: z.string().trim().max(160).default(''),
   taxId: z.string().trim().max(40).default(''),

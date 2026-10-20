@@ -70,7 +70,7 @@ export default async function SettingsPage() {
         </Link>
       </p>
 
-      <LocationsSettings locations={locations} />
+      <LocationsSettings locations={locations} nearbyMessage={org.settings.nearbyMessage ?? ''} />
 
       <LegalSettings settings={org.settings} slug={org.slug} />
 

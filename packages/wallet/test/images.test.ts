@@ -30,6 +30,7 @@ const content: PassContent = {
   cardUrl: 'http://localhost:3002/c/abc123def456ghi789',
   places: [],
   offer: null,
+  nearbyMessage: null,
   latestMessage: null,
   customerName: '',
   about: '',
