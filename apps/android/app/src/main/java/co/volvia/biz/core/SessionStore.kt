@@ -71,6 +71,34 @@ class SessionStore(context: Context) : TokenSource {
     }
 
     /**
+     * A fresher copy of the user from `/v1/auth/me`: a role or a pinned location changed
+     * in the dashboard reaches the counter without signing out and in again.
+     */
+    fun updateUser(value: SessionUser) {
+        prefs.edit().putString("user", json.encodeToString(value)).apply()
+        user = value
+        val selected = membership?.orgId
+        membership = value.memberships.firstOrNull { it.orgId == selected } ?: value.memberships.firstOrNull()
+    }
+
+    /** The location this phone stamps for, remembered per business. */
+    fun locationId(orgId: String): String? = prefs.getString("location.$orgId", null)
+
+    fun setLocationId(orgId: String, locationId: String?) {
+        prefs.edit().apply {
+            if (locationId == null) remove("location.$orgId") else putString("location.$orgId", locationId)
+        }.apply()
+    }
+
+    /**
+     * "Sellado rápido": one stamp the moment a card is read, the 1.1 behaviour. On by
+     * default so nobody who already uses the app finds the counter slower after updating.
+     */
+    var quickStamp: Boolean
+        get() = prefs.getBoolean("quickStamp", true)
+        set(value) = prefs.edit().putBoolean("quickStamp", value).apply()
+
+    /**
      * Clears the session but never the pending queue: stamps already taken from real
      * customers are not ours to discard because somebody signed out.
      */
@@ -78,7 +106,11 @@ class SessionStore(context: Context) : TokenSource {
         prefs.edit().remove("accessToken").remove("refreshToken").remove("user").apply()
         user = null
         membership = null
+        onChange?.invoke()
     }
+
+    /** Told when the session ends, including a refresh the server refused mid-request. */
+    var onChange: (() -> Unit)? = null
 
     private fun readUser(): SessionUser? =
         prefs.getString("user", null)?.let { stored ->

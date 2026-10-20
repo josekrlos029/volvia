@@ -1,1 +1,7 @@
-Primera versión: inicio de sesión, escáner de tarjetas, entrega de recompensas y cola de sellos sin conexión.
+Volvia Biz 1.2 trae el mostrador completo al teléfono:
+• Vista previa antes de sellar: cantidad de sellos, monto de la compra y premios por entregar.
+• Deshacer un sello durante 5 minutos y entregar premios tecleando su código.
+• Nueva pestaña Hoy con tus sellos del día y los cumpleaños que vienen.
+• Clientes: búsqueda, perfil con historial e inscripción en el mostrador con QR y envío por WhatsApp.
+• Para dueños y administradores: estadísticas, mensajes, campañas, equipo y modo kiosko.
+• Elige la sede del teléfono y muestra el QR de inscripción a pantalla completa.

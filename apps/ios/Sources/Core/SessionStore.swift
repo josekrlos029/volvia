@@ -47,9 +47,48 @@ final class SessionStore: ObservableObject {
         keychain.write("accessToken", token)
     }
 
+    /// `/v1/auth/me` answered: roles and pinned locations may have changed since the
+    /// session was saved (an owner promoted somebody, or moved them to another branch).
+    func update(_ fresh: SessionUser) {
+        guard accessToken != nil else { return }
+        if let encoded = try? JSONEncoder().encode(fresh),
+           let json = String(data: encoded, encoding: .utf8) {
+            keychain.write("user", json)
+        }
+        user = fresh
+        let current = membership?.orgId
+        membership = fresh.memberships.first { $0.orgId == current } ?? fresh.memberships.first
+    }
+
     func select(_ membership: Membership) {
         self.membership = membership
         UserDefaults.standard.set(membership.orgId, forKey: selectedOrgKey)
+    }
+
+    // MARK: - Counter preferences
+
+    /// The location this phone stamps for, remembered per business. A member pinned to
+    /// one location always uses that one, whatever was stored.
+    var locationId: String? {
+        if let pinned = membership?.locationId { return pinned }
+        guard let orgId = membership?.orgId else { return nil }
+        return UserDefaults.standard.string(forKey: "locationId.\(orgId)")
+    }
+
+    func selectLocation(_ id: String?) {
+        guard let orgId = membership?.orgId else { return }
+        objectWillChange.send()
+        UserDefaults.standard.set(id, forKey: "locationId.\(orgId)")
+    }
+
+    /// "Sellado rápido": one stamp straight from the camera, as 1.1 did. On by default
+    /// so nobody who already uses the app finds the counter slower after updating.
+    var quickStamp: Bool {
+        get { UserDefaults.standard.object(forKey: "quickStamp") as? Bool ?? true }
+        set {
+            objectWillChange.send()
+            UserDefaults.standard.set(newValue, forKey: "quickStamp")
+        }
     }
 
     /// Clears the session but never the pending queue: stamps already taken from real

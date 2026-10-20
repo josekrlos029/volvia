@@ -14,9 +14,14 @@ data class Membership(
     val orgId: String,
     val orgName: String,
     val orgSlug: String,
+    /** `owner`, `admin` or `staff`: decides which parts of "Más" exist at all. */
     val role: String,
+    /** Set when the member is pinned to one location; the API enforces it either way. */
     val locationId: String? = null,
-)
+) {
+    val isAdmin: Boolean get() = role == "owner" || role == "admin"
+    val isOwner: Boolean get() = role == "owner"
+}
 
 @Serializable
 data class SessionUser(
@@ -50,6 +55,9 @@ data class StampCustomer(val id: String, val firstName: String, val isNew: Boole
 
 @Serializable
 data class StampResult(
+    val customerCardId: String? = null,
+    /** The ledger row this scan wrote; what "Deshacer" sends back. Absent on old replays. */
+    val eventId: String? = null,
     val stampsAdded: Int,
     val stampsCount: Int,
     val stampsRequired: Int,
@@ -86,7 +94,17 @@ data class StampResultDesign(
 )
 
 @Serializable
-data class RedeemResult(val grantId: String, val title: String)
+data class RedeemCustomer(val id: String, val firstName: String)
+
+@Serializable
+data class RedeemResult(
+    val grantId: String,
+    val title: String,
+    val customer: RedeemCustomer? = null,
+    val stampsCount: Int = 0,
+    val stampsRequired: Int = 0,
+    val remainingPending: Int = 0,
+)
 
 /**
  * Request bodies, as types rather than string templates.
@@ -101,16 +119,29 @@ data class LoginRequest(val email: String, val password: String)
 @Serializable
 data class GoogleLoginRequest(val idToken: String)
 
+/** Nulls are left out on the wire (`explicitNulls = false`): the API's fields are optional, not nullable. */
 @Serializable
 data class StampRequest(
-    val cardToken: String,
+    val cardToken: String? = null,
+    val customerCardId: String? = null,
     val count: Int,
+    val locationId: String? = null,
     val idempotencyKey: String,
+    /** Whole pesos, required by a `min_spend` card. */
+    val purchaseAmount: Long? = null,
     val occurredAt: String,
+    val note: String? = null,
 )
 
+/** One of `grantId`, `code` (typed at the till) or `cardToken` (the oldest reward waiting). */
 @Serializable
-data class RedeemRequest(val grantId: String, val idempotencyKey: String)
+data class RedeemRequest(
+    val grantId: String? = null,
+    val code: String? = null,
+    val cardToken: String? = null,
+    val locationId: String? = null,
+    val idempotencyKey: String,
+)
 
 @Serializable
 data class RefreshRequest(val refreshToken: String)
@@ -118,7 +149,16 @@ data class RefreshRequest(val refreshToken: String)
 @Serializable
 private data class ApiErrorEnvelope(val error: Body) {
     @Serializable
-    data class Body(@SerialName("code") val code: String, val message: String)
+    data class Body(
+        @SerialName("code") val code: String,
+        val message: String,
+        /** The plan that would unlock a FEATURE_NOT_IN_PLAN / PLAN_LIMIT_REACHED. */
+        val upgradeTo: String? = null,
+        val details: List<Detail> = emptyList(),
+    )
+
+    @Serializable
+    data class Detail(val path: String, val message: String)
 }
 
 /**
@@ -131,10 +171,24 @@ data class ApiException(
     val status: Int,
     val code: String,
     override val message: String,
+    val upgradeTo: String? = null,
+    /** Seconds until the cooldown ends, when the API said so. */
+    val retryAfterSeconds: Int? = null,
 ) : Exception(message) {
 
+    /**
+     * Worth retrying later. A 429 is usually the rate limiter, but the cooldown and the
+     * daily cap also answer 429, and those are the card's rules saying no: retrying them
+     * from the queue would only turn a clear "not yet" into a rejection hours later.
+     */
     val isTransient: Boolean
-        get() = status == 0 || status >= 500 || status == 408 || status == 429
+        get() = when {
+            code in BUSINESS_REFUSALS -> false
+            else -> status == 0 || status >= 500 || status == 408 || status == 429
+        }
+
+    /** The plan does not include this; shown as "Disponible en el plan X", never as an error. */
+    val isPlanGate: Boolean get() = code == "FEATURE_NOT_IN_PLAN" || code == "PLAN_LIMIT_REACHED"
 
     /** The server already applied this exact scan. */
     val isAlreadyApplied: Boolean get() = code == "CONFLICT"
@@ -144,9 +198,21 @@ data class ApiException(
     companion object {
         val offline = ApiException(0, "OFFLINE", "sin conexión")
 
+        /** Permanent "no" from the card's rules, whatever the HTTP status says. */
+        val BUSINESS_REFUSALS = setOf("STAMP_COOLDOWN_ACTIVE", "STAMP_DAILY_CAP_REACHED")
+
         fun decode(status: Int, body: String, json: kotlinx.serialization.json.Json): ApiException =
             runCatching { json.decodeFromString<ApiErrorEnvelope>(body) }
-                .map { ApiException(status, it.error.code, it.error.message) }
+                .map { envelope ->
+                    val error = envelope.error
+                    ApiException(
+                        status,
+                        error.code,
+                        error.message,
+                        error.upgradeTo,
+                        error.details.firstOrNull { it.path == "retryAfterSeconds" }?.message?.toIntOrNull(),
+                    )
+                }
                 .getOrElse { ApiException(status, "INTERNAL", "error $status") }
     }
 }

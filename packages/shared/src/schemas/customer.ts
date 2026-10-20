@@ -10,6 +10,7 @@ import {
   phoneSchema,
   sortOrderSchema,
 } from './common'
+import type { StampResult } from './loyalty'
 
 /** What a customer fills in when they join a card from the public QR. */
 export const joinCardSchema = z.object({
@@ -36,6 +37,33 @@ export const joinCardSchema = z.object({
   captchaToken: z.string().max(4000).optional(),
 })
 export type JoinCardInput = z.infer<typeof joinCardSchema>
+
+/**
+ * A staff member signs the customer up at the counter, from the Biz app. Same data as
+ * the public form minus the captcha (the staff session is the anti-abuse), and the
+ * customer's authorisation to keep their data must be ticked explicitly.
+ */
+export const staffEnrollSchema = joinCardSchema.omit({ captchaToken: true, answers: true }).extend({
+  cardId: z.string().uuid(),
+  /** Habeas Data: the customer said yes, out loud, to the staff member. */
+  dataConsent: z.literal(true),
+  /** Add the first stamp of this visit in the same step. */
+  stampNow: z.boolean().default(false),
+  locationId: z.string().uuid().optional(),
+  idempotencyKey: z.string().min(8).max(80),
+})
+export type StaffEnrollInput = z.infer<typeof staffEnrollSchema>
+
+export interface StaffEnrollResult {
+  customerId: string
+  isNew: boolean
+  cardToken: string
+  /** The customer's card page, to send by WhatsApp or show as a QR. */
+  cardUrl: string
+  walletPasses: { appleUrl: string; googleUrl: string }
+  /** The first stamp, when asked for and the card's rules allowed it. */
+  stamp: StampResult | null
+}
 
 export const updateCustomerSchema = z.object({
   firstName: z.string().trim().min(1).max(60).optional(),

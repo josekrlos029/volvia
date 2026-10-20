@@ -66,10 +66,23 @@ struct CardLook: Hashable, Sendable {
 
     init?(_ result: StampResult) {
         guard let design = result.design else { return nil }
-        let unlocked = !result.unlockedRewards.isEmpty
+        self.init(
+            design: design,
+            stampsCount: result.stampsCount,
+            stampsRequired: result.stampsRequired,
+            unlocked: !result.unlockedRewards.isEmpty
+        )
+    }
+
+    /// The card as it stands, before a stamp: the preview sheet and the profile.
+    init(_ lookup: CardLookup) {
+        self.init(design: lookup.design, stampsCount: lookup.stampsCount, stampsRequired: lookup.card.stampsRequired, unlocked: false)
+    }
+
+    init(design: StampResultDesign, stampsCount: Int, stampsRequired: Int, unlocked: Bool) {
         // Completing the card starts a new cycle at 0 on the server; an empty grid next to
         // "¡Ganó…!" reads like the stamp was lost, so show it full.
-        let shown = unlocked && result.stampsCount == 0 ? result.stampsRequired : result.stampsCount
+        let shown = unlocked && stampsCount == 0 ? stampsRequired : stampsCount
 
         businessName = design.businessName
         cardName = design.cardName
@@ -83,7 +96,7 @@ struct CardLook: Hashable, Sendable {
         glyph = design.stampIcon.kind == "preset" ? "Stamps/\(design.stampIcon.value)" : nil
         emoji = design.stampIcon.kind == "emoji" ? design.stampIcon.value : nil
         filled = shown
-        total = result.stampsRequired
+        total = stampsRequired
         rewardPositions = design.rewardPositions
 
         if !unlocked, let next = design.nextReward, next.atStamp > shown {

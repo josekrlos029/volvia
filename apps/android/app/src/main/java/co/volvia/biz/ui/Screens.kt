@@ -3,15 +3,11 @@ package co.volvia.biz.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -20,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -32,7 +27,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import co.volvia.biz.R
-import co.volvia.biz.core.ScanOutcomeUi
 import co.volvia.biz.ui.theme.VolviaColors
 import kotlinx.coroutines.launch
 
@@ -199,114 +193,5 @@ private fun GoogleMark(modifier: Modifier = Modifier) {
             topLeft = Offset(size.width / 2, size.height / 2 - stroke / 2),
             size = Size(size.width / 2, stroke),
         )
-    }
-}
-
-enum class OutcomeKind { Stamped, Queued, Failed }
-
-/** What happened, in the words a person would use, large enough to read at arm's length. */
-@Composable
-fun ScanOutcomeCard(
-    outcome: ScanOutcomeUi,
-    kind: OutcomeKind,
-    onRedeem: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    outcome.card?.let { card ->
-        BrandedOutcomeCard(outcome, card, onRedeem, onDismiss)
-        return
-    }
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = colors.surface.copy(alpha = 0.96f),
-        shadowElevation = 8.dp,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(outcome.title, fontSize = if (kind == OutcomeKind.Failed) 22.sp else 24.sp, fontWeight = FontWeight.SemiBold)
-                Text(
-                    outcome.body,
-                    fontSize = if (kind == OutcomeKind.Stamped) 17.sp else 15.sp,
-                    color = colors.onSurfaceVariant,
-                    style = TextStyle(fontFeatureSettings = "tnum"),
-                )
-            }
-
-            outcome.rewardGrantId?.let { grantId ->
-                HorizontalDivider(color = colors.outlineVariant)
-                if (outcome.rewardIsNew) {
-                    outcome.rewardTitle?.let { Text(it, fontSize = 18.sp, fontWeight = FontWeight.SemiBold) }
-                    outcome.rewardCode?.let {
-                        Text("Código $it", fontSize = 15.sp, color = colors.onSurfaceVariant)
-                    }
-                    Button(onClick = { onRedeem(grantId) }, shape = RoundedCornerShape(12.dp)) {
-                        Text("Entregar ahora")
-                    }
-                } else {
-                    outcome.rewardTitle?.let { Text(it, fontSize = 15.sp, fontWeight = FontWeight.Medium) }
-                    OutlinedButton(onClick = { onRedeem(grantId) }, shape = RoundedCornerShape(12.dp)) {
-                        Text("Entregar ahora")
-                    }
-                }
-            }
-
-            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                Text("Siguiente cliente", fontSize = 15.sp, fontWeight = FontWeight.Medium)
-            }
-        }
-    }
-}
-
-/** The viewfinder frame. Everything that is not the camera belongs on another screen. */
-@Composable
-fun AimFrame(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Box(
-            Modifier
-                .size(228.dp)
-                .border(3.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(22.dp)),
-        )
-        Text(
-            "Apunta al código del cliente",
-            color = Color.White,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-            style = TextStyle(shadow = Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 8f)),
-        )
-    }
-}
-
-@Composable
-fun ScanHeader(businessName: String, pendingCount: Int, onAccount: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.45f))
-            .statusBarsPadding()
-            .padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f).padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(businessName, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            if (pendingCount > 0) {
-                // The only number worth showing here: stamps taken and not yet sent.
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(Icons.Outlined.Sync, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                    Text("$pendingCount por enviar", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                }
-            }
-        }
-        IconButton(onClick = onAccount) {
-            Icon(Icons.Outlined.AccountCircle, contentDescription = "Cuenta", tint = Color.White, modifier = Modifier.size(28.dp))
-        }
     }
 }

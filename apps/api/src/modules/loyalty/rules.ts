@@ -100,3 +100,44 @@ export function rewardsCrossed(input: {
 
   return { unlocked, finalCount: current, cyclesCompleted }
 }
+
+export interface VoidAttempt {
+  now: Date
+  windowMinutes: number
+  /** Admins and owners may undo any scan; staff only their own, and only briefly. */
+  isAdmin: boolean
+  actorUserId: string
+  event: { actorUserId: string | null; source: StampSource; createdAt: Date; delta: number }
+  /** True when nothing else was written to the card after this scan. */
+  isLatestEvent: boolean
+  /** A reward this scan unlocked has already been handed over. */
+  unlockedRewardRedeemed: boolean
+}
+
+export type VoidDecision =
+  | { allowed: true }
+  | { allowed: false; reason: 'not_a_scan' | 'not_yours' | 'too_late' | 'card_moved_on' }
+
+/**
+ * Decides whether a scan may be taken back.
+ *
+ * Only the most recent write to a card is reversible: undoing an older one would mean
+ * rewriting everything that happened after it, and a reward already in the customer's
+ * hands cannot be un-given.
+ */
+export function evaluateVoid(attempt: VoidAttempt): VoidDecision {
+  const { event } = attempt
+  const reversible = event.source === 'staff_scan' || event.source === 'remote'
+  if (!reversible || event.delta <= 0) return { allowed: false, reason: 'not_a_scan' }
+
+  if (!attempt.isAdmin) {
+    if (event.actorUserId !== attempt.actorUserId) return { allowed: false, reason: 'not_yours' }
+    const ageMs = attempt.now.getTime() - event.createdAt.getTime()
+    if (ageMs > attempt.windowMinutes * 60_000) return { allowed: false, reason: 'too_late' }
+  }
+
+  if (!attempt.isLatestEvent || attempt.unlockedRewardRedeemed) {
+    return { allowed: false, reason: 'card_moved_on' }
+  }
+  return { allowed: true }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateStamp, rewardsCrossed } from '../src/modules/loyalty/rules'
+import { evaluateStamp, evaluateVoid, rewardsCrossed } from '../src/modules/loyalty/rules'
 
 const rules = {
   mode: 'per_visit' as const,
@@ -196,5 +196,65 @@ describe('remote stamps', () => {
         requestedCount: 10,
       }),
     ).toEqual({ allowed: true, granted: 2 })
+  })
+})
+
+describe('evaluateVoid', () => {
+  const now = new Date('2026-10-19T15:00:00Z')
+  const base = {
+    now,
+    windowMinutes: 5,
+    isAdmin: false,
+    actorUserId: 'cashier',
+    event: {
+      actorUserId: 'cashier',
+      source: 'staff_scan' as const,
+      createdAt: new Date('2026-10-19T14:58:00Z'),
+      delta: 2,
+    },
+    isLatestEvent: true,
+    unlockedRewardRedeemed: false,
+  }
+
+  it('lets the cashier undo their own scan straight away', () => {
+    expect(evaluateVoid(base)).toEqual({ allowed: true })
+  })
+
+  it('refuses after the window', () => {
+    const late = { ...base, event: { ...base.event, createdAt: new Date('2026-10-19T14:54:00Z') } }
+    expect(evaluateVoid(late)).toEqual({ allowed: false, reason: 'too_late' })
+  })
+
+  it("refuses someone else's scan, unless an admin asks", () => {
+    const other = { ...base, actorUserId: 'colleague' }
+    expect(evaluateVoid(other)).toEqual({ allowed: false, reason: 'not_yours' })
+    expect(evaluateVoid({ ...other, isAdmin: true })).toEqual({ allowed: true })
+  })
+
+  it('lets an admin undo an old scan', () => {
+    const old = { ...base, isAdmin: true, event: { ...base.event, createdAt: new Date(0) } }
+    expect(evaluateVoid(old)).toEqual({ allowed: true })
+  })
+
+  it('never rewrites history behind a later write', () => {
+    expect(evaluateVoid({ ...base, isLatestEvent: false })).toEqual({
+      allowed: false,
+      reason: 'card_moved_on',
+    })
+    expect(evaluateVoid({ ...base, isAdmin: true, unlockedRewardRedeemed: true })).toEqual({
+      allowed: false,
+      reason: 'card_moved_on',
+    })
+  })
+
+  it('only undoes scans, not manual corrections or kiosk stamps', () => {
+    expect(evaluateVoid({ ...base, event: { ...base.event, source: 'manual' } })).toEqual({
+      allowed: false,
+      reason: 'not_a_scan',
+    })
+    expect(evaluateVoid({ ...base, event: { ...base.event, source: 'kiosk' } })).toEqual({
+      allowed: false,
+      reason: 'not_a_scan',
+    })
   })
 })

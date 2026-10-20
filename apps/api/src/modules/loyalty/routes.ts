@@ -1,17 +1,24 @@
-import { and, eq, locations, stampCards } from '@volvia/db'
+import { and, customerCards, eq, locations, stampCards } from '@volvia/db'
 import {
   adjustStampsSchema,
   kioskSessionSchema,
   kioskStampSchema,
+  publicTokenSchema,
   redeemSchema,
+  staffEnrollSchema,
   stampSchema,
+  voidStampSchema,
 } from '@volvia/shared'
+import type { StaffEnrollResult } from '@volvia/shared'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { env } from '../../env'
 import { AUDIT_ACTIONS, audit } from '../../lib/audit'
+import { invalidateEntitlements } from '../../lib/entitlements'
 import { AppError } from '../../lib/errors'
 import { withIdempotency } from '../../lib/idempotency'
 import { redisKeys } from '../../lib/redis'
+import { startOfOrgDay } from '../../lib/time'
 import { stampCounter } from '../../plugins/observability'
 import { rateLimits } from '../../plugins/security'
 import { typed } from '../../types'
@@ -26,7 +33,24 @@ import {
   recordKioskStamp,
 } from './kiosk'
 import { adjustStamps, recentActivity, redeemReward } from './redeem'
-import { applyStamp } from './service'
+import {
+  applyStamp,
+  enrolOnCard,
+  findActiveCardForOrg,
+  lookupCard,
+  myActivity,
+  voidStamp,
+} from './service'
+
+/** The cached public card view must drop as soon as the count changes. */
+async function tokenFor(app: ReturnType<typeof typed>, orgId: string, customerCardId: string) {
+  const [row] = await app.db
+    .select({ token: customerCards.token })
+    .from(customerCards)
+    .where(and(eq(customerCards.id, customerCardId), eq(customerCards.orgId, orgId)))
+    .limit(1)
+  return row?.token ?? null
+}
 
 export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
   const app = typed(fastify)
@@ -80,6 +104,7 @@ export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
         const result = await applyStamp(app.db, {
           orgId: org.orgId,
           cardToken: request.body.cardToken,
+          customerCardId: request.body.customerCardId,
           count: request.body.count,
           locationId,
           actorUserId: request.auth!.userId,
@@ -92,7 +117,9 @@ export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
 
         await outcome.commit(result)
         // The public card view is cached for speed; the customer must see the new stamp.
-        await app.redis.del(redisKeys.cardState(request.body.cardToken))
+        const token =
+          request.body.cardToken ?? (await tokenFor(app, org.orgId, result.customerCardId))
+        if (token) await app.redis.del(redisKeys.cardState(token))
         stampCounter.labels(source, 'ok').inc()
 
         await audit(app.db, {
@@ -112,6 +139,172 @@ export async function loyaltyRoutes(fastify: FastifyInstance): Promise<void> {
         stampCounter.labels(source, 'rejected').inc()
         throw error
       }
+    },
+  )
+
+  /** Undo a scan moments after making it: wrong customer, wrong count. */
+  app.post(
+    '/stamp/:eventId/void',
+    {
+      preHandler: [app.requireOrg('staff')],
+      config: { rateLimit: rateLimits.stamp },
+      schema: {
+        params: z.object({ eventId: z.string().uuid() }),
+        body: voidStampSchema,
+        tags: ['loyalty'],
+      },
+    },
+    async (request) => {
+      const org = request.org!
+      const { cardToken, ...result } = await voidStamp(app.db, {
+        orgId: org.orgId,
+        eventId: request.params.eventId,
+        actorUserId: request.auth!.userId,
+        isAdmin: org.role === 'admin' || org.role === 'owner',
+        reason: request.body.reason,
+      })
+      await app.redis.del(redisKeys.cardState(cardToken))
+      await audit(app.db, {
+        orgId: org.orgId,
+        actorUserId: request.auth!.userId,
+        action: AUDIT_ACTIONS.stampVoided,
+        targetType: 'customer_card',
+        targetId: result.customerCardId,
+        meta: {
+          eventId: request.params.eventId,
+          stamps: result.stampsRemoved,
+          rewards: result.rewardsRevoked,
+        },
+        ip: request.ip,
+      })
+      return result
+    },
+  )
+
+  /** The scanned card before stamping, so staff can pick the count or type the amount. */
+  app.get(
+    '/lookup',
+    {
+      preHandler: [app.requireOrg('staff')],
+      schema: {
+        querystring: z
+          .object({
+            cardToken: publicTokenSchema.optional(),
+            customerCardId: z.string().uuid().optional(),
+          })
+          .refine((query) => Boolean(query.cardToken || query.customerCardId), {
+            message: 'card_reference_required',
+          }),
+        tags: ['loyalty'],
+      },
+    },
+    async (request) =>
+      lookupCard(app.db, {
+        orgId: request.org!.orgId,
+        cardToken: request.query.cardToken,
+        customerCardId: request.query.customerCardId,
+      }),
+  )
+
+  /**
+   * Sign-up at the counter, from the staff app. Unlike the public form there is no
+   * captcha: the staff session is the credential, and every enrolment is audited.
+   */
+  app.post(
+    '/enroll',
+    {
+      preHandler: [app.requireOrg('staff')],
+      config: { rateLimit: rateLimits.join },
+      schema: { body: staffEnrollSchema, tags: ['loyalty'] },
+    },
+    async (request, reply) => {
+      const org = request.org!
+      const outcome = await withIdempotency<StaffEnrollResult>(
+        app.redis,
+        `enroll:${org.orgId}`,
+        request.body.idempotencyKey,
+      )
+      if (outcome.status === 'replayed') return outcome.result
+      if (outcome.status === 'in_flight') {
+        throw new AppError('CONFLICT', { message: 'this sign-up is already being processed' })
+      }
+
+      try {
+        const { cardId, dataConsent, stampNow, locationId, idempotencyKey, ...data } = request.body
+        const { card, org: organization } = await findActiveCardForOrg(app.db, org.orgId, cardId)
+        const joined = await enrolOnCard(app.db, {
+          card,
+          org: organization,
+          data: { ...data, answers: {} },
+        })
+        if (joined.isNew) await invalidateEntitlements(app.redis, org.orgId)
+
+        // A rule refusing the first stamp (a cooldown on a returning customer) must not
+        // undo the sign-up itself.
+        const stamp = stampNow
+          ? await applyStamp(app.db, {
+              orgId: org.orgId,
+              cardToken: joined.token,
+              count: 1,
+              locationId: org.locationId ?? locationId ?? null,
+              actorUserId: request.auth!.userId,
+              source: 'staff_scan',
+              idempotencyKey: `enroll:${idempotencyKey}`,
+            }).catch(() => null)
+          : null
+
+        await app.redis.del(redisKeys.cardState(joined.token))
+        await audit(app.db, {
+          orgId: org.orgId,
+          actorUserId: request.auth!.userId,
+          action: AUDIT_ACTIONS.customerEnrolled,
+          targetType: 'customer',
+          targetId: joined.customerId,
+          // Habeas Data: who took the customer's consent, when and from where.
+          meta: { cardId: card.id, isNew: joined.isNew, dataConsent, stamped: Boolean(stamp) },
+          ip: request.ip,
+        })
+
+        const result: StaffEnrollResult = {
+          customerId: joined.customerId,
+          isNew: joined.isNew,
+          cardToken: joined.token,
+          cardUrl: `${env.PASS_URL}/c/${joined.token}`,
+          walletPasses: {
+            appleUrl: `${env.API_URL}/wallet/apple/pass/${joined.token}`,
+            googleUrl: `${env.API_URL}/wallet/google/save/${joined.token}`,
+          },
+          stamp,
+        }
+        await outcome.commit(result)
+        return reply.status(joined.isNew ? 201 : 200).send(result)
+      } catch (error) {
+        await outcome.release()
+        throw error
+      }
+    },
+  )
+
+  /** "My scans today" in the staff app, with the ones that can still be undone. */
+  app.get(
+    '/activity/mine',
+    {
+      preHandler: [app.requireOrg('staff')],
+      schema: {
+        querystring: z.object({ since: z.coerce.date().optional() }),
+        tags: ['loyalty'],
+      },
+    },
+    async (request) => {
+      const org = request.org!
+      const now = new Date()
+      const items = await myActivity(app.db, {
+        orgId: org.orgId,
+        userId: request.auth!.userId,
+        since: request.query.since ?? startOfOrgDay(now, org.timezone),
+        now,
+      })
+      return { items }
     },
   )
 

@@ -31,4 +31,41 @@ class MessagesTest {
         assertEquals(Messages.stamp(error("DAILY_CAP_REACHED")), Messages.stamp(error("STAMP_DAILY_CAP_REACHED")))
         assertEquals("Esa tarjeta no es de este negocio.", Messages.stamp(error("NOT_A_MEMBER")))
     }
+
+    @Test
+    fun `cooldown and daily cap read as the spec says`() {
+        assertEquals("Ya recibió sello hace poco.", Messages.stamp(error("STAMP_COOLDOWN_ACTIVE")))
+        assertEquals("Llegó al límite de sellos de hoy.", Messages.stamp(error("STAMP_DAILY_CAP_REACHED")))
+        assertEquals("Ya recibió sello hace poco (espera 3 min)", Messages.cooldown(150))
+        assertEquals("Ya recibió sello hace poco (espera 1 min)", Messages.cooldown(1))
+        val decoded = ApiException.decode(
+            429,
+            """{"error":{"code":"STAMP_COOLDOWN_ACTIVE","message":"x","details":[{"path":"retryAfterSeconds","message":"240"}]}}""",
+            kotlinx.serialization.json.Json { ignoreUnknownKeys = true },
+        )
+        assertEquals("Ya recibió sello hace poco (espera 4 min)", Messages.stamp(decoded))
+    }
+
+    @Test
+    fun `a missing or short purchase amount is explained`() {
+        assertEquals("Escribe el monto de la compra.", Messages.stamp(ApiException(422, "VALIDATION_FAILED", "purchase amount required")))
+        assertEquals(
+            "La compra no alcanza el mínimo para sellar.",
+            Messages.stamp(ApiException(422, "VALIDATION_FAILED", "purchase below the minimum")),
+        )
+    }
+
+    @Test
+    fun `undo and redeem refusals are in spanish`() {
+        assertTrue(Messages.void(error("STAMP_VOID_NOT_ALLOWED")).startsWith("Ya no se puede deshacer"))
+        assertEquals("Ese premio ya se entregó.", Messages.redeem(error("REWARD_ALREADY_REDEEMED")))
+        assertTrue(Messages.redeem(error("REWARD_NOT_AVAILABLE")).startsWith("Ese premio no está disponible"))
+    }
+
+    @Test
+    fun `a plan gate names the plan instead of failing`() {
+        val gate = ApiException(402, "FEATURE_NOT_IN_PLAN", "feature kiosk_mode is not included", upgradeTo = "business")
+        assertTrue(gate.isPlanGate)
+        assertEquals("Disponible en el plan Negocio.", Messages.load(gate))
+    }
 }

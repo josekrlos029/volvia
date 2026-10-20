@@ -1,4 +1,4 @@
-package co.volvia.biz.ui
+package co.volvia.biz.ui.scan
 
 import android.annotation.SuppressLint
 import androidx.camera.core.ImageAnalysis

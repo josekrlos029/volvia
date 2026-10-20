@@ -1,1 +1,1 @@
-Primera versión: inicio de sesión con correo o Google, escáner de tarjetas, entrega de recompensas y cola de sellos sin conexión.
+Novedades 1.2: pestañas Escanear, Hoy, Clientes y Más. Mira la tarjeta antes de sellar, suma varios sellos o el monto de la compra, deshaz un sello por error y entrega premios por código. Inscribe clientes en el mostrador con su QR y envío por WhatsApp. Para administradores: estadísticas, mensajes, campañas, equipo y modo kiosko.

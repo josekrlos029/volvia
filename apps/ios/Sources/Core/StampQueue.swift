@@ -1,9 +1,14 @@
 import Foundation
 
 /// A stamp that was taken from a real customer and has not reached the server yet.
+///
+/// Files written by 1.1 carry only the token, the count and the bookkeeping; every field
+/// added in 1.2 is optional so those stamps still load and still go out.
 struct PendingStamp: Codable, Sendable, Hashable, Identifiable {
     let id: UUID
-    let cardToken: String
+    /// The scanned card. Nil only when the stamp was taken from a customer's profile,
+    /// where the card is known by its id instead.
+    let cardToken: String?
     let count: Int
     /// Generated once, at the counter, and reused on every retry. It is what makes a
     /// retry safe: the server replays the original result instead of stamping twice.
@@ -12,14 +17,52 @@ struct PendingStamp: Codable, Sendable, Hashable, Identifiable {
     /// wrong hour in the business's analytics.
     let occurredAt: Date
     var attempts: Int
+    /// The customer card's id, when the staff member picked the customer from the list.
+    let customerCardId: String?
+    /// Whole pesos, for a card that only stamps above a minimum spend.
+    let purchaseAmount: Int?
+    let note: String?
+    /// The location the phone was at when the stamp was taken, not when it was sent.
+    let locationId: String?
 
-    init(cardToken: String, count: Int = 1, occurredAt: Date = Date()) {
+    init(
+        cardToken: String?,
+        customerCardId: String? = nil,
+        count: Int = 1,
+        purchaseAmount: Int? = nil,
+        note: String? = nil,
+        locationId: String? = nil,
+        occurredAt: Date = Date()
+    ) {
         self.id = UUID()
         self.cardToken = cardToken
+        self.customerCardId = customerCardId
         self.count = count
+        self.purchaseAmount = purchaseAmount
+        self.note = note
+        self.locationId = locationId
         self.idempotencyKey = "ios-\(UUID().uuidString)"
         self.occurredAt = occurredAt
         self.attempts = 0
+    }
+
+    /// The `/v1/stamp` body. The token wins when both references are known: it is what
+    /// the camera read, and it works even if the id was mistyped by a fixture.
+    var requestBody: [String: Any] {
+        var body: [String: Any] = [
+            "count": count,
+            "idempotencyKey": idempotencyKey,
+            "occurredAt": ISO8601DateFormatter().string(from: occurredAt),
+        ]
+        if let cardToken {
+            body["cardToken"] = cardToken
+        } else if let customerCardId {
+            body["customerCardId"] = customerCardId
+        }
+        if let purchaseAmount { body["purchaseAmount"] = purchaseAmount }
+        if let note, !note.isEmpty { body["note"] = note }
+        if let locationId { body["locationId"] = locationId }
+        return body
     }
 }
 

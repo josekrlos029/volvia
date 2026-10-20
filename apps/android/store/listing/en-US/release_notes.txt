@@ -1,1 +1,1 @@
-First release: sign-in with email or Google, card scanner, reward hand-over and an offline stamp queue.
+New in 1.2: Scan, Today, Customers and More tabs. Preview the card before stamping, add several stamps or the purchase amount, undo a mistaken stamp and hand over rewards by code. Sign customers up at the counter with their QR and a WhatsApp link. For admins: stats, messages, campaigns, team and kiosk mode.

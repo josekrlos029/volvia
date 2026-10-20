@@ -10,8 +10,19 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class PendingStamp(
     val id: String = UUID.randomUUID().toString(),
-    val cardToken: String,
+    /** The scanned card. Null only for a stamp started from a customer's profile. */
+    val cardToken: String? = null,
+    /**
+     * Everything below `count` arrived in 1.2. All optional with defaults, so a queue
+     * file written by 1.1 (token, count, key, time, attempts) still loads unchanged.
+     */
+    val customerCardId: String? = null,
     val count: Int = 1,
+    /** Whole pesos for a `min_spend` card. */
+    val purchaseAmount: Long? = null,
+    val note: String? = null,
+    /** The location chosen in "Más" at the moment of the scan, not when it is sent. */
+    val locationId: String? = null,
     /**
      * Generated once, at the counter, and reused on every retry. It is what makes a
      * retry safe: the server replays the original result instead of stamping twice.
@@ -90,7 +101,7 @@ class StampQueue(private val file: File, private val maximumAttempts: Int = 8) {
                         error.isTransient -> {
                             val attempted = next.copy(attempts = next.attempts + 1)
                             pending = if (attempted.attempts >= maximumAttempts) {
-                                reject(attempted, error.message)
+                                reject(attempted, Messages.stamp(error))
                                 pending.drop(1)
                             } else {
                                 listOf(attempted) + pending.drop(1)
@@ -100,7 +111,9 @@ class StampQueue(private val file: File, private val maximumAttempts: Int = 8) {
                         }
 
                         else -> {
-                            reject(next, error.message)
+                            // In the staff member's words: "Ya recibió sello hace poco", not
+                            // the server's English.
+                            reject(next, Messages.stamp(error))
                             pending = pending.drop(1)
                             persist()
                         }

@@ -10,6 +10,7 @@ import java.nio.file.Files
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -140,5 +141,85 @@ class StampQueueTest {
 
         assertEquals(1, queue.pending.size)
         assertEquals("b", queue.pending.first().cardToken)
+    }
+
+    @Test
+    fun `still reads a queue written by 1-1`() {
+        // Exactly what 1.1 persisted: no customer card, amount, note or location.
+        val file = File(directory, "pending.json")
+        file.writeText(
+            """[{"id":"q1","cardToken":"legacy-token-0000000000","count":1,""" +
+                """"idempotencyKey":"android-1","occurredAtIso":"2026-10-07T10:00:00Z","attempts":2}]""",
+        )
+
+        val queue = StampQueue(file)
+
+        val pending = queue.pending.single()
+        assertEquals("legacy-token-0000000000", pending.cardToken)
+        assertEquals("android-1", pending.idempotencyKey)
+        assertEquals(2, pending.attempts)
+        assertNull(pending.customerCardId)
+        assertNull(pending.purchaseAmount)
+        assertNull(pending.note)
+        assertNull(pending.locationId)
+    }
+
+    @Test
+    fun `keeps the amount, note, count and location across a restart`() {
+        val file = File(directory, "pending.json")
+        StampQueue(file).enqueue(
+            PendingStamp(
+                customerCardId = "6f1c0d5e-0000-4000-8000-000000000001",
+                count = 3,
+                purchaseAmount = 25_000,
+                note = "Mesa 4",
+                locationId = "6f1c0d5e-0000-4000-8000-0000000000aa",
+                occurredAtIso = "2026-10-19T12:00:00Z",
+            ),
+        )
+
+        val restored = StampQueue(file).pending.single()
+        assertNull(restored.cardToken)
+        assertEquals("6f1c0d5e-0000-4000-8000-000000000001", restored.customerCardId)
+        assertEquals(3, restored.count)
+        assertEquals(25_000L, restored.purchaseAmount)
+        assertEquals("Mesa 4", restored.note)
+        assertEquals("6f1c0d5e-0000-4000-8000-0000000000aa", restored.locationId)
+    }
+
+    @Test
+    fun `a cooldown is a refusal, not a reason to retry`() = runTest {
+        queue.enqueue(stamp("a"))
+        queue.enqueue(stamp("b"))
+
+        var attempts = 0
+        queue.flush {
+            attempts += 1
+            // 429 like the rate limiter, but the card's own rule: it will not change by retrying.
+            Result.failure(ApiException(429, "STAMP_COOLDOWN_ACTIVE", "this customer was stamped very recently"))
+        }
+
+        assertEquals(2, attempts)
+        assertTrue(queue.pending.isEmpty())
+        assertEquals(listOf("Ya recibió sello hace poco.", "Ya recibió sello hace poco."), queue.rejected.map { it.reason })
+    }
+
+    @Test
+    fun `the daily cap is told in spanish when it rejects a queued stamp`() = runTest {
+        queue.enqueue(stamp("a"))
+
+        queue.flush { Result.failure(ApiException(429, "STAMP_DAILY_CAP_REACHED", "daily stamp limit reached")) }
+
+        assertEquals("Llegó al límite de sellos de hoy.", queue.rejected.single().reason)
+    }
+
+    @Test
+    fun `the rate limiter is still worth waiting out`() = runTest {
+        queue.enqueue(stamp("a"))
+
+        queue.flush { Result.failure(ApiException(429, "RATE_LIMITED", "slow down")) }
+
+        assertEquals(1, queue.pending.size)
+        assertTrue(queue.rejected.isEmpty())
     }
 }

@@ -1,4 +1,4 @@
-package co.volvia.biz.ui
+package co.volvia.biz.ui.scan
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -62,6 +62,8 @@ fun BrandedOutcomeCard(
     card: CardLook,
     onRedeem: (String) -> Unit,
     onDismiss: () -> Unit,
+    /** "Deshacer", while the scan can still be taken back. */
+    undo: UndoAction? = null,
 ) {
     val background = Color(card.background)
     val foreground = Color(card.foreground)
@@ -76,28 +78,7 @@ fun BrandedOutcomeCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                BusinessBadge(card, accent, onAccent)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        card.cardName.uppercase(),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 1.4.sp,
-                        color = foreground.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(outcome.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                ProgressRing(card.filled, card.total, accent, foreground.copy(alpha = 0.18f))
-            }
-
-            StampGrid(card, accent, onAccent)
-
-            card.remainingLine?.let {
-                Text(it, fontSize = 15.sp, color = foreground.copy(alpha = 0.85f))
-            }
+            CardFaceContent(card, outcome.title)
 
             outcome.rewardGrantId?.let { grantId ->
                 if (outcome.rewardIsNew) {
@@ -135,10 +116,67 @@ fun BrandedOutcomeCard(
                 }
             }
 
-            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                Text("Siguiente cliente", color = foreground, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                undo?.let {
+                    TextButton(onClick = it.onUndo) {
+                        Text(it.label, color = foreground.copy(alpha = 0.8f), fontSize = 15.sp)
+                    }
+                }
+                TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                    Text("Siguiente cliente", color = foreground, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                }
             }
         }
+    }
+}
+
+/** "Deshacer (4:12)": the label carries the time left, the action asks before it acts. */
+data class UndoAction(val label: String, val onUndo: () -> Unit)
+
+/**
+ * The card in the business's colours with nothing around it: the result after a scan
+ * and the preview before one ("antes de sellar") draw exactly the same face.
+ */
+@Composable
+fun BrandedCardFace(card: CardLook, title: String, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = Color(card.background),
+        contentColor = Color(card.foreground),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            CardFaceContent(card, title)
+        }
+    }
+}
+
+@Composable
+private fun CardFaceContent(card: CardLook, title: String) {
+    val foreground = Color(card.foreground)
+    val accent = Color(card.accent)
+    val onAccent = Color(card.onAccent)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        BusinessBadge(card, accent, onAccent)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                card.cardName.uppercase(),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 1.4.sp,
+                color = foreground.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        ProgressRing(card.filled, card.total, accent, foreground.copy(alpha = 0.18f))
+    }
+
+    StampGrid(card, accent, onAccent)
+
+    card.remainingLine?.let {
+        Text(it, fontSize = 15.sp, color = foreground.copy(alpha = 0.85f))
     }
 }
 

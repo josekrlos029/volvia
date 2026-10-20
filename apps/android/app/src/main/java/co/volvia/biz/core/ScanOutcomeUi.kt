@@ -48,6 +48,32 @@ data class ScanOutcomeUi(
         )
 
         fun failed(message: String) = ScanOutcomeUi(title = "No se pudo sellar", body = message)
+
+        /** After "Deshacer": what was taken back and where the card stands now. */
+        fun voided(result: VoidResult, firstName: String): ScanOutcomeUi {
+            val removed = if (result.stampsRemoved == 1) "1 sello" else "${result.stampsRemoved} sellos"
+            val revoked = when (result.rewardsRevoked) {
+                0 -> ""
+                1 -> " También se anuló el premio que había ganado."
+                else -> " También se anularon ${result.rewardsRevoked} premios."
+            }
+            return ScanOutcomeUi(
+                title = "Sello deshecho",
+                body = "Se quitó $removed a $firstName. Ahora tiene ${result.stampsCount} de ${result.stampsRequired}.$revoked",
+            )
+        }
+
+        fun redeemed(result: RedeemResult): ScanOutcomeUi = ScanOutcomeUi(
+            title = "Premio entregado",
+            body = listOfNotNull(
+                result.customer?.firstName?.let { "${result.title} para $it." } ?: "${result.title}.",
+                when (result.remainingPending) {
+                    0 -> null
+                    1 -> "Le queda 1 premio más por entregar."
+                    else -> "Le quedan ${result.remainingPending} premios por entregar."
+                },
+            ).joinToString(" "),
+        )
     }
 }
 

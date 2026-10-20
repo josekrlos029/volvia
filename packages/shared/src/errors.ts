@@ -33,6 +33,8 @@ export const ERROR_CODES = {
   KIOSK_NONCE_USED: 409,
   /** The business has not turned on stamping customers who are not at the counter. */
   REMOTE_STAMPING_DISABLED: 403,
+  /** The scan can no longer be undone: too old, someone else's, or the card moved on. */
+  STAMP_VOID_NOT_ALLOWED: 409,
 
   // generic
   VALIDATION_FAILED: 422,

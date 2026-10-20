@@ -53,7 +53,8 @@ struct SimulatedScannerView: View {
                 }
             }
         }
-        .ignoresSafeArea()
+        // The bottom edge stays clear of the tab bar so the menu can be reached.
+        .ignoresSafeArea(edges: .top)
     }
 }
 #endif

@@ -15,8 +15,8 @@ android {
         applicationId = "co.volvia.biz"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 4
+        versionName = "1.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Points at the laptop's API in debug; release builds take the real host.
@@ -101,6 +101,8 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.4.1")
     implementation("androidx.camera:camera-view:1.4.1")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    // Only the encoder: the card, sign-up and kiosk QR codes are drawn on the phone.
+    implementation("com.google.zxing:core:3.5.3")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

@@ -49,6 +49,8 @@ export const AUDIT_ACTIONS = {
   cardArchived: 'card.archived',
   stampAdded: 'stamp.added',
   stampAdjusted: 'stamp.adjusted',
+  stampVoided: 'stamp.voided',
+  customerEnrolled: 'customer.enrolled',
   rewardRedeemed: 'reward.redeemed',
   customerDeleted: 'customer.deleted',
   customerDocumentSaved: 'customer.document_saved',

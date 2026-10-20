@@ -8,6 +8,8 @@ import {
   desc,
   eq,
   gte,
+  inArray,
+  lt,
   organizations,
   rewardGrants,
   rewards,
@@ -16,7 +18,15 @@ import {
   stampEvents,
 } from '@volvia/db'
 import { cardDesignSchema } from '@volvia/shared'
-import type { JoinCardInput, StampResult, StampResultDesign, StampSource } from '@volvia/shared'
+import { STAMP_VOID_WINDOW_MINUTES } from '@volvia/shared'
+import type {
+  CardLookup,
+  JoinCardInput,
+  MyActivityItem,
+  StampResult,
+  StampResultDesign,
+  StampSource,
+} from '@volvia/shared'
 import { AppError } from '../../lib/errors'
 import { OUTBOX_KINDS, enqueue } from '../../lib/outbox'
 import { addDays, orgDay, orgHour, startOfOrgDay } from '../../lib/time'
@@ -27,7 +37,7 @@ import {
   loadLiveOffer,
   multiplierFor,
 } from '../engagement/offers'
-import { evaluateStamp, rewardsCrossed } from './rules'
+import { evaluateStamp, evaluateVoid, rewardsCrossed } from './rules'
 
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0]
 
@@ -121,6 +131,35 @@ export async function joinCard(
   input: { joinSlug: string; data: JoinCardInput; ip: string },
 ): Promise<JoinResult> {
   const { card, org } = await findActiveCardByJoinSlug(db, input.joinSlug)
+  return enrolOnCard(db, { card, org, data: input.data })
+}
+
+/** The staff app's sign-up at the counter: the card is picked by id, inside the org. */
+export async function findActiveCardForOrg(db: Database, orgId: string, cardId: string) {
+  const [row] = await db
+    .select({ card: stampCards, org: organizations })
+    .from(stampCards)
+    .innerJoin(organizations, eq(organizations.id, stampCards.orgId))
+    .where(and(eq(stampCards.id, cardId), eq(stampCards.orgId, orgId)))
+    .limit(1)
+
+  if (!row) throw new AppError('CARD_NOT_FOUND', { message: 'card not found' })
+  if (row.org.deletedAt || row.card.status !== 'active') {
+    throw new AppError('CARD_NOT_ACTIVE', { message: 'this card is not accepting new members' })
+  }
+  return row
+}
+
+/** Shared by the public form and the counter: one customer, one card, never twice. */
+export async function enrolOnCard(
+  db: Database,
+  input: {
+    card: typeof stampCards.$inferSelect
+    org: typeof organizations.$inferSelect
+    data: JoinCardInput
+  },
+): Promise<JoinResult> {
+  const { card, org } = input
   const now = new Date()
 
   return db.transaction(async (tx) => {
@@ -270,7 +309,9 @@ export async function joinCard(
 export interface StampCommand {
   /** The organisation doing the stamping. Cards outside it must not be reachable. */
   orgId: string
-  cardToken: string
+  /** One of the two: the scanned token, or the card picked from the customer list. */
+  cardToken?: string
+  customerCardId?: string
   count: number
   locationId?: string | null
   actorUserId?: string | null
@@ -303,7 +344,12 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
       .innerJoin(organizations, eq(organizations.id, customerCards.orgId))
       .innerJoin(customers, eq(customers.id, customerCards.customerId))
       .where(
-        and(eq(customerCards.token, command.cardToken), eq(customerCards.orgId, command.orgId)),
+        and(
+          command.customerCardId
+            ? eq(customerCards.id, command.customerCardId)
+            : eq(customerCards.token, command.cardToken ?? ''),
+          eq(customerCards.orgId, command.orgId),
+        ),
       )
       .for('update', { of: customerCards })
       .limit(1)
@@ -344,6 +390,10 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
         case 'cooldown':
           throw new AppError('STAMP_COOLDOWN_ACTIVE', {
             message: 'this customer was stamped very recently',
+            // The staff app tells the cashier how long to wait.
+            details: [
+              { path: 'retryAfterSeconds', message: String(decision.retryAfterSeconds ?? 0) },
+            ],
             logContext: { retryAfterSeconds: decision.retryAfterSeconds },
           })
         case 'daily_cap':
@@ -393,20 +443,23 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
 
     const nextCycle = row.customerCard.cycleIndex + crossing.cyclesCompleted
 
-    await tx.insert(stampEvents).values({
-      orgId: row.org.id,
-      customerCardId: row.customerCard.id,
-      locationId: command.locationId ?? null,
-      actorUserId: command.actorUserId ?? null,
-      source: command.source,
-      delta: granted,
-      resultingCount: crossing.finalCount,
-      cycleIndex: nextCycle,
-      purchaseAmount: command.purchaseAmount ?? null,
-      note,
-      idempotencyKey: command.idempotencyKey,
-      occurredAt: now,
-    })
+    const [event] = await tx
+      .insert(stampEvents)
+      .values({
+        orgId: row.org.id,
+        customerCardId: row.customerCard.id,
+        locationId: command.locationId ?? null,
+        actorUserId: command.actorUserId ?? null,
+        source: command.source,
+        delta: granted,
+        resultingCount: crossing.finalCount,
+        cycleIndex: nextCycle,
+        purchaseAmount: command.purchaseAmount ?? null,
+        note,
+        idempotencyKey: command.idempotencyKey,
+        occurredAt: now,
+      })
+      .returning({ id: stampEvents.id })
 
     // Rewards that are not repeating are only granted on the customer's first cycle.
     const unlockedGrants = crossing.unlocked
@@ -507,6 +560,7 @@ export async function applyStamp(db: Database, command: StampCommand): Promise<S
 
     return {
       customerCardId: row.customerCard.id,
+      eventId: event!.id,
       stampsAdded: granted,
       stampsCount: crossing.finalCount,
       stampsRequired: row.card.stampsRequired,
@@ -562,4 +616,408 @@ export function stampResultDesign(input: {
     rewardPositions: input.rewards.map((reward) => reward.atStamp),
     nextReward: nextReward ? { atStamp: nextReward.atStamp, title: nextReward.title } : null,
   }
+}
+
+/**
+ * The card as the staff app sees it right after a scan, before anything is written:
+ * who it is, where they are on the card, and whether the rules will let a stamp in.
+ */
+export async function lookupCard(
+  db: Database,
+  input: { orgId: string; cardToken?: string; customerCardId?: string; now?: Date },
+): Promise<CardLookup> {
+  const now = input.now ?? new Date()
+  const [row] = await db
+    .select({
+      customerCard: customerCards,
+      card: stampCards,
+      org: organizations,
+      customer: customers,
+    })
+    .from(customerCards)
+    .innerJoin(stampCards, eq(stampCards.id, customerCards.cardId))
+    .innerJoin(organizations, eq(organizations.id, customerCards.orgId))
+    .innerJoin(customers, eq(customers.id, customerCards.customerId))
+    .where(
+      and(
+        input.customerCardId
+          ? eq(customerCards.id, input.customerCardId)
+          : eq(customerCards.token, input.cardToken ?? ''),
+        eq(customerCards.orgId, input.orgId),
+      ),
+    )
+    .limit(1)
+
+  // Same answer as a card of another business: tokens must not be probeable.
+  if (!row || row.customerCard.status === 'deleted') {
+    throw new AppError('CUSTOMER_CARD_NOT_FOUND', { message: 'card not found' })
+  }
+  if (row.customerCard.status !== 'active') {
+    throw new AppError('CUSTOMER_CARD_BLOCKED', { message: 'this card is not active' })
+  }
+
+  const [cardRewards, pending] = await Promise.all([
+    db.select().from(rewards).where(eq(rewards.cardId, row.card.id)).orderBy(rewards.atStamp),
+    db
+      .select({
+        grantId: rewardGrants.id,
+        title: rewardGrants.title,
+        code: rewardGrants.code,
+        expiresAt: rewardGrants.expiresAt,
+      })
+      .from(rewardGrants)
+      .where(
+        and(
+          eq(rewardGrants.customerCardId, row.customerCard.id),
+          eq(rewardGrants.status, 'pending'),
+        ),
+      )
+      .orderBy(rewardGrants.grantedAt),
+  ])
+
+  const rules = row.card.rules
+  const lastStampAt = row.customerCard.lastStampAt
+  const cooldownSecondsLeft =
+    rules.cooldownMinutes > 0 && lastStampAt
+      ? Math.max(
+          0,
+          Math.ceil(
+            (rules.cooldownMinutes * 60_000 - (now.getTime() - lastStampAt.getTime())) / 1000,
+          ),
+        )
+      : 0
+
+  return {
+    customerCardId: row.customerCard.id,
+    cardToken: row.customerCard.token,
+    customer: {
+      id: row.customer.id,
+      firstName: row.customer.firstName,
+      phone: row.customer.phone,
+      notes: row.customer.notes,
+      totalStamps: row.customer.totalStamps,
+      joinedAt: row.customer.joinedAt,
+    },
+    card: {
+      id: row.card.id,
+      name: row.card.name,
+      stampsRequired: row.card.stampsRequired,
+      ruleMode: rules.mode,
+      minSpendAmount: rules.minSpendAmount ?? null,
+      maxStampsPerScan: rules.maxStampsPerScan,
+    },
+    stampsCount: row.customerCard.stampsCount,
+    lastStampAt,
+    cooldownSecondsLeft,
+    pendingRewards: pending.filter(
+      (grant) => !grant.expiresAt || grant.expiresAt.getTime() > now.getTime(),
+    ),
+    design: stampResultDesign({
+      org: row.org,
+      card: row.card,
+      rewards: cardRewards,
+      stampsCount: row.customerCard.stampsCount,
+    }),
+  }
+}
+
+const VOID_KEY_PREFIX = 'void:'
+
+const VOID_MESSAGES = {
+  not_a_scan: 'only a stamp from a scan can be undone',
+  not_yours: 'only the person who made this scan can undo it',
+  too_late: 'this scan is too old to undo',
+  card_moved_on: 'the card changed after this scan',
+} as const
+
+/**
+ * Takes a scan back: the card returns to where it was, rewards it unlocked are
+ * revoked, and the ledger keeps both rows so the history still explains itself.
+ */
+export async function voidStamp(
+  db: Database,
+  input: {
+    orgId: string
+    eventId: string
+    actorUserId: string
+    isAdmin: boolean
+    reason?: string
+    now?: Date
+  },
+) {
+  const now = input.now ?? new Date()
+
+  return db.transaction(async (tx) => {
+    const [target] = await tx
+      .select({ event: stampEvents })
+      .from(stampEvents)
+      .where(and(eq(stampEvents.id, input.eventId), eq(stampEvents.orgId, input.orgId)))
+      .limit(1)
+    if (!target) throw new AppError('NOT_FOUND', { message: 'scan not found' })
+    const event = target.event
+
+    const [row] = await tx
+      .select({ customerCard: customerCards, card: stampCards, org: organizations })
+      .from(customerCards)
+      .innerJoin(stampCards, eq(stampCards.id, customerCards.cardId))
+      .innerJoin(organizations, eq(organizations.id, customerCards.orgId))
+      .where(eq(customerCards.id, event.customerCardId))
+      .for('update', { of: customerCards })
+      .limit(1)
+    if (!row) throw new AppError('CUSTOMER_CARD_NOT_FOUND', { message: 'card not found' })
+
+    const [latest] = await tx
+      .select({ id: stampEvents.id })
+      .from(stampEvents)
+      .where(eq(stampEvents.customerCardId, event.customerCardId))
+      .orderBy(desc(stampEvents.createdAt))
+      .limit(1)
+
+    // Grants are written in the same transaction as their scan, so they share its clock.
+    const unlocked = await tx
+      .select({ id: rewardGrants.id, status: rewardGrants.status })
+      .from(rewardGrants)
+      .where(
+        and(
+          eq(rewardGrants.customerCardId, event.customerCardId),
+          gte(rewardGrants.grantedAt, event.createdAt),
+        ),
+      )
+
+    const decision = evaluateVoid({
+      now,
+      windowMinutes: STAMP_VOID_WINDOW_MINUTES,
+      isAdmin: input.isAdmin,
+      actorUserId: input.actorUserId,
+      event,
+      isLatestEvent: latest?.id === event.id,
+      unlockedRewardRedeemed: unlocked.some((grant) => grant.status === 'redeemed'),
+    })
+    if (!decision.allowed) {
+      throw new AppError('STAMP_VOID_NOT_ALLOWED', {
+        message: VOID_MESSAGES[decision.reason],
+        logContext: { reason: decision.reason },
+      })
+    }
+
+    const [previous] = await tx
+      .select({
+        resultingCount: stampEvents.resultingCount,
+        cycleIndex: stampEvents.cycleIndex,
+      })
+      .from(stampEvents)
+      .where(
+        and(
+          eq(stampEvents.customerCardId, event.customerCardId),
+          lt(stampEvents.createdAt, event.createdAt),
+        ),
+      )
+      .orderBy(desc(stampEvents.createdAt))
+      .limit(1)
+
+    // Within one cycle the arithmetic is exact; a scan that completed the card is
+    // rewound to the row before it.
+    const previousCycle = previous?.cycleIndex ?? 0
+    const wrapped = event.cycleIndex !== previousCycle
+    const restoredCount = wrapped
+      ? (previous?.resultingCount ?? 0)
+      : Math.max(0, event.resultingCount - event.delta)
+
+    // The cooldown must not punish the corrected scan that usually follows an undo.
+    const [lastCounted] = await tx
+      .select({ occurredAt: stampEvents.occurredAt })
+      .from(stampEvents)
+      .where(
+        and(
+          eq(stampEvents.customerCardId, event.customerCardId),
+          lt(stampEvents.createdAt, event.createdAt),
+          gte(stampEvents.delta, 1),
+        ),
+      )
+      .orderBy(desc(stampEvents.createdAt))
+      .limit(1)
+
+    await tx.insert(stampEvents).values({
+      orgId: input.orgId,
+      customerCardId: event.customerCardId,
+      locationId: event.locationId,
+      actorUserId: input.actorUserId,
+      source: 'manual',
+      delta: -event.delta,
+      resultingCount: restoredCount,
+      cycleIndex: previousCycle,
+      note: input.reason ? `Sello anulado: ${input.reason}` : 'Sello anulado',
+      idempotencyKey: `${VOID_KEY_PREFIX}${event.id}`,
+      occurredAt: now,
+    })
+
+    const revocable = unlocked
+      .filter((grant) => grant.status === 'pending')
+      .map((grant) => grant.id)
+    if (revocable.length > 0) {
+      await tx
+        .update(rewardGrants)
+        .set({ status: 'revoked' })
+        .where(inArray(rewardGrants.id, revocable))
+    }
+
+    await tx
+      .update(customerCards)
+      .set({
+        stampsCount: restoredCount,
+        cycleIndex: previousCycle,
+        lifetimeStamps: sql`greatest(0, ${customerCards.lifetimeStamps} - ${event.delta})`,
+        lastStampAt: lastCounted?.occurredAt ?? null,
+        updatedAt: now,
+      })
+      .where(eq(customerCards.id, event.customerCardId))
+
+    await tx
+      .update(customers)
+      .set({
+        totalStamps: sql`greatest(0, ${customers.totalStamps} - ${event.delta})`,
+        totalRewards: sql`greatest(0, ${customers.totalRewards} - ${revocable.length})`,
+        updatedAt: now,
+      })
+      .where(eq(customers.id, row.customerCard.customerId))
+
+    // Counted where the scan was counted, so today's numbers come back down.
+    await bumpAnalytics(tx, {
+      orgId: input.orgId,
+      cardId: row.card.id,
+      locationId: event.locationId,
+      day: orgDay(event.occurredAt, row.org.timezone),
+      hour: orgHour(event.occurredAt, row.org.timezone),
+      stamps: -event.delta,
+      rewardsUnlocked: -revocable.length,
+    })
+
+    await enqueue(
+      tx,
+      OUTBOX_KINDS.walletUpdate,
+      { customerCardId: event.customerCardId, reason: 'adjust' },
+      { orgId: input.orgId },
+    )
+
+    return {
+      customerCardId: event.customerCardId,
+      cardToken: row.customerCard.token,
+      stampsCount: restoredCount,
+      stampsRequired: row.card.stampsRequired,
+      stampsRemoved: event.delta,
+      rewardsRevoked: revocable.length,
+    }
+  })
+}
+
+/** What this staff member did since `since`: their scans, undos and handed-over rewards. */
+export async function myActivity(
+  db: Database,
+  input: { orgId: string; userId: string; since: Date; now?: Date },
+): Promise<MyActivityItem[]> {
+  const now = input.now ?? new Date()
+
+  const [events, redemptions] = await Promise.all([
+    db
+      .select({
+        id: stampEvents.id,
+        at: stampEvents.createdAt,
+        source: stampEvents.source,
+        delta: stampEvents.delta,
+        idempotencyKey: stampEvents.idempotencyKey,
+        customerCardId: stampEvents.customerCardId,
+        customerId: customers.id,
+        firstName: customers.firstName,
+        cardName: stampCards.name,
+      })
+      .from(stampEvents)
+      .innerJoin(customerCards, eq(customerCards.id, stampEvents.customerCardId))
+      .innerJoin(customers, eq(customers.id, customerCards.customerId))
+      .innerJoin(stampCards, eq(stampCards.id, customerCards.cardId))
+      .where(
+        and(
+          eq(stampEvents.orgId, input.orgId),
+          eq(stampEvents.actorUserId, input.userId),
+          gte(stampEvents.createdAt, input.since),
+        ),
+      )
+      .orderBy(desc(stampEvents.createdAt))
+      .limit(100),
+    db
+      .select({
+        id: rewardGrants.id,
+        at: rewardGrants.redeemedAt,
+        title: rewardGrants.title,
+        customerCardId: rewardGrants.customerCardId,
+        customerId: customers.id,
+        firstName: customers.firstName,
+        cardName: stampCards.name,
+      })
+      .from(rewardGrants)
+      .innerJoin(customerCards, eq(customerCards.id, rewardGrants.customerCardId))
+      .innerJoin(customers, eq(customers.id, customerCards.customerId))
+      .innerJoin(stampCards, eq(stampCards.id, customerCards.cardId))
+      .where(
+        and(
+          eq(rewardGrants.orgId, input.orgId),
+          eq(rewardGrants.redeemedBy, input.userId),
+          gte(rewardGrants.redeemedAt, input.since),
+        ),
+      )
+      .orderBy(desc(rewardGrants.redeemedAt))
+      .limit(100),
+  ])
+
+  const cardIds = [...new Set(events.map((event) => event.customerCardId))]
+  const latestByCard = new Map<string, string>()
+  if (cardIds.length > 0) {
+    const latest = await db
+      .selectDistinctOn([stampEvents.customerCardId], {
+        customerCardId: stampEvents.customerCardId,
+        id: stampEvents.id,
+      })
+      .from(stampEvents)
+      .where(inArray(stampEvents.customerCardId, cardIds))
+      .orderBy(stampEvents.customerCardId, desc(stampEvents.createdAt))
+    for (const row of latest) latestByCard.set(row.customerCardId, row.id)
+  }
+
+  const windowMs = STAMP_VOID_WINDOW_MINUTES * 60_000
+  const items: MyActivityItem[] = []
+  for (const event of events) {
+    const isVoid = event.idempotencyKey.startsWith(VOID_KEY_PREFIX)
+    const isScan = event.source === 'staff_scan' || event.source === 'remote'
+    if (!isVoid && !isScan) continue
+    items.push({
+      kind: isVoid ? 'void' : 'stamp',
+      id: event.id,
+      at: event.at,
+      customerCardId: event.customerCardId,
+      customerId: event.customerId,
+      firstName: event.firstName,
+      cardName: event.cardName,
+      delta: event.delta,
+      rewardTitle: null,
+      canVoid:
+        isScan &&
+        event.delta > 0 &&
+        latestByCard.get(event.customerCardId) === event.id &&
+        now.getTime() - event.at.getTime() <= windowMs,
+    })
+  }
+  for (const grant of redemptions) {
+    items.push({
+      kind: 'redeem',
+      id: grant.id,
+      at: grant.at ?? now,
+      customerCardId: grant.customerCardId,
+      customerId: grant.customerId,
+      firstName: grant.firstName,
+      cardName: grant.cardName,
+      delta: 0,
+      rewardTitle: grant.title,
+      canVoid: false,
+    })
+  }
+  return items.sort((a, b) => b.at.getTime() - a.at.getTime())
 }

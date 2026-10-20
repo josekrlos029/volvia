@@ -1,1 +1,7 @@
-First release: sign-in, card scanner, reward hand-over and an offline stamp queue.
+Volvia Biz 1.2 puts the whole counter on your phone:
+• Preview before stamping: number of stamps, purchase amount and rewards waiting.
+• Undo a stamp for 5 minutes and hand over rewards by typing their code.
+• New Today tab with your stamps of the day and upcoming birthdays.
+• Customers: search, profiles with history, and sign-up at the counter with a QR and WhatsApp sharing.
+• For owners and admins: statistics, messages, campaigns, team and kiosk mode.
+• Pick the phone's location and show the sign-up QR full screen.

@@ -1,8 +1,34 @@
 # Volvia Biz, las apps del personal
 
-Dos apps nativas, una por tienda, con el mismo trabajo: entrar, escanear la tarjeta del
-cliente y sumar el sello. Nada más. Todo lo demás —diseñar la tarjeta, ver clientes,
-lanzar campañas— sigue en el panel web.
+Dos apps nativas, una por tienda, con el mismo trabajo: todo lo que pasa en el mostrador,
+y lo que el dueño necesita ver o hacer lejos del computador. Diseñar la tarjeta, la
+página del negocio, los segmentos y la facturación siguen en el panel web.
+
+Desde la 1.2 las apps tienen cuatro pestañas:
+
+| Pestaña | Quién | Qué hace |
+|---|---|---|
+| Escanear | todos | Cámara; antes de sellar muestra la tarjeta (`GET /v1/lookup`) para elegir cuántos sellos, escribir el monto en tarjetas `min_spend` o entregar un premio. "Sellado rápido" conserva el flujo de la 1.1. "Deshacer" durante 5 minutos (`POST /v1/stamp/:eventId/void`). Canje por código tecleado. |
+| Hoy | todos | El pulso del día, cumpleaños y "Mis sellos de hoy" (`GET /v1/activity/mine`). |
+| Clientes | todos | Búsqueda por nombre, correo o teléfono; perfil; sumar sello sin QR (`customerCardId` en `/v1/stamp`); inscripción en el mostrador (`POST /v1/enroll`) con autorización de datos y envío de la tarjeta por WhatsApp. Los admin editan datos y ajustan sellos. |
+| Más | todos / admin | Sede, QR de inscripción, sellos por enviar. Para admin: estadísticas, mensajes al Wallet, campañas, equipo y modo kiosko. |
+
+Lo que el plan no incluye no desaparece: la app muestra en qué plan está disponible
+(`FEATURE_NOT_IN_PLAN` trae `upgradeTo`).
+
+**Deshacer un sello.** Solo se deshace lo último que pasó en la tarjeta: deshacer algo
+más viejo obligaría a reescribir lo que vino después, y un premio que ya se entregó no se
+puede quitar. Un empleado deshace solo sus propios escaneos y durante 5 minutos; un admin,
+cualquiera. El libro de sellos guarda las dos filas (el sello y su anulación) y el premio
+que el sello había desbloqueado queda `revoked`. La anulación devuelve también la hora del
+último sello, para que el *cooldown* no castigue el escaneo corregido que suele venir
+después.
+
+**Inscribir en el mostrador.** Mismo camino que el formulario público (`enrolOnCard`),
+sin captcha porque la sesión del empleado es la credencial. Pide el correo, porque un
+cliente es único por correo dentro del negocio, y exige `dataConsent: true`: el empleado
+confirma que el cliente autorizó el tratamiento de sus datos (Habeas Data). Quién lo
+confirmó, cuándo y desde dónde queda en `audit_logs` (`customer.enrolled`).
 
 | | iOS | Android |
 |---|---|---|
@@ -117,5 +143,7 @@ cd apps/android && ./gradlew :app:testDebugUnitTest
 ```
 
 Lo que se prueba es lo que puede perder el sello de alguien: la cola offline, el parseo
-del código escaneado y la clasificación de errores. La interfaz no se prueba
+del código escaneado y la clasificación de errores. Los endpoints del mostrador tienen su
+spec en `tests/e2e/specs/biz-counter.spec.ts`, y la regla de deshacer, sus pruebas
+unitarias en `apps/api/test/rules.test.ts`. La interfaz no se prueba
 automáticamente; para eso está el simulador.

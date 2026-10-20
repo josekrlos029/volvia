@@ -2,11 +2,14 @@ package co.volvia.biz
 
 import co.volvia.biz.core.ApiException
 import co.volvia.biz.core.PendingReward
+import co.volvia.biz.core.RedeemCustomer
+import co.volvia.biz.core.RedeemResult
+import co.volvia.biz.core.VoidResult
 import co.volvia.biz.core.ScanOutcomeUi
 import co.volvia.biz.core.StampCustomer
 import co.volvia.biz.core.StampResult
 import co.volvia.biz.core.UnlockedReward
-import co.volvia.biz.ui.QrAnalyzer
+import co.volvia.biz.ui.scan.QrAnalyzer
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -64,6 +67,22 @@ class ScanOutcomeUiTest {
     }
 
     @Test
+    fun `says what an undo took back`() {
+        val ui = ScanOutcomeUi.voided(VoidResult("cc", stampsCount = 4, stampsRequired = 10, stampsRemoved = 2, rewardsRevoked = 1), "Ana")
+        assertEquals("Sello deshecho", ui.title)
+        assertTrue(ui.body.contains("Se quitó 2 sellos a Ana"))
+        assertTrue(ui.body.contains("4 de 10"))
+        assertTrue(ui.body.contains("premio"))
+    }
+
+    @Test
+    fun `names the reward handed over and what is left`() {
+        val ui = ScanOutcomeUi.redeemed(RedeemResult("g", "Café gratis", RedeemCustomer("c", "Ana"), remainingPending = 1))
+        assertEquals("Premio entregado", ui.title)
+        assertEquals("Café gratis para Ana. Le queda 1 premio más por entregar.", ui.body)
+    }
+
+    @Test
     fun `tells the customer the same thing when there is no signal`() {
         // From the counter, a queued stamp and a sent one are the same event.
         val ui = ScanOutcomeUi.queued()
@@ -80,6 +99,24 @@ class ApiExceptionTest {
         assertTrue(ApiException.offline.isTransient)
         assertTrue(ApiException(500, "INTERNAL", "").isTransient)
         assertTrue(ApiException(429, "RATE_LIMITED", "").isTransient)
+    }
+
+    @Test
+    fun `never queues a refusal from the card's own rules`() {
+        // Both answer 429, like the rate limiter, but retrying them changes nothing.
+        assertFalse(ApiException(429, "STAMP_COOLDOWN_ACTIVE", "").isTransient)
+        assertFalse(ApiException(429, "STAMP_DAILY_CAP_REACHED", "").isTransient)
+    }
+
+    @Test
+    fun `reads the plan a 402 asks for`() {
+        val error = ApiException.decode(
+            402,
+            """{"error":{"code":"FEATURE_NOT_IN_PLAN","message":"no","upgradeTo":"business"}}""",
+            json,
+        )
+        assertTrue(error.isPlanGate)
+        assertEquals("business", error.upgradeTo)
     }
 
     @Test

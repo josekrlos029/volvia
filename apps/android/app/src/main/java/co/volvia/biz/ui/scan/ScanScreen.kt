@@ -1,4 +1,4 @@
-package co.volvia.biz.ui
+package co.volvia.biz.ui.scan
 
 import android.Manifest
 import android.content.Intent
@@ -14,12 +14,6 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,7 +33,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import co.volvia.biz.core.ScanOutcomeUi
+import co.volvia.biz.ui.UiState
+import androidx.compose.material3.CircularProgressIndicator
 import java.util.concurrent.Executors
 
 /**
@@ -51,16 +46,19 @@ object DebugCamera {
     var simulated by mutableStateOf(false)
 }
 
-/** The screen the app lives on. */
+/**
+ * The "Escanear" tab: the camera, and nothing between it and the next customer. The
+ * preview sheet and the "Código" sheet open over it; the result slides up from below.
+ */
 @Composable
-fun ScanScreen(state: UiState, model: AppViewModel) {
+fun ScanScreen(app: UiState, scan: ScanState, model: ScanViewModel) {
     val context = LocalContext.current
     fun granted() = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
         PackageManager.PERMISSION_GRANTED
 
     var hasCamera by remember { mutableStateOf(granted()) }
     var asked by remember { mutableStateOf(false) }
-    var showAccount by remember { mutableStateOf(false) }
+    var showCode by remember { mutableStateOf(false) }
 
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         hasCamera = it
@@ -107,8 +105,12 @@ fun ScanScreen(state: UiState, model: AppViewModel) {
         } else if (hasCamera) {
             CameraPreview(
                 onCode = { code ->
-                    tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 70)
-                    model.handleScan(code)
+                    // While the sheet is open the camera keeps running but does not stamp:
+                    // the customer in front of the staff member is the one in the sheet.
+                    if (scan.preview == null) {
+                        tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 70)
+                        model.handleScan(code)
+                    }
                 },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -117,47 +119,31 @@ fun ScanScreen(state: UiState, model: AppViewModel) {
         }
 
         Column(Modifier.fillMaxSize()) {
-            ScanHeader(state.businessName, state.pendingCount, onAccount = { showAccount = true })
+            ScanHeader(app.businessName, app.locationName, app.pendingCount, onCode = { showCode = true })
             Spacer(Modifier.weight(1f))
 
-            // Keep the last outcome around while the card animates out.
-            var shown by remember { mutableStateOf<ScanOutcome?>(null) }
-            if (state.outcome != null) shown = state.outcome
+            OutcomeOverlay(scan, model)
 
-            AnimatedVisibility(
-                visible = state.outcome != null,
-                enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
-                exit = slideOutVertically(tween(220)) { it } + fadeOut(tween(220)),
-            ) {
-                shown?.let { outcome ->
-                    Box(
-                        Modifier
-                            .navigationBarsPadding()
-                            .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
-                    ) {
-                        ScanOutcomeCard(
-                            outcome.toUi(),
-                            kind = outcome.kind(),
-                            onRedeem = model::redeem,
-                            onDismiss = model::dismissOutcome,
-                        )
-                    }
-                }
-            }
-
-            if (state.outcome == null && hasCamera) {
+            if (scan.outcome == null && hasCamera) {
                 AimFrame(
                     Modifier
                         .align(Alignment.CenterHorizontally)
-                        .navigationBarsPadding()
                         .padding(bottom = 90.dp),
                 )
             }
         }
+
+        if (scan.isWorking && scan.preview == null) {
+            CircularProgressIndicator(
+                color = Color.White,
+                strokeWidth = 3.dp,
+                modifier = Modifier.align(Alignment.Center).size(36.dp),
+            )
+        }
     }
 
-    if (showAccount) {
-        AccountSheet(state = state, model = model, onDismiss = { showAccount = false })
+    if (showCode) {
+        RedeemCodeSheet(model = model, onDismiss = { showCode = false })
     }
 }
 
@@ -186,18 +172,6 @@ private fun CameraDenied(modifier: Modifier = Modifier) {
             shape = RoundedCornerShape(12.dp),
         ) { Text("Permitir la cámara") }
     }
-}
-
-private fun ScanOutcome.toUi(): ScanOutcomeUi = when (this) {
-    is ScanOutcome.Stamped -> ScanOutcomeUi.stamped(result)
-    ScanOutcome.Queued -> ScanOutcomeUi.queued()
-    is ScanOutcome.Failed -> ScanOutcomeUi.failed(message)
-}
-
-private fun ScanOutcome.kind(): OutcomeKind = when (this) {
-    is ScanOutcome.Stamped -> OutcomeKind.Stamped
-    ScanOutcome.Queued -> OutcomeKind.Queued
-    is ScanOutcome.Failed -> OutcomeKind.Failed
 }
 
 /**

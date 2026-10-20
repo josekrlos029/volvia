@@ -1,16 +1,16 @@
 import SwiftUI
 
-/// The screen the app lives on.
+/// The counter: the camera, and the answer to the last scan on top of it.
 struct ScanScreen: View {
     @EnvironmentObject private var model: AppModel
-    @State private var showsAccount = false
+    @State private var showsCodeEntry = false
 
     var body: some View {
         ZStack {
             ScannerView { code in
                 Task { await model.handleScan(code) }
             }
-            .ignoresSafeArea()
+            .ignoresSafeArea(edges: .top)
 
             VStack {
                 header
@@ -18,19 +18,20 @@ struct ScanScreen: View {
                 if let outcome = model.outcome {
                     ScanOutcomeCard(outcome: outcome) { model.outcome = nil }
                         .padding(.horizontal, 16)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 16)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else if model.isSending {
+                    ProgressView()
+                        .controlSize(.large)
+                        .tint(.white)
+                        .padding(.bottom, 120)
                 } else {
                     aim
                 }
             }
         }
         .animation(.snappy(duration: 0.22), value: model.outcome)
-        .sheet(isPresented: $showsAccount) { AccountSheet() }
-        .task { await model.flush() }
-        #if targetEnvironment(simulator)
-        .onAppear { if SimulatorFixtures.state == .account { showsAccount = true } }
-        #endif
+        .sheet(isPresented: $showsCodeEntry) { RedeemCodeSheet() }
     }
 
     private var header: some View {
@@ -38,6 +39,7 @@ struct ScanScreen: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.session.membership?.orgName ?? "Volvia Biz")
                     .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
                 if !model.queue.pending.isEmpty {
                     // The only number worth showing here: stamps taken and not yet sent.
                     Label(
@@ -48,14 +50,20 @@ struct ScanScreen: View {
                 }
             }
             Spacer()
-            Button { showsAccount = true } label: {
-                Image(systemName: "person.crop.circle")
-                    .font(.system(size: 22))
+            Button {
+                showsCodeEntry = true
+            } label: {
+                Label("Código", systemImage: "gift")
+                    .font(.system(size: 15, weight: .semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(.white.opacity(0.18), in: Capsule())
             }
+            .accessibilityHint("Entregar un premio tecleando su código")
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        .padding(.vertical, 12)
         .background(.black.opacity(0.45))
     }
 
@@ -80,18 +88,18 @@ struct ScanOutcomeCard: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        if case .stamped(let result) = outcome, let look = CardLook(result) {
-            BrandedOutcomeCard(result: result, look: look, onDismiss: onDismiss)
+        if case .stamped(let result, let at) = outcome, let look = CardLook(result) {
+            BrandedOutcomeCard(result: result, stampedAt: at, look: look, onDismiss: onDismiss)
         } else {
             plain
         }
     }
 
-    /// Queued, refused, or a replay of a scan from before the API sent the card's look.
+    /// Queued, refused, undone, redeemed, or a replay from before the API sent the look.
     private var plain: some View {
         VStack(alignment: .leading, spacing: 12) {
             switch outcome {
-            case .stamped(let result):
+            case .stamped(let result, let at):
                 Text(result.customer.firstName)
                     .font(.system(size: 24, weight: .semibold))
                 Text("\(result.stampsCount) de \(result.stampsRequired) sellos")
@@ -119,6 +127,7 @@ struct ScanOutcomeCard: View {
                     }
                     .buttonStyle(.bordered)
                 }
+                UndoButton(result: result, stampedAt: at)
 
             case .queued:
                 Text("Sello guardado")
@@ -135,6 +144,32 @@ struct ScanOutcomeCard: View {
                     .font(.system(size: 15))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+
+            case .voided(let result, let name):
+                Label("Sello deshecho", systemImage: "arrow.uturn.backward.circle.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Color.volviaNavy)
+                Text(voidLine(result, name: name))
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+            case .redeemed(let result):
+                Label("Premio entregado", systemImage: "gift.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Color.volviaViolet)
+                Text(redeemLine(result))
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+            case .notice(let title, let message):
+                Text(title)
+                    .font(.system(size: 22, weight: .semibold))
+                Text(message)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Button("Siguiente cliente", action: onDismiss)
@@ -146,76 +181,20 @@ struct ScanOutcomeCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
     }
-}
 
-struct AccountSheet: View {
-    @EnvironmentObject private var model: AppModel
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Tu cuenta") {
-                    LabeledContent("Nombre", value: model.session.user?.name ?? "—")
-                    LabeledContent("Negocio", value: model.session.membership?.orgName ?? "—")
-                }
-
-                if model.session.user?.memberships.count ?? 0 > 1 {
-                    Section("Cambiar de negocio") {
-                        ForEach(model.session.user?.memberships ?? []) { membership in
-                            Button {
-                                model.session.select(membership)
-                                dismiss()
-                            } label: {
-                                HStack {
-                                    Text(membership.orgName)
-                                    Spacer()
-                                    if membership.orgId == model.session.membership?.orgId {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Section("Sellos por enviar") {
-                    if model.queue.pending.isEmpty {
-                        Text("Todo enviado").foregroundStyle(.secondary)
-                    } else {
-                        LabeledContent("Pendientes", value: "\(model.queue.pending.count)")
-                        Button("Enviar ahora") { Task { await model.flush() } }
-                    }
-
-                    if !model.queue.rejected.isEmpty {
-                        // Never deleted in silence: somebody took these from a real
-                        // customer and deserves to know they did not land.
-                        ForEach(model.queue.rejected, id: \.stamp.id) { entry in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Rechazado").font(.system(size: 14, weight: .medium))
-                                Text(entry.reason)
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Button("Entendido", role: .destructive) { model.queue.clearRejected() }
-                    }
-                }
-
-                Section {
-                    Button("Cerrar sesión", role: .destructive) {
-                        model.signOut()
-                        dismiss()
-                    }
-                }
-            }
-            .navigationTitle("Cuenta")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Listo") { dismiss() }
-                }
-            }
+    private func voidLine(_ result: VoidResult, name: String) -> String {
+        let removed = result.stampsRemoved == 1 ? "1 sello" : "\(result.stampsRemoved) sellos"
+        var line = "Se quitó \(removed) a \(name). Ahora tiene \(result.stampsCount) de \(result.stampsRequired)."
+        if result.rewardsRevoked > 0 {
+            line += result.rewardsRevoked == 1 ? " Se anuló 1 premio." : " Se anularon \(result.rewardsRevoked) premios."
         }
+        return line
+    }
+
+    private func redeemLine(_ result: RedeemResult) -> String {
+        if let name = result.customer?.firstName, !name.isEmpty {
+            return "\(result.title) para \(name)."
+        }
+        return result.title
     }
 }
